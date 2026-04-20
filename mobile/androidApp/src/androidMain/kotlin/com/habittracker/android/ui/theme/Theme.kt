@@ -34,3 +34,6 @@ fun streakBrokenColor(): Color =
 @Composable
 fun streakEmptyColor(): Color =
     if (isSystemInDarkTheme()) StreakEmptyDark else StreakEmpty
+
+@Composable
+fun streakTodayOutlineColor(): Color = StreakTodayOutline

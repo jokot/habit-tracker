@@ -5,8 +5,11 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 
 object SupabaseProvider {
-    // Replace with your Supabase project URL and anon key
-    // from supabase.com → Project Settings → API
+    // ⚠️  NEVER commit real credentials here.
+    // Copy local.properties.example → local.properties and set:
+    //   supabase.url=https://YOUR_PROJECT_REF.supabase.co
+    //   supabase.anon_key=YOUR_ANON_KEY
+    // Phase 2 will inject these via BuildConfig (Android) and xcconfig (iOS).
     private const val SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co"
     private const val SUPABASE_ANON_KEY = "YOUR_ANON_KEY"
 
