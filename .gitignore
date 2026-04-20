@@ -1,2 +1,5 @@
 # Worktrees
 .worktrees/
+
+# Android SDK local config — machine-specific, never commit
+local.properties
