@@ -1,0 +1,111 @@
+CREATE TABLE IF NOT EXISTS HabitLog (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    habitId TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    loggedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
+    syncedAt INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS WantLog (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    activityId TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    deviceMode TEXT NOT NULL,
+    loggedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
+    syncedAt INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS LocalHabit (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    templateId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    thresholdPerPoint REAL NOT NULL,
+    dailyTarget INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS LocalIdentity (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    icon TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS LocalWantActivity (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    costPerUnit REAL NOT NULL,
+    isCustom INTEGER NOT NULL DEFAULT 0
+);
+
+-- HabitLog queries
+insertHabitLog:
+INSERT INTO HabitLog (id, userId, habitId, quantity, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+softDeleteHabitLog:
+UPDATE HabitLog SET deletedAt = ? WHERE id = ? AND userId = ?;
+
+markHabitLogSynced:
+UPDATE HabitLog SET syncedAt = ? WHERE id = ?;
+
+getUnsyncedHabitLogs:
+SELECT * FROM HabitLog WHERE syncedAt IS NULL AND userId = ?;
+
+getActiveHabitLogsForHabitOnDay:
+SELECT * FROM HabitLog
+WHERE userId = ? AND habitId = ? AND loggedAt >= ? AND loggedAt < ? AND deletedAt IS NULL;
+
+getAllActiveHabitLogsForUser:
+SELECT * FROM HabitLog WHERE userId = ? AND deletedAt IS NULL ORDER BY loggedAt DESC;
+
+-- WantLog queries
+insertWantLog:
+INSERT INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+softDeleteWantLog:
+UPDATE WantLog SET deletedAt = ? WHERE id = ? AND userId = ?;
+
+markWantLogSynced:
+UPDATE WantLog SET syncedAt = ? WHERE id = ?;
+
+getUnsyncedWantLogs:
+SELECT * FROM WantLog WHERE syncedAt IS NULL AND userId = ?;
+
+getAllActiveWantLogsForUser:
+SELECT * FROM WantLog WHERE userId = ? AND deletedAt IS NULL ORDER BY loggedAt DESC;
+
+-- LocalHabit queries
+upsertHabit:
+INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+getHabitsForUser:
+SELECT * FROM LocalHabit WHERE userId = ?;
+
+deleteHabit:
+DELETE FROM LocalHabit WHERE id = ? AND userId = ?;
+
+-- LocalIdentity queries
+upsertIdentity:
+INSERT OR REPLACE INTO LocalIdentity (id, name, description, icon) VALUES (?, ?, ?, ?);
+
+getAllIdentities:
+SELECT * FROM LocalIdentity;
+
+-- LocalWantActivity queries
+upsertWantActivity:
+INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom)
+VALUES (?, ?, ?, ?, ?, ?);
+
+getWantActivitiesForUser:
+SELECT * FROM LocalWantActivity WHERE userId = ? OR userId IS NULL;
