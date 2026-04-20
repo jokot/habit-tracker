@@ -1,2 +1,11 @@
 # Worktrees
 .worktrees/
+
+# Android SDK local config — machine-specific, never commit
+local.properties
+
+# Build artifacts
+.gradle/
+build/
+mobile/androidApp/build/
+mobile/shared/build/
