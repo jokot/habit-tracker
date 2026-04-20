@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "second-opinion": {
+      "source": "4RSIM3R/skills",
+      "sourceType": "github",
+      "computedHash": "da2c2cd86f3a28ee75b1d055bdc89d6f6de1a5ab7e90e69af78db4a6df24b3de"
+    }
+  }
+}
