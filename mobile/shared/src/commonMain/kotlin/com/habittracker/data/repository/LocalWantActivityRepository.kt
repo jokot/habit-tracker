@@ -1,0 +1,36 @@
+package com.habittracker.data.repository
+
+import com.habittracker.data.local.HabitTrackerDatabase
+import com.habittracker.data.local.LocalWantActivity
+import com.habittracker.domain.model.WantActivity
+
+class LocalWantActivityRepository(
+    private val db: HabitTrackerDatabase,
+) : WantActivityRepository {
+
+    override suspend fun getWantActivities(userId: String): List<WantActivity> =
+        db.habitTrackerDatabaseQueries
+            .getWantActivitiesForUser(userId)
+            .executeAsList()
+            .map { it.toDomain() }
+
+    override suspend fun saveWantActivity(activity: WantActivity, userId: String) {
+        db.habitTrackerDatabaseQueries.upsertWantActivity(
+            id = activity.id,
+            userId = if (activity.isCustom) userId else null,
+            name = activity.name,
+            unit = activity.unit,
+            costPerUnit = activity.costPerUnit,
+            isCustom = if (activity.isCustom) 1L else 0L,
+        )
+    }
+}
+
+private fun LocalWantActivity.toDomain(): WantActivity = WantActivity(
+    id = id,
+    name = name,
+    unit = unit,
+    costPerUnit = costPerUnit,
+    isCustom = isCustom == 1L,
+    createdByUserId = userId,
+)
