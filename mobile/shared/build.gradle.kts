@@ -34,8 +34,8 @@ kotlin {
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
             implementation(libs.ktor.client.core)
-            implementation(libs.supabase.postgrest)
-            implementation(libs.supabase.auth)
+            api(libs.supabase.postgrest)
+            api(libs.supabase.auth)
         }
 
         commonTest.dependencies {

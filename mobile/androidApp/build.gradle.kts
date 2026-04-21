@@ -53,6 +53,5 @@ dependencies {
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.navigation.compose)
-    implementation(libs.supabase.auth)
     debugImplementation(libs.compose.ui.tooling)
 }
