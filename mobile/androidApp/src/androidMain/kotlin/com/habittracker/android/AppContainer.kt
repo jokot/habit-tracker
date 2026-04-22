@@ -70,16 +70,20 @@ class AppContainer(context: Context) {
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
         val localId = userIdentityProvider.localUserId()
         if (localId == authUserId) return
-        habitRepository.migrateUserId(localId, authUserId)
-        habitLogRepository.migrateUserId(localId, authUserId)
-        wantLogRepository.migrateUserId(localId, authUserId)
-        wantActivityRepository.migrateUserId(localId, authUserId)
+        db.habitTrackerDatabaseQueries.transaction {
+            db.habitTrackerDatabaseQueries.migrateHabitsUserId(authUserId, localId)
+            db.habitTrackerDatabaseQueries.migrateHabitLogsUserId(authUserId, localId)
+            db.habitTrackerDatabaseQueries.migrateWantLogsUserId(authUserId, localId)
+            db.habitTrackerDatabaseQueries.migrateWantActivitiesUserId(authUserId, localId)
+        }
     }
 
     suspend fun clearAuthenticatedUserData(authUserId: String) {
-        habitRepository.clearForUser(authUserId)
-        habitLogRepository.clearForUser(authUserId)
-        wantLogRepository.clearForUser(authUserId)
-        wantActivityRepository.clearForUser(authUserId)
+        db.habitTrackerDatabaseQueries.transaction {
+            db.habitTrackerDatabaseQueries.clearHabitsForUser(authUserId)
+            db.habitTrackerDatabaseQueries.clearHabitLogsForUser(authUserId)
+            db.habitTrackerDatabaseQueries.clearWantLogsForUser(authUserId)
+            db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(authUserId)
+        }
     }
 }
