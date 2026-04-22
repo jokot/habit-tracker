@@ -37,7 +37,7 @@ Each habit has:
   - `BELOW_THRESHOLD`: quantity too small for 1 pt → "Below threshold — logged, 0 pts". No undo timer (no points to undo).
   - `DAILY_TARGET_MET`: quantity cleared threshold but cap full → "Daily goal already met today — logged, 0 pts". No undo timer.
 
-> **Phase 2 UX note:** logging is single-tap quick-log from the Home screen — tapping a habit card records exactly one `threshold_per_point`-sized entry (so quantity always equals the threshold and status is either `EARNED` or `DAILY_TARGET_MET`; `BELOW_THRESHOLD` is effectively unreachable via quick-log). Custom-quantity entry (the original dedicated Log Habit screen) was removed to reduce friction and can be revisited in a later phase if needed.
+> **Phase 2 UX note:** habit logging uses a 3-second tap-to-commit batch on the Home screen. Each tap on a habit card bumps a pending-count badge (`×N`) and resets a 3-second countdown shown inline on the card with a Cancel button. When the countdown expires, one log is written with `quantity = threshold × N`, so LogHabitStatus derives naturally (EARNED if points were awarded; DAILY_TARGET_MET if the cap was full). `BELOW_THRESHOLD` is only reachable for quantities < threshold, which can't happen via a whole-number tap count. Cancel drops the pending state before commit; after commit the log is final (no post-commit undo in Phase 2 — batch window replaces it).
 
 **Habit display:** flat list with identity tags. Grouped by identity in onboarding only.
 

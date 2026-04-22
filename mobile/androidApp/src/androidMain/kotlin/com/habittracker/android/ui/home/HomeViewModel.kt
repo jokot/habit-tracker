@@ -3,7 +3,6 @@ package com.habittracker.android.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
-import com.habittracker.android.ui.common.UndoState
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.PointBalance
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -38,22 +38,32 @@ data class HomeUiState(
     val error: String? = null,
 )
 
+/** One pending habit log: N taps accumulated, seconds remaining before commit. */
+data class PendingHabitLog(
+    val count: Int,
+    val secondsRemaining: Int,
+)
+
 sealed interface HomeEvent {
     data class Message(val text: String) : HomeEvent
 }
+
+private const val PENDING_WINDOW_SECONDS = 3
 
 class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val _undoState = MutableStateFlow<UndoState?>(null)
-    val undoState: StateFlow<UndoState?> = _undoState.asStateFlow()
+    /** habitId → pending tap batch. Drops to empty on commit or cancel. */
+    private val _pending = MutableStateFlow<Map<String, PendingHabitLog>>(emptyMap())
+    val pending: StateFlow<Map<String, PendingHabitLog>> = _pending.asStateFlow()
 
     private val _events = MutableSharedFlow<HomeEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<HomeEvent> = _events.asSharedFlow()
 
-    private var undoJob: Job? = null
+    /** One countdown coroutine per habit. */
+    private val timers = mutableMapOf<String, Job>()
 
     init {
         viewModelScope.launch {
@@ -113,54 +123,56 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun quickLogHabit(habit: Habit) {
-        val userId = container.currentUserId()
-        viewModelScope.launch {
-            container.logHabitUseCase.execute(userId, habit.id, habit.thresholdPerPoint)
-                .onSuccess { result ->
-                    when (result.status) {
-                        LogHabitStatus.EARNED -> {
-                            _events.tryEmit(
-                                HomeEvent.Message("+${result.pointsEarned} pts — ${habit.name}")
-                            )
-                            startUndoTimer(result.log.id)
-                        }
-                        LogHabitStatus.DAILY_TARGET_MET -> {
-                            _events.tryEmit(
-                                HomeEvent.Message("Goal already met today — ${habit.name}")
-                            )
-                        }
-                        LogHabitStatus.BELOW_THRESHOLD -> {
-                            _events.tryEmit(HomeEvent.Message("Logged — 0 pts"))
-                        }
-                    }
-                }
-                .onFailure { e ->
-                    _events.tryEmit(HomeEvent.Message("Failed: ${e.message}"))
-                }
-        }
-    }
-
-    fun undoLastHabit() {
-        val current = _undoState.value ?: return
-        val userId = container.currentUserId()
-        viewModelScope.launch {
-            container.undoHabitLogUseCase.execute(current.logId, userId)
-            undoJob?.cancel()
-            _undoState.value = null
-            _events.tryEmit(HomeEvent.Message("Undone"))
-        }
-    }
-
-    private fun startUndoTimer(logId: String) {
-        undoJob?.cancel()
-        undoJob = viewModelScope.launch {
-            for (seconds in 300 downTo 0) {
-                _undoState.value = UndoState(logId, seconds)
+    /** Tap handler: bump pending count for this habit and (re)start its 3s countdown. */
+    fun tapHabit(habit: Habit) {
+        val newCount = (_pending.value[habit.id]?.count ?: 0) + 1
+        _pending.update { it + (habit.id to PendingHabitLog(newCount, PENDING_WINDOW_SECONDS)) }
+        timers[habit.id]?.cancel()
+        timers[habit.id] = viewModelScope.launch {
+            for (seconds in PENDING_WINDOW_SECONDS - 1 downTo 0) {
                 delay(1000L)
+                _pending.update { current ->
+                    val existing = current[habit.id] ?: return@update current
+                    current + (habit.id to existing.copy(secondsRemaining = seconds))
+                }
             }
-            _undoState.value = null
+            commitPending(habit)
         }
+    }
+
+    /** User hit Cancel before the countdown expired — drop state, no log written. */
+    fun cancelPending(habitId: String) {
+        timers[habitId]?.cancel()
+        timers.remove(habitId)
+        _pending.update { it - habitId }
+    }
+
+    private suspend fun commitPending(habit: Habit) {
+        val batch = _pending.value[habit.id] ?: return
+        _pending.update { it - habit.id }
+        timers.remove(habit.id)
+        val userId = container.currentUserId()
+        val quantity = habit.thresholdPerPoint * batch.count
+        container.logHabitUseCase.execute(userId, habit.id, quantity)
+            .onSuccess { result ->
+                val msg = when (result.status) {
+                    LogHabitStatus.EARNED ->
+                        "+${result.pointsEarned} pts — ${habit.name}"
+                    LogHabitStatus.DAILY_TARGET_MET ->
+                        "Goal already met — ${habit.name}"
+                    LogHabitStatus.BELOW_THRESHOLD ->
+                        "Logged — 0 pts"
+                }
+                _events.tryEmit(HomeEvent.Message(msg))
+            }
+            .onFailure { e ->
+                _events.tryEmit(HomeEvent.Message("Failed: ${e.message}"))
+            }
+    }
+
+    override fun onCleared() {
+        timers.values.forEach { it.cancel() }
+        timers.clear()
     }
 }
 

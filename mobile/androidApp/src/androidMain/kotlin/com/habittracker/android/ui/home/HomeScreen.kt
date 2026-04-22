@@ -21,7 +21,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -33,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.habittracker.android.ui.theme.Spacing
 import com.habittracker.android.ui.theme.streakCompleteColor
 import com.habittracker.domain.model.HabitWithProgress
@@ -47,7 +45,7 @@ fun HomeScreen(
     onSignIn: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val undoState by viewModel.undoState.collectAsState()
+    val pendingMap by viewModel.pending.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -79,35 +77,6 @@ fun HomeScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
-        bottomBar = {
-            val current = undoState
-            if (current != null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    tonalElevation = 3.dp,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.xl, vertical = Spacing.md),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val minutes = current.secondsRemaining / 60
-                        val seconds = current.secondsRemaining % 60
-                        val timeText = "${minutes}:${seconds.toString().padStart(2, '0')}"
-                        Text(
-                            text = "Undo available: $timeText",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(onClick = { viewModel.undoLastHabit() }) {
-                            Text("Undo")
-                        }
-                    }
-                }
-            }
-        },
     ) { padding ->
         if (uiState.isLoading) {
             Column(
@@ -148,7 +117,9 @@ fun HomeScreen(
                 items(uiState.habitsWithProgress) { hwp ->
                     HabitCard(
                         habitWithProgress = hwp,
-                        onQuickLog = { viewModel.quickLogHabit(hwp.habit) },
+                        pending = pendingMap[hwp.habit.id],
+                        onTap = { viewModel.tapHabit(hwp.habit) },
+                        onCancel = { viewModel.cancelPending(hwp.habit.id) },
                     )
                 }
             }
@@ -192,9 +163,14 @@ private fun PointBalanceCard(earned: Int, spent: Int, balance: Int) {
 }
 
 @Composable
-private fun HabitCard(habitWithProgress: HabitWithProgress, onQuickLog: () -> Unit) {
+private fun HabitCard(
+    habitWithProgress: HabitWithProgress,
+    pending: PendingHabitLog?,
+    onTap: () -> Unit,
+    onCancel: () -> Unit,
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onQuickLog),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onTap),
     ) {
         Column(modifier = Modifier.padding(Spacing.xl)) {
             Row(
@@ -203,12 +179,22 @@ private fun HabitCard(habitWithProgress: HabitWithProgress, onQuickLog: () -> Un
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(habitWithProgress.habit.name, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    habitWithProgress.progressText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (habitWithProgress.isGoalMet) streakCompleteColor()
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (pending != null) {
+                        Text(
+                            "×${pending.count}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(end = Spacing.md),
+                        )
+                    }
+                    Text(
+                        habitWithProgress.progressText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (habitWithProgress.isGoalMet) streakCompleteColor()
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Spacer(Modifier.height(Spacing.sm))
             LinearProgressIndicator(
@@ -223,6 +209,21 @@ private fun HabitCard(habitWithProgress: HabitWithProgress, onQuickLog: () -> Un
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (pending != null) {
+                Spacer(Modifier.height(Spacing.md))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Commits in ${pending.secondsRemaining}s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                }
+            }
         }
     }
 }
