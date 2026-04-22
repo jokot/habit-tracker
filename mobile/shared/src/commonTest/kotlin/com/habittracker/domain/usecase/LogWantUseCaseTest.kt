@@ -51,11 +51,21 @@ class LogWantUseCaseTest {
     }
 
     @Test
-    fun `zero points for quantity below cost threshold`() = runTest {
+    fun `partial-point spend rounds up to 1 pt`() = runTest {
+        giveBalance(5)
         activityRepo.activities.add(WantActivity("a1", "YouTube long-form", "minutes", 0.1))
-        // 5 min × 0.1 = 0.5 → floor 0 pts. No balance needed.
+        // 5 min × 0.1 = 0.5 pts → ceil = 1 pt (any positive consumption costs at least 1).
         val result = useCase.execute(userId, "a1", 5.0, DeviceMode.OTHER).getOrThrow()
-        assertEquals(0, result.pointsSpent)
+        assertEquals(1, result.pointsSpent)
+    }
+
+    @Test
+    fun `twitter 1 minute costs 1 pt via ceil`() = runTest {
+        giveBalance(5)
+        // Cost 0.5 pt/min (1 pt per 2 min).
+        activityRepo.activities.add(WantActivity("a1", "Twitter", "minutes", 0.5))
+        val result = useCase.execute(userId, "a1", 1.0, DeviceMode.OTHER).getOrThrow()
+        assertEquals(1, result.pointsSpent)
     }
 
     @Test

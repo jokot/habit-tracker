@@ -27,13 +27,15 @@ class LogHabitUseCaseTest {
         val result = useCase.execute(userId, "h1", 9.0).getOrThrow()
         assertEquals(3, result.pointsEarned)
         assertEquals(9.0, result.log.quantity)
+        assertEquals(LogHabitStatus.EARNED, result.status)
     }
 
     @Test
-    fun `returns zero points below threshold`() = runTest {
+    fun `returns zero points below threshold with BELOW_THRESHOLD status`() = runTest {
         habitRepo.saveHabit(makeHabit("h1", 3.0))
         val result = useCase.execute(userId, "h1", 2.0).getOrThrow()
         assertEquals(0, result.pointsEarned)
+        assertEquals(LogHabitStatus.BELOW_THRESHOLD, result.status)
     }
 
     @Test
@@ -51,14 +53,15 @@ class LogHabitUseCaseTest {
     }
 
     @Test
-    fun `zero points when daily target already reached`() = runTest {
+    fun `DAILY_TARGET_MET status when goal already reached`() = runTest {
         // Daily target 3, threshold 3.
         habitRepo.saveHabit(makeHabit("h1", 3.0))
         // First log: 9 pages = 3 pts, fills the cap.
         useCase.execute(userId, "h1", 9.0).getOrThrow()
-        // Second log: 6 more pages = raw 2 pts but capped → 0.
+        // Second log: 6 more pages = raw 2 pts, valid threshold but cap full → 0.
         val result = useCase.execute(userId, "h1", 6.0).getOrThrow()
         assertEquals(0, result.pointsEarned)
+        assertEquals(LogHabitStatus.DAILY_TARGET_MET, result.status)
     }
 
     @Test

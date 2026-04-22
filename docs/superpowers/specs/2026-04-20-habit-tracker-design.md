@@ -30,9 +30,12 @@ Each habit has:
 
 **Earning rules:**
 - Log quantity → `floor(quantity / threshold_per_point)` = points earned
-- Completions ≤ `daily_target` → earns points
-- Completions > `daily_target` → logged, no points (data feeds exchange rate algorithm)
+- Daily cap: cumulative daily earned per habit ≤ `daily_target`. Logs past the cap still save (data for exchange-rate algorithm) but award 0 pts.
 - Partial progress = lost (no carryover). UI shows progress bar toward next threshold.
+- Three log statuses surfaced to UI (`LogHabitStatus`):
+  - `EARNED`: ≥ 1 pt awarded → show "+N pts earned!" + 5-min undo timer.
+  - `BELOW_THRESHOLD`: quantity too small for 1 pt → "Below threshold — logged, 0 pts". No undo timer (no points to undo).
+  - `DAILY_TARGET_MET`: quantity cleared threshold but cap full → "Daily goal already met today — logged, 0 pts". No undo timer.
 
 **Habit display:** flat list with identity tags. Grouped by identity in onboarding only.
 
@@ -91,8 +94,11 @@ HEALTH-CONSCIOUS
 
 User logs time spent AFTER the activity (v1 = manual post-log, C mode).
 
-**Spending:** user inputs actual duration/quantity → `floor(quantity / cost_per_unit)` = points spent.  
-Example: watch 30 min YouTube → `floor(30 / 10)` = 3 points spent.
+**Spending:** user inputs actual duration/quantity → `ceil(quantity × cost_per_unit)` = points spent (`cost_per_unit` = pts per unit; rounds up, minimum 1 pt for any positive consumption).
+
+- Watch 30 min YouTube (0.1 pt/min) → `ceil(30 × 0.1)` = 3 pts.
+- Browse Twitter 1 min (0.5 pt/min) → `ceil(1 × 0.5)` = 1 pt (prevents "free" micro-sessions).
+- Browse Twitter 3 min → `ceil(1.5)` = 2 pts.
 
 **Spending modes:**
 

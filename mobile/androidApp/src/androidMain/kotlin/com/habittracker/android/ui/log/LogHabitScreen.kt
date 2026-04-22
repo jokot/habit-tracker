@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.habittracker.android.ui.theme.Spacing
 import com.habittracker.android.ui.theme.streakCompleteColor
+import com.habittracker.domain.usecase.LogHabitStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,11 +91,17 @@ fun LogHabitScreen(viewModel: LogHabitViewModel, onBack: () -> Unit) {
                     }
                     is LogHabitUiState.Success -> {
                         Spacer(Modifier.height(Spacing.md))
+                        val (text, isWin) = when (state.status) {
+                            LogHabitStatus.EARNED -> "+${state.pointsEarned} pts earned!" to true
+                            LogHabitStatus.BELOW_THRESHOLD ->
+                                "Below threshold — logged, 0 pts" to false
+                            LogHabitStatus.DAILY_TARGET_MET ->
+                                "Daily goal already met today — logged, 0 pts" to false
+                        }
                         Text(
-                            if (state.pointsEarned > 0) "+${state.pointsEarned} pts earned!"
-                            else "Logged (below threshold, 0 pts)",
+                            text,
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (state.pointsEarned > 0) streakCompleteColor()
+                            color = if (isWin) streakCompleteColor()
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

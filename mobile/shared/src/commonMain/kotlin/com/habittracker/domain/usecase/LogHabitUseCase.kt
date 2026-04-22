@@ -12,7 +12,22 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-data class LogHabitResult(val log: HabitLog, val pointsEarned: Int)
+enum class LogHabitStatus {
+    /** Quantity met threshold and awarded 1+ points (respecting daily cap). */
+    EARNED,
+
+    /** Quantity fell below the per-point threshold — 0 pts awarded. */
+    BELOW_THRESHOLD,
+
+    /** Daily target already reached for this habit — log recorded, 0 pts. */
+    DAILY_TARGET_MET,
+}
+
+data class LogHabitResult(
+    val log: HabitLog,
+    val pointsEarned: Int,
+    val status: LogHabitStatus,
+)
 
 class LogHabitUseCase(
     private val habitLogRepository: HabitLogRepository,
@@ -33,12 +48,19 @@ class LogHabitUseCase(
                 PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
             }
             val cappedBefore = rawBefore.coerceAtMost(habit.dailyTarget)
+            val rawThisLog = PointCalculator.pointsEarned(quantity, habit.thresholdPerPoint)
 
             val id = Uuid.random().toString()
             val log = habitLogRepository.insertLog(id, userId, habitId, quantity, now)
 
-            val rawAfter = rawBefore + PointCalculator.pointsEarned(quantity, habit.thresholdPerPoint)
-            val cappedAfter = rawAfter.coerceAtMost(habit.dailyTarget)
-            LogHabitResult(log, cappedAfter - cappedBefore)
+            val cappedAfter = (rawBefore + rawThisLog).coerceAtMost(habit.dailyTarget)
+            val delta = cappedAfter - cappedBefore
+
+            val status = when {
+                delta > 0 -> LogHabitStatus.EARNED
+                rawThisLog == 0 -> LogHabitStatus.BELOW_THRESHOLD
+                else -> LogHabitStatus.DAILY_TARGET_MET
+            }
+            LogHabitResult(log, delta, status)
         }
 }

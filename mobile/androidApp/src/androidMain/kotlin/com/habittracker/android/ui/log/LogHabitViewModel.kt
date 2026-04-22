@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
 import com.habittracker.domain.model.Habit
+import com.habittracker.domain.usecase.LogHabitStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +17,11 @@ data class UndoState(val logId: String, val secondsRemaining: Int)
 sealed interface LogHabitUiState {
     object Idle : LogHabitUiState
     object Loading : LogHabitUiState
-    data class Success(val pointsEarned: Int, val logId: String) : LogHabitUiState
+    data class Success(
+        val pointsEarned: Int,
+        val logId: String,
+        val status: LogHabitStatus,
+    ) : LogHabitUiState
     data class Error(val message: String) : LogHabitUiState
 }
 
@@ -67,8 +72,12 @@ class LogHabitViewModel(
             _uiState.value = LogHabitUiState.Loading
             container.logHabitUseCase.execute(userId, habitId, quantity)
                 .onSuccess { result ->
-                    _uiState.value = LogHabitUiState.Success(result.pointsEarned, result.log.id)
-                    startUndoTimer(result.log.id)
+                    _uiState.value = LogHabitUiState.Success(
+                        pointsEarned = result.pointsEarned,
+                        logId = result.log.id,
+                        status = result.status,
+                    )
+                    if (result.status == LogHabitStatus.EARNED) startUndoTimer(result.log.id)
                 }
                 .onFailure { e ->
                     _uiState.value = LogHabitUiState.Error(e.message ?: "Failed to log")
