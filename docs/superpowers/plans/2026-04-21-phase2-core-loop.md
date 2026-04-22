@@ -2955,7 +2955,12 @@ git commit -m "feat: guest mode — optional auth with local user id, migration 
 
 ## Task 9: Log Habit Screen + ViewModel
 
-> **SUPERSEDED in a later UX pass.** Quick-log buttons replaced the dedicated Log Habit screen — see `HomeViewModel.quickLogHabit`. This task's original implementation is retained in git history at commit 8acb379.
+> **SUPERSEDED in later UX passes.** The dedicated Log Habit screen is gone. Current flow lives entirely on Home via `HomeViewModel.tapHabit` / `cancelPending`:
+>
+> 1. First pass (commit 2ae89be): dedicated screen removed, tapping a habit card instant-logged `threshold_per_point` with a 5-minute bottom-bar undo.
+> 2. Second pass (commit c3bd32e): switched to a **3-second tap-to-commit batch**. Each tap bumps an in-card `×N` counter and resets a 3-second countdown with an inline Cancel. Commit writes one log with `quantity = threshold × N`; snackbar shows `"+N pts — Habit name"`. Cancel drops the pending state, no log written. Post-commit undo removed entirely — the 3s window is the only reversal affordance.
+>
+> Task 9's original file layout (LogHabitScreen / LogHabitViewModel) is deleted; see git history at commit 8acb379 for the superseded code. `LogHabitUseCase` (shared module) is unchanged — it still computes points from quantity + handles the daily cap + returns `LogHabitStatus`.
 
 **Files:**
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogHabitViewModel.kt`
