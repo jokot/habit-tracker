@@ -188,7 +188,8 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
     fun tapWant(activity: WantActivity) {
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
-        val projectedCost = PointCalculator.pointsSpent(newCount.toDouble(), activity.costPerUnit)
+        val perTap = PointCalculator.pointsSpent(1.0, activity.costPerUnit)
+        val projectedCost = newCount * perTap
         val balance = _uiState.value.pointBalance.balance
         if (projectedCost > balance) {
             _events.tryEmit(
@@ -226,25 +227,28 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         _pendingWants.update { it - activity.id }
         wantTimers.remove(activity.id)
         val userId = container.currentUserId()
-        container.logWantUseCase.execute(
-            userId,
-            activity.id,
-            batch.count.toDouble(),
-            DeviceMode.OTHER,
-        )
-            .onSuccess { result ->
-                _events.tryEmit(
-                    HomeEvent.Message("-${result.pointsSpent} pts — ${activity.name}")
-                )
+        var totalSpent = 0
+        var succeeded = 0
+        for (i in 1..batch.count) {
+            val result = container.logWantUseCase.execute(userId, activity.id, 1.0, DeviceMode.OTHER)
+            if (result.isSuccess) {
+                totalSpent += result.getOrThrow().pointsSpent
+                succeeded++
+                continue
             }
-            .onFailure { e ->
-                val msg = when (e) {
-                    is InsufficientPointsException ->
-                        "Not enough points: need ${e.required}, have ${e.available} — ${activity.name}"
-                    else -> "Failed: ${e.message}"
+            val e = result.exceptionOrNull()
+            val msg = when (e) {
+                is InsufficientPointsException -> if (succeeded > 0) {
+                    "-$totalSpent pts — $succeeded/${batch.count} logged, balance empty — ${activity.name}"
+                } else {
+                    "Not enough points: need ${e.required}, have ${e.available} — ${activity.name}"
                 }
-                _events.tryEmit(HomeEvent.Message(msg))
+                else -> "Failed: ${e?.message}"
             }
+            _events.tryEmit(HomeEvent.Message(msg))
+            return
+        }
+        _events.tryEmit(HomeEvent.Message("-$totalSpent pts — ${activity.name}"))
     }
 
     override fun onCleared() {

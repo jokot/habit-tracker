@@ -134,7 +134,7 @@ FOOD INDULGENCE
   Eat donut / dessert           → 1 pt / piece
 ```
 
-> **Phase 2 UX note:** want spending uses the same 3-second tap-to-commit batch as habits. Tapping a want activity row on Home bumps a `×N` badge and starts/resets a 3s countdown with an inline Cancel button. On commit, `quantity = N` (each tap = 1 unit — minute, match, meal, etc.), and `LogWantUseCase` enforces the no-negative-balance lock: if the batch would overdraw, commit is rejected with `InsufficientPointsException` and the snackbar shows `"Not enough points: need X, have Y"`. Cancel drops the pending batch before commit.
+> **Phase 2 UX note:** want spending uses the same 3-second tap-to-commit batch as habits. Tapping a want activity row on Home bumps a `×N` badge and starts/resets a 3s countdown with an inline Cancel button. On commit, the Home view writes **N separate logs of `quantity = 1`** (each tap is an independent session). This means every tap costs at least 1 pt after `pointsSpent(1, cost_per_unit)` → `ceil(cost_per_unit).coerceAtLeast(1)` — Twitter at 0.5 pt/min becomes 1 pt per tap, YouTube long-form at 0.1 pt/min also becomes 1 pt per tap. Cost scales linearly with tap count. Pre-tap balance guard: each tap pre-computes `(N+1) × perTap` against the live balance; if the next tap would overdraw, the tap is rejected instantly with a "Not enough points" snackbar and no state change. If the mid-batch commit loop hits insufficient balance (rare — balance can shift between pre-check and commit), the snackbar reports partial success ("-$X pts — N/M logged, balance empty"). Cancel drops the pending batch before commit.
 
 ### 2.3 Point Balance
 
