@@ -7,11 +7,12 @@ import com.habittracker.data.repository.WantLogRepository
 import com.habittracker.domain.model.PointBalance
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.TimeZone
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.atStartOfDayIn
 
 class GetPointBalanceUseCase(
     private val habitLogRepo: HabitLogRepository,
@@ -26,10 +27,11 @@ class GetPointBalanceUseCase(
 
         val earned = habitLogRepo.getAllActiveLogsForUser(userId)
             .filter { it.loggedAt >= weekStart }
-            .sumOf { log ->
-                habits[log.habitId]?.let {
-                    PointCalculator.pointsEarned(log.quantity, it.thresholdPerPoint)
-                } ?: 0
+            .groupBy { log -> log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date }
+            .entries.sumOf { (key, dayLogs) ->
+                val habit = habits[key.first] ?: return@sumOf 0
+                dayLogs.sumOf { PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint) }
+                    .coerceAtMost(habit.dailyTarget)
             }
 
         val spent = wantLogRepo.getAllActiveLogsForUser(userId)

@@ -124,20 +124,29 @@ fun HomeScreen(
 
 @Composable
 private fun PointBalanceCard(earned: Int, spent: Int, balance: Int) {
+    val inDebt = balance < 0
+    val container = if (inDebt) MaterialTheme.colorScheme.errorContainer
+    else MaterialTheme.colorScheme.primaryContainer
+    val onContainer = if (inDebt) MaterialTheme.colorScheme.onErrorContainer
+    else MaterialTheme.colorScheme.onPrimaryContainer
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = container),
     ) {
         Column(modifier = Modifier.padding(Spacing.xl)) {
-            Text("Point Balance", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(
+                if (inDebt) "Point Balance (debt)" else "Point Balance",
+                style = MaterialTheme.typography.labelMedium,
+                color = onContainer,
+            )
             Spacer(Modifier.height(Spacing.sm))
-            Text("$balance pts", style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text("$balance pts", style = MaterialTheme.typography.displaySmall, color = onContainer)
             Spacer(Modifier.height(Spacing.xs))
-            Text("Earned: $earned  ·  Spent: $spent",
+            Text(
+                "Earned: $earned  ·  Spent: $spent",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                color = onContainer,
+            )
         }
     }
 }

@@ -65,11 +65,21 @@ class GetPointBalanceUseCaseTest {
     }
 
     @Test
-    fun `balance never goes below zero`() = runTest {
+    fun `balance can go negative when spending exceeds earning`() = runTest {
         activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1.0))
         wantLogRepo.insertLog("l1", userId, "a1", 10.0, DeviceMode.OTHER, Clock.System.now())
         val result = useCase.execute(userId).getOrThrow()
-        assertEquals(0, result.balance)
+        assertEquals(-10, result.balance)
+    }
+
+    @Test
+    fun `earned is capped at daily_target per habit per day`() = runTest {
+        // Habit: 3 pages = 1 pt, daily target 3 (max 3 pts/day).
+        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now()))
+        // Log 30 pages → raw 10 pts, capped to 3.
+        habitLogRepo.insertLog("l1", userId, "h1", 30.0, Clock.System.now())
+        val result = useCase.execute(userId).getOrThrow()
+        assertEquals(3, result.earned)
     }
 
     @Test

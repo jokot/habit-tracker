@@ -51,6 +51,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 container.wantActivityRepository.observeWantActivities(userId),
                 container.wantLogRepository.observeAllActiveLogsForUser(userId),
             ) { habits, habitLogs, wants, wantLogs ->
+                val habitsById = habits.associateBy { it.id }
                 val habitsWithProgress = habits.map { habit ->
                     val pointsToday = habitLogs
                         .filter {
@@ -59,15 +60,20 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         .sumOf {
                             PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
                         }
+                        .coerceAtMost(habit.dailyTarget)
                     HabitWithProgress(habit, pointsToday)
                 }
 
                 val earned = habitLogs
                     .filter { it.loggedAt >= weekStart }
-                    .sumOf { log ->
-                        habits.firstOrNull { it.id == log.habitId }?.let {
-                            PointCalculator.pointsEarned(log.quantity, it.thresholdPerPoint)
-                        } ?: 0
+                    .groupBy { log ->
+                        log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date
+                    }
+                    .entries.sumOf { (key, dayLogs) ->
+                        val habit = habitsById[key.first] ?: return@sumOf 0
+                        dayLogs.sumOf {
+                            PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                        }.coerceAtMost(habit.dailyTarget)
                     }
                 val spent = wantLogs
                     .filter { it.loggedAt >= weekStart }

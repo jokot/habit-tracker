@@ -49,4 +49,26 @@ class LogHabitUseCaseTest {
         assertEquals(1, habitLogRepo.logs.size)
         assertEquals("h1", habitLogRepo.logs.first().habitId)
     }
+
+    @Test
+    fun `zero points when daily target already reached`() = runTest {
+        // Daily target 3, threshold 3.
+        habitRepo.saveHabit(makeHabit("h1", 3.0))
+        // First log: 9 pages = 3 pts, fills the cap.
+        useCase.execute(userId, "h1", 9.0).getOrThrow()
+        // Second log: 6 more pages = raw 2 pts but capped → 0.
+        val result = useCase.execute(userId, "h1", 6.0).getOrThrow()
+        assertEquals(0, result.pointsEarned)
+    }
+
+    @Test
+    fun `points capped at remaining capacity`() = runTest {
+        // Daily target 3, threshold 3.
+        habitRepo.saveHabit(makeHabit("h1", 3.0))
+        // First log: 6 pages = 2 pts, room for 1 more.
+        useCase.execute(userId, "h1", 6.0).getOrThrow()
+        // Second log: 9 pages = raw 3 pts but only 1 slot left → 1.
+        val result = useCase.execute(userId, "h1", 9.0).getOrThrow()
+        assertEquals(1, result.pointsEarned)
+    }
 }
