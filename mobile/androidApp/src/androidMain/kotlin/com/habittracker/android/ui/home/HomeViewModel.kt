@@ -188,6 +188,16 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
     fun tapWant(activity: WantActivity) {
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
+        val projectedCost = PointCalculator.pointsSpent(newCount.toDouble(), activity.costPerUnit)
+        val balance = _uiState.value.pointBalance.balance
+        if (projectedCost > balance) {
+            _events.tryEmit(
+                HomeEvent.Message(
+                    "Not enough points: need $projectedCost, have $balance — ${activity.name}"
+                )
+            )
+            return
+        }
         _pendingWants.update {
             it + (activity.id to PendingWantLog(newCount, PENDING_WINDOW_SECONDS))
         }
