@@ -60,7 +60,6 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         .sumOf {
                             PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
                         }
-                        .coerceAtMost(habit.dailyTarget)
                     HabitWithProgress(habit, pointsToday)
                 }
 
