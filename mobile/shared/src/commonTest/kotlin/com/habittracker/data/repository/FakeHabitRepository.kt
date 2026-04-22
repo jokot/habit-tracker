@@ -1,28 +1,35 @@
 package com.habittracker.data.repository
 
 import com.habittracker.domain.model.Habit
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 class FakeHabitRepository : HabitRepository {
-    val habits = mutableListOf<Habit>()
+    private val _habits = MutableStateFlow<List<Habit>>(emptyList())
+    val habits: List<Habit> get() = _habits.value
+
+    override fun observeHabitsForUser(userId: String): Flow<List<Habit>> =
+        _habits.map { list -> list.filter { it.userId == userId } }
 
     override suspend fun getHabitsForUser(userId: String): List<Habit> =
-        habits.filter { it.userId == userId }
+        _habits.value.filter { it.userId == userId }
 
     override suspend fun saveHabit(habit: Habit) {
-        habits.removeAll { it.id == habit.id }
-        habits.add(habit)
+        _habits.value = _habits.value.filterNot { it.id == habit.id } + habit
     }
 
     override suspend fun deleteHabit(habitId: String, userId: String) {
-        habits.removeAll { it.id == habitId && it.userId == userId }
+        _habits.value = _habits.value.filterNot { it.id == habitId && it.userId == userId }
     }
 
     override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
-        val indices = habits.indices.filter { habits[it].userId == oldUserId }
-        indices.forEach { i -> habits[i] = habits[i].copy(userId = newUserId) }
+        _habits.value = _habits.value.map {
+            if (it.userId == oldUserId) it.copy(userId = newUserId) else it
+        }
     }
 
     override suspend fun clearForUser(userId: String) {
-        habits.removeAll { it.userId == userId }
+        _habits.value = _habits.value.filterNot { it.userId == userId }
     }
 }

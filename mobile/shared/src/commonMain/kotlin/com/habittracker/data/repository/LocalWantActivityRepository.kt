@@ -1,12 +1,24 @@
 package com.habittracker.data.repository
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import com.habittracker.data.local.HabitTrackerDatabase
 import com.habittracker.data.local.LocalWantActivity
 import com.habittracker.domain.model.WantActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class LocalWantActivityRepository(
     private val db: HabitTrackerDatabase,
 ) : WantActivityRepository {
+
+    override fun observeWantActivities(userId: String): Flow<List<WantActivity>> =
+        db.habitTrackerDatabaseQueries
+            .getWantActivitiesForUser(userId)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
 
     override suspend fun getWantActivities(userId: String): List<WantActivity> =
         db.habitTrackerDatabaseQueries

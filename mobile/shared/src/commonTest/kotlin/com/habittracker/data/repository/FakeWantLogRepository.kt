@@ -2,36 +2,44 @@ package com.habittracker.data.repository
 
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantLog
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
 class FakeWantLogRepository : WantLogRepository {
-    private val _logs = mutableListOf<WantLog>()
-    val logs: List<WantLog> get() = _logs
+    private val _logs = MutableStateFlow<List<WantLog>>(emptyList())
+    val logs: List<WantLog> get() = _logs.value
 
     override suspend fun insertLog(
         id: String, userId: String, activityId: String,
         quantity: Double, deviceMode: DeviceMode, loggedAt: Instant,
     ): WantLog {
         val log = WantLog(id = id, userId = userId, activityId = activityId, quantity = quantity, deviceMode = deviceMode, loggedAt = loggedAt)
-        _logs.add(log)
+        _logs.value = _logs.value + log
         return log
     }
 
     override suspend fun softDelete(logId: String, userId: String) {
-        val i = _logs.indexOfFirst { it.id == logId && it.userId == userId }
-        if (i >= 0) _logs[i] = _logs[i].copy(deletedAt = Clock.System.now())
+        _logs.value = _logs.value.map {
+            if (it.id == logId && it.userId == userId) it.copy(deletedAt = Clock.System.now()) else it
+        }
     }
 
+    override fun observeAllActiveLogsForUser(userId: String): Flow<List<WantLog>> =
+        _logs.map { list -> list.filter { it.isActive && it.userId == userId } }
+
     override suspend fun getAllActiveLogsForUser(userId: String): List<WantLog> =
-        _logs.filter { it.isActive && it.userId == userId }
+        _logs.value.filter { it.isActive && it.userId == userId }
 
     override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
-        val indices = _logs.indices.filter { _logs[it].userId == oldUserId }
-        indices.forEach { i -> _logs[i] = _logs[i].copy(userId = newUserId) }
+        _logs.value = _logs.value.map {
+            if (it.userId == oldUserId) it.copy(userId = newUserId) else it
+        }
     }
 
     override suspend fun clearForUser(userId: String) {
-        _logs.removeAll { it.userId == userId }
+        _logs.value = _logs.value.filterNot { it.userId == userId }
     }
 }

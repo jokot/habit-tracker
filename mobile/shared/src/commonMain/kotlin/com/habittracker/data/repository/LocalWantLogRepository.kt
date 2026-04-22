@@ -1,9 +1,14 @@
 package com.habittracker.data.repository
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import com.habittracker.data.local.HabitTrackerDatabase
 import com.habittracker.data.local.WantLog as WantLogEntity
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
@@ -39,6 +44,13 @@ class LocalWantLogRepository(
             userId = userId,
         )
     }
+
+    override fun observeAllActiveLogsForUser(userId: String): Flow<List<WantLog>> =
+        db.habitTrackerDatabaseQueries
+            .getAllActiveWantLogsForUser(userId)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
 
     override suspend fun getAllActiveLogsForUser(userId: String): List<WantLog> =
         db.habitTrackerDatabaseQueries

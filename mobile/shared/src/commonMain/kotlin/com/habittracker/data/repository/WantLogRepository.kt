@@ -2,6 +2,7 @@ package com.habittracker.data.repository
 
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantLog
+import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.Instant
 
 interface WantLogRepository {
@@ -15,6 +16,8 @@ interface WantLogRepository {
     ): WantLog
 
     suspend fun softDelete(logId: String, userId: String)
+
+    fun observeAllActiveLogsForUser(userId: String): Flow<List<WantLog>>
 
     suspend fun getAllActiveLogsForUser(userId: String): List<WantLog>
 

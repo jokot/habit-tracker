@@ -1,8 +1,13 @@
 package com.habittracker.data.repository
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import com.habittracker.data.local.HabitLog as HabitLogEntity
 import com.habittracker.data.local.HabitTrackerDatabase
 import com.habittracker.domain.model.HabitLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
@@ -37,6 +42,23 @@ class LocalHabitLogRepository(
         )
     }
 
+    override fun observeActiveLogsForHabitOnDay(
+        userId: String,
+        habitId: String,
+        dayStart: Instant,
+        dayEnd: Instant,
+    ): Flow<List<HabitLog>> =
+        db.habitTrackerDatabaseQueries
+            .getActiveHabitLogsForHabitOnDay(
+                userId = userId,
+                habitId = habitId,
+                loggedAt = dayStart.toEpochMilliseconds(),
+                loggedAt_ = dayEnd.toEpochMilliseconds(),
+            )
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
+
     override suspend fun getActiveLogsForHabitOnDay(
         userId: String,
         habitId: String,
@@ -52,6 +74,13 @@ class LocalHabitLogRepository(
             )
             .executeAsList()
             .map { it.toDomain() }
+
+    override fun observeAllActiveLogsForUser(userId: String): Flow<List<HabitLog>> =
+        db.habitTrackerDatabaseQueries
+            .getAllActiveHabitLogsForUser(userId)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
 
     override suspend fun getAllActiveLogsForUser(userId: String): List<HabitLog> =
         db.habitTrackerDatabaseQueries

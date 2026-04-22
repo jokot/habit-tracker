@@ -10,12 +10,14 @@ import com.habittracker.domain.usecase.PointCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.plus
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.days
 
@@ -33,39 +35,64 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init { load() }
-
-    fun load() {
+    init {
         viewModelScope.launch {
             val userId = container.currentUserId()
-            val habits = container.habitRepository.getHabitsForUser(userId)
-
             val now = Clock.System.now()
             val todayDate = now.toLocalDateTime(TimeZone.UTC).date
             val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
             val dayEnd = dayStart + 1.days
+            val weekStart = weekStartUtc()
+            val isAuthed = container.isAuthenticated()
 
-            val habitsWithProgress = habits.map { habit ->
-                val logsToday = container.habitLogRepository
-                    .getActiveLogsForHabitOnDay(userId, habit.id, dayStart, dayEnd)
-                val pointsToday = logsToday.sumOf {
-                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+            combine(
+                container.habitRepository.observeHabitsForUser(userId),
+                container.habitLogRepository.observeAllActiveLogsForUser(userId),
+                container.wantActivityRepository.observeWantActivities(userId),
+                container.wantLogRepository.observeAllActiveLogsForUser(userId),
+            ) { habits, habitLogs, wants, wantLogs ->
+                val habitsWithProgress = habits.map { habit ->
+                    val pointsToday = habitLogs
+                        .filter {
+                            it.habitId == habit.id && it.loggedAt >= dayStart && it.loggedAt < dayEnd
+                        }
+                        .sumOf {
+                            PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                        }
+                    HabitWithProgress(habit, pointsToday)
                 }
-                HabitWithProgress(habit, pointsToday)
-            }
 
-            val balance = container.getPointBalanceUseCase.execute(userId)
-                .getOrDefault(PointBalance(0, 0))
+                val earned = habitLogs
+                    .filter { it.loggedAt >= weekStart }
+                    .sumOf { log ->
+                        habits.firstOrNull { it.id == log.habitId }?.let {
+                            PointCalculator.pointsEarned(log.quantity, it.thresholdPerPoint)
+                        } ?: 0
+                    }
+                val spent = wantLogs
+                    .filter { it.loggedAt >= weekStart }
+                    .sumOf { log ->
+                        wants.firstOrNull { it.id == log.activityId }?.let {
+                            PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
+                        } ?: 0
+                    }
 
-            val activities = container.wantActivityRepository.getWantActivities(userId)
-
-            _uiState.value = HomeUiState(
-                habitsWithProgress = habitsWithProgress,
-                pointBalance = balance,
-                wantActivities = activities,
-                isAuthenticated = container.isAuthenticated(),
-                isLoading = false,
-            )
+                HomeUiState(
+                    habitsWithProgress = habitsWithProgress,
+                    pointBalance = PointBalance(earned, spent),
+                    wantActivities = wants,
+                    isAuthenticated = isAuthed,
+                    isLoading = false,
+                )
+            }.collect { _uiState.value = it }
         }
     }
+}
+
+private fun weekStartUtc(): Instant {
+    val now = Clock.System.now()
+    val localDate = now.toLocalDateTime(TimeZone.UTC).date
+    val daysFromMonday = localDate.dayOfWeek.ordinal
+    val monday = localDate.minus(daysFromMonday, DateTimeUnit.DAY)
+    return monday.atStartOfDayIn(TimeZone.UTC)
 }
