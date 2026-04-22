@@ -45,6 +45,14 @@ class LocalWantLogRepository(
             .getAllActiveWantLogsForUser(userId)
             .executeAsList()
             .map { it.toDomain() }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        db.habitTrackerDatabaseQueries.migrateWantLogsUserId(newUserId, oldUserId)
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        db.habitTrackerDatabaseQueries.clearWantLogsForUser(userId)
+    }
 }
 
 private fun DeviceMode.toDbValue(): String = when (this) {

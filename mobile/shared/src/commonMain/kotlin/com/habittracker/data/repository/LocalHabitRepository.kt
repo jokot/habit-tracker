@@ -31,6 +31,14 @@ class LocalHabitRepository(
     override suspend fun deleteHabit(habitId: String, userId: String) {
         db.habitTrackerDatabaseQueries.deleteHabit(id = habitId, userId = userId)
     }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        db.habitTrackerDatabaseQueries.migrateHabitsUserId(newUserId, oldUserId)
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        db.habitTrackerDatabaseQueries.clearHabitsForUser(userId)
+    }
 }
 
 private fun LocalHabit.toDomain(): Habit = Habit(

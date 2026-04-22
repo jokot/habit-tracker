@@ -19,6 +19,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -37,12 +38,29 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onLogHabit: (String) -> Unit,
     onLogWant: (String) -> Unit,
+    onSignIn: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Habit Tracker") })
+            TopAppBar(
+                title = { Text("Habit Tracker") },
+                actions = {
+                    if (uiState.isAuthenticated) {
+                        Text(
+                            text = "Synced",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Spacing.md),
+                        )
+                    } else {
+                        TextButton(onClick = onSignIn) {
+                            Text("Sign in")
+                        }
+                    }
+                },
+            )
         }
     ) { padding ->
         if (uiState.isLoading) {

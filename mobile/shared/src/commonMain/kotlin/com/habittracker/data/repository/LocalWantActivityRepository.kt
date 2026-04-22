@@ -24,6 +24,14 @@ class LocalWantActivityRepository(
             isCustom = if (activity.isCustom) 1L else 0L,
         )
     }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        db.habitTrackerDatabaseQueries.migrateWantActivitiesUserId(newUserId, oldUserId)
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(userId)
+    }
 }
 
 private fun LocalWantActivity.toDomain(): WantActivity = WantActivity(

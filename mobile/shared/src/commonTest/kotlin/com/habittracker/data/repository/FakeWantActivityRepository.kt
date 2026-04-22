@@ -11,4 +11,13 @@ class FakeWantActivityRepository : WantActivityRepository {
         activities.removeAll { it.id == activity.id }
         activities.add(activity)
     }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        val indices = activities.indices.filter { activities[it].createdByUserId == oldUserId }
+        indices.forEach { i -> activities[i] = activities[i].copy(createdByUserId = newUserId) }
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        activities.removeAll { it.createdByUserId == userId }
+    }
 }

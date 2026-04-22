@@ -25,4 +25,13 @@ class FakeWantLogRepository : WantLogRepository {
 
     override suspend fun getAllActiveLogsForUser(userId: String): List<WantLog> =
         _logs.filter { it.isActive && it.userId == userId }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        val indices = _logs.indices.filter { _logs[it].userId == oldUserId }
+        indices.forEach { i -> _logs[i] = _logs[i].copy(userId = newUserId) }
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        _logs.removeAll { it.userId == userId }
+    }
 }

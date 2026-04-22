@@ -1,6 +1,16 @@
 package com.habittracker.android.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -36,23 +46,34 @@ sealed class Screen(val route: String) {
 @Composable
 fun AppNavigation(container: AppContainer) {
     val navController = rememberNavController()
+    var startDestination by remember { mutableStateOf<String?>(null) }
 
-    NavHost(navController = navController, startDestination = Screen.Auth.route) {
+    LaunchedEffect(Unit) {
+        container.seedLocalDataIfEmpty()
+        val userId = container.currentUserId()
+        startDestination = if (container.isOnboardedUseCase.execute(userId)) {
+            Screen.Home.route
+        } else {
+            Screen.Onboarding.route
+        }
+    }
+
+    val start = startDestination
+    if (start == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    NavHost(navController = navController, startDestination = start) {
 
         composable(Screen.Auth.route) {
             val vm = viewModel { AuthViewModel(container) }
             AuthScreen(
                 viewModel = vm,
-                onNavigateToOnboarding = {
-                    navController.navigate(Screen.Onboarding.route) {
-                        popUpTo(Screen.Auth.route) { inclusive = true }
-                    }
-                },
-                onNavigateToHome = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Auth.route) { inclusive = true }
-                    }
-                },
+                onSuccess = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -74,6 +95,7 @@ fun AppNavigation(container: AppContainer) {
                 viewModel = vm,
                 onLogHabit = { habitId -> navController.navigate(Screen.LogHabit.route(habitId)) },
                 onLogWant = { activityId -> navController.navigate(Screen.LogWant.route(activityId)) },
+                onSignIn = { navController.navigate(Screen.Auth.route) },
             )
         }
 

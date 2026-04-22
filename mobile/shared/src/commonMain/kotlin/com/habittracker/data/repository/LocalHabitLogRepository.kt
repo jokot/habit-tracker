@@ -58,6 +58,14 @@ class LocalHabitLogRepository(
             .getAllActiveHabitLogsForUser(userId)
             .executeAsList()
             .map { it.toDomain() }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        db.habitTrackerDatabaseQueries.migrateHabitLogsUserId(newUserId, oldUserId)
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        db.habitTrackerDatabaseQueries.clearHabitLogsForUser(userId)
+    }
 }
 
 private fun HabitLogEntity.toDomain(): HabitLog = HabitLog(

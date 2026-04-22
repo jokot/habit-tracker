@@ -23,6 +23,7 @@ data class HomeUiState(
     val habitsWithProgress: List<HabitWithProgress> = emptyList(),
     val pointBalance: PointBalance = PointBalance(0, 0),
     val wantActivities: List<WantActivity> = emptyList(),
+    val isAuthenticated: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null,
 )
@@ -36,7 +37,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     fun load() {
         viewModelScope.launch {
-            val userId = container.authRepository.currentUserId() ?: return@launch
+            val userId = container.currentUserId()
             val habits = container.habitRepository.getHabitsForUser(userId)
 
             val now = Clock.System.now()
@@ -62,6 +63,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 habitsWithProgress = habitsWithProgress,
                 pointBalance = balance,
                 wantActivities = activities,
+                isAuthenticated = container.isAuthenticated(),
                 isLoading = false,
             )
         }

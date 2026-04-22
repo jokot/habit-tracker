@@ -16,4 +16,13 @@ class FakeHabitRepository : HabitRepository {
     override suspend fun deleteHabit(habitId: String, userId: String) {
         habits.removeAll { it.id == habitId && it.userId == userId }
     }
+
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+        val indices = habits.indices.filter { habits[it].userId == oldUserId }
+        indices.forEach { i -> habits[i] = habits[i].copy(userId = newUserId) }
+    }
+
+    override suspend fun clearForUser(userId: String) {
+        habits.removeAll { it.userId == userId }
+    }
 }

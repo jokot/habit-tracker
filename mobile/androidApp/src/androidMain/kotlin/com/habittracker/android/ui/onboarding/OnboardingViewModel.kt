@@ -70,10 +70,7 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
     fun finish() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            val userId = container.authRepository.currentUserId() ?: run {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = "Not logged in")
-                return@launch
-            }
+            val userId = container.currentUserId()
             val state = _uiState.value
             val selectedTemplates = state.habitTemplates.filter { it.id in state.selectedTemplateIds }
             val selectedActivities = state.wantActivities.filter { it.id in state.selectedActivityIds }

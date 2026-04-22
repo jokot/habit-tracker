@@ -12,11 +12,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,24 +30,35 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.habittracker.android.ui.theme.Spacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     viewModel: AuthViewModel,
-    onNavigateToOnboarding: () -> Unit,
-    onNavigateToHome: () -> Unit,
+    onSuccess: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.navigation.collect { nav ->
-            when (nav) {
-                AuthNavigation.ToOnboarding -> onNavigateToOnboarding()
-                AuthNavigation.ToHome -> onNavigateToHome()
+        viewModel.events.collect { event ->
+            when (event) {
+                AuthEvent.Success -> onSuccess()
             }
         }
     }
 
-    Scaffold { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (uiState.isSignUp) "Create Account" else "Sign In") },
+                navigationIcon = {
+                    TextButton(onClick = onBack) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -56,8 +69,9 @@ fun AuthScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = if (uiState.isSignUp) "Create Account" else "Sign In",
-                style = MaterialTheme.typography.headlineMedium,
+                text = "Sync across devices",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(Spacing.xxl))
@@ -90,10 +104,10 @@ fun AuthScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            if (uiState.error != null) {
+            uiState.error?.let { errorMsg ->
                 Spacer(modifier = Modifier.height(Spacing.sm))
                 Text(
-                    text = uiState.error!!,
+                    text = errorMsg,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                 )

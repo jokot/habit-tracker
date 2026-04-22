@@ -17,4 +17,8 @@ interface WantLogRepository {
     suspend fun softDelete(logId: String, userId: String)
 
     suspend fun getAllActiveLogsForUser(userId: String): List<WantLog>
+
+    suspend fun migrateUserId(oldUserId: String, newUserId: String)
+
+    suspend fun clearForUser(userId: String)
 }

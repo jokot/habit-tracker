@@ -11,9 +11,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed interface AuthNavigation {
-    object ToOnboarding : AuthNavigation
-    object ToHome : AuthNavigation
+sealed interface AuthEvent {
+    object Success : AuthEvent
 }
 
 data class AuthUiState(
@@ -29,22 +28,8 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _navigation = MutableSharedFlow<AuthNavigation>()
-    val navigation: SharedFlow<AuthNavigation> = _navigation.asSharedFlow()
-
-    init {
-        viewModelScope.launch {
-            if (container.authRepository.isLoggedIn()) {
-                val userId = container.authRepository.currentUserId() ?: return@launch
-                container.seedLocalDataIfEmpty()
-                if (container.isOnboardedUseCase.execute(userId)) {
-                    _navigation.emit(AuthNavigation.ToHome)
-                } else {
-                    _navigation.emit(AuthNavigation.ToOnboarding)
-                }
-            }
-        }
-    }
+    private val _events = MutableSharedFlow<AuthEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<AuthEvent> = _events.asSharedFlow()
 
     fun onEmailChange(value: String) {
         _uiState.value = _uiState.value.copy(email = value, error = null)
@@ -64,6 +49,7 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
             _uiState.value = state.copy(error = "Email and password required")
             return
         }
+        if (state.isLoading) return
         viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, error = null)
             val result = if (state.isSignUp) {
@@ -72,12 +58,9 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 container.authRepository.signIn(state.email.trim(), state.password)
             }
             result.onSuccess { session ->
+                container.migrateLocalToAuthenticated(session.userId)
                 container.seedLocalDataIfEmpty()
-                if (container.isOnboardedUseCase.execute(session.userId)) {
-                    _navigation.emit(AuthNavigation.ToHome)
-                } else {
-                    _navigation.emit(AuthNavigation.ToOnboarding)
-                }
+                _events.emit(AuthEvent.Success)
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Auth failed")
             }

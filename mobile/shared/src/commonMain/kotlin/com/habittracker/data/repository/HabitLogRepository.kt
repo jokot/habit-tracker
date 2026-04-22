@@ -22,4 +22,8 @@ interface HabitLogRepository {
     ): List<HabitLog>
 
     suspend fun getAllActiveLogsForUser(userId: String): List<HabitLog>
+
+    suspend fun migrateUserId(oldUserId: String, newUserId: String)
+
+    suspend fun clearForUser(userId: String)
 }
