@@ -3247,6 +3247,8 @@ rtk git commit -m "feat: add Log Habit screen with point display and 5-min undo"
 
 ## Task 10: Log Want Screen + ViewModel
 
+> **SUPERSEDED.** Dedicated Log Want screen is gone — spending lives on Home via `HomeViewModel.tapWant` / `cancelPendingWant` using the same 3-second batch pattern as habits (see Task 9 note). `DeviceMode` toggle UI removed in Phase 2; default `OTHER` is hard-coded until Phase 5 adds the overlay flow back. `LogWantUseCase` (shared module) unchanged — still enforces no-negative-balance lock and returns `InsufficientPointsException` on overdraw. Original screen code in git history at commit 6240952.
+
 **Files:**
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogWantViewModel.kt`
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogWantScreen.kt`

@@ -104,12 +104,7 @@ User logs time spent AFTER the activity (v1 = manual post-log, C mode).
 
 **Spending modes:**
 
-| Mode | Flow |
-|---|---|
-| This device | Log want → deduct points → start timer → alarm notification when done (Phase 2) |
-| Other device / physical | Log want → deduct points → done |
-
-Timer enforcement (Android overlay, Phase 5+): shows overlay notification when timer ends to prompt user to close the want app. Requires `SYSTEM_ALERT_WINDOW` permission — user must grant manually. iOS: timer + notification only (no overlay).
+Phase 2 ships with a single implicit mode: `OTHER` (post-hoc manual log). The `This device` timer/overlay flow is deferred to Phase 5+ when the Android `SYSTEM_ALERT_WINDOW` overlay lands. `device_mode` is still stored on every log (defaulting to `OTHER`) so the column is ready when Phase 5 adds the UI toggle back.
 
 **Default spend rates (user-customizable):**
 ```
@@ -138,6 +133,8 @@ FOOD INDULGENCE
   Sugary drinks                 → 1 pt / drink
   Eat donut / dessert           → 1 pt / piece
 ```
+
+> **Phase 2 UX note:** want spending uses the same 3-second tap-to-commit batch as habits. Tapping a want activity row on Home bumps a `×N` badge and starts/resets a 3s countdown with an inline Cancel button. On commit, `quantity = N` (each tap = 1 unit — minute, match, meal, etc.), and `LogWantUseCase` enforces the no-negative-balance lock: if the batch would overdraw, commit is rejected with `InsufficientPointsException` and the snackbar shows `"Not enough points: need X, have Y"`. Cancel drops the pending batch before commit.
 
 ### 2.3 Point Balance
 

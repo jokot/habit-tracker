@@ -12,18 +12,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.habittracker.android.AppContainer
 import com.habittracker.android.ui.auth.AuthScreen
 import com.habittracker.android.ui.auth.AuthViewModel
 import com.habittracker.android.ui.home.HomeScreen
 import com.habittracker.android.ui.home.HomeViewModel
-import com.habittracker.android.ui.log.LogWantScreen
-import com.habittracker.android.ui.log.LogWantViewModel
 import com.habittracker.android.ui.onboarding.OnboardingScreen
 import com.habittracker.android.ui.onboarding.OnboardingViewModel
 
@@ -31,10 +27,6 @@ sealed class Screen(val route: String) {
     object Auth : Screen("auth")
     object Onboarding : Screen("onboarding")
     object Home : Screen("home")
-    object LogWant : Screen("log_want/{activityId}") {
-        const val ARG = "activityId"
-        fun route(activityId: String) = "log_want/$activityId"
-    }
 }
 
 @Composable
@@ -87,18 +79,8 @@ fun AppNavigation(container: AppContainer) {
             val vm = viewModel { HomeViewModel(container) }
             HomeScreen(
                 viewModel = vm,
-                onLogWant = { activityId -> navController.navigate(Screen.LogWant.route(activityId)) },
                 onSignIn = { navController.navigate(Screen.Auth.route) },
             )
-        }
-
-        composable(
-            route = Screen.LogWant.route,
-            arguments = listOf(navArgument(Screen.LogWant.ARG) { type = NavType.StringType }),
-        ) { backStack ->
-            val activityId = backStack.arguments?.getString(Screen.LogWant.ARG) ?: return@composable
-            val vm = viewModel(key = activityId) { LogWantViewModel(activityId, container) }
-            LogWantScreen(viewModel = vm, onBack = { navController.popBackStack() })
         }
     }
 }

@@ -3,10 +3,12 @@ package com.habittracker.android.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
+import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogHabitStatus
 import com.habittracker.domain.usecase.PointCalculator
 import kotlinx.coroutines.Job
@@ -44,6 +46,12 @@ data class PendingHabitLog(
     val secondsRemaining: Int,
 )
 
+/** One pending want log: N taps accumulated, seconds remaining before commit. */
+data class PendingWantLog(
+    val count: Int,
+    val secondsRemaining: Int,
+)
+
 sealed interface HomeEvent {
     data class Message(val text: String) : HomeEvent
 }
@@ -59,11 +67,18 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     private val _pending = MutableStateFlow<Map<String, PendingHabitLog>>(emptyMap())
     val pending: StateFlow<Map<String, PendingHabitLog>> = _pending.asStateFlow()
 
+    /** want activityId → pending tap batch. Drops to empty on commit or cancel. */
+    private val _pendingWants = MutableStateFlow<Map<String, PendingWantLog>>(emptyMap())
+    val pendingWants: StateFlow<Map<String, PendingWantLog>> = _pendingWants.asStateFlow()
+
     private val _events = MutableSharedFlow<HomeEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<HomeEvent> = _events.asSharedFlow()
 
     /** One countdown coroutine per habit. */
     private val timers = mutableMapOf<String, Job>()
+
+    /** One countdown coroutine per want activity. */
+    private val wantTimers = mutableMapOf<String, Job>()
 
     init {
         viewModelScope.launch {
@@ -170,9 +185,63 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
             }
     }
 
+    /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
+    fun tapWant(activity: WantActivity) {
+        val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
+        _pendingWants.update {
+            it + (activity.id to PendingWantLog(newCount, PENDING_WINDOW_SECONDS))
+        }
+        wantTimers[activity.id]?.cancel()
+        wantTimers[activity.id] = viewModelScope.launch {
+            for (seconds in PENDING_WINDOW_SECONDS - 1 downTo 0) {
+                delay(1000L)
+                _pendingWants.update { current ->
+                    val existing = current[activity.id] ?: return@update current
+                    current + (activity.id to existing.copy(secondsRemaining = seconds))
+                }
+            }
+            commitPendingWant(activity)
+        }
+    }
+
+    /** User hit Cancel before the countdown expired — drop state, no log written. */
+    fun cancelPendingWant(activityId: String) {
+        wantTimers[activityId]?.cancel()
+        wantTimers.remove(activityId)
+        _pendingWants.update { it - activityId }
+    }
+
+    private suspend fun commitPendingWant(activity: WantActivity) {
+        val batch = _pendingWants.value[activity.id] ?: return
+        _pendingWants.update { it - activity.id }
+        wantTimers.remove(activity.id)
+        val userId = container.currentUserId()
+        container.logWantUseCase.execute(
+            userId,
+            activity.id,
+            batch.count.toDouble(),
+            DeviceMode.OTHER,
+        )
+            .onSuccess { result ->
+                _events.tryEmit(
+                    HomeEvent.Message("-${result.pointsSpent} pts — ${activity.name}")
+                )
+            }
+            .onFailure { e ->
+                val msg = when (e) {
+                    is InsufficientPointsException ->
+                        "Not enough points: need ${e.required}, have ${e.available} — ${activity.name}"
+                    else -> "Failed: ${e.message}"
+                }
+                _events.tryEmit(HomeEvent.Message(msg))
+            }
+    }
+
     override fun onCleared() {
         timers.values.forEach { it.cancel() }
         timers.clear()
+        wantTimers.values.forEach { it.cancel() }
+        wantTimers.clear()
     }
 }
 

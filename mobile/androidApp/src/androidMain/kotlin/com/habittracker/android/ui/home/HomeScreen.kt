@@ -41,11 +41,11 @@ import com.habittracker.domain.model.WantActivity
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onLogWant: (String) -> Unit,
     onSignIn: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
+    val pendingWantMap by viewModel.pendingWants.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -133,7 +133,12 @@ fun HomeScreen(
                     Spacer(Modifier.height(Spacing.sm))
                 }
                 items(uiState.wantActivities) { activity ->
-                    WantActivityRow(activity = activity, onClick = { onLogWant(activity.id) })
+                    WantActivityRow(
+                        activity = activity,
+                        pending = pendingWantMap[activity.id],
+                        onTap = { viewModel.tapWant(activity) },
+                        onCancel = { viewModel.cancelPendingWant(activity.id) },
+                    )
                 }
             }
 
@@ -229,19 +234,59 @@ private fun HabitCard(
 }
 
 @Composable
-private fun WantActivityRow(activity: WantActivity, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = Spacing.md),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+private fun WantActivityRow(
+    activity: WantActivity,
+    pending: PendingWantLog?,
+    onTap: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap)
+            .padding(vertical = Spacing.md),
     ) {
-        Text(activity.name, style = MaterialTheme.typography.bodyLarge)
-        val costText = if (activity.costPerUnit >= 1.0) {
-            "${activity.costPerUnit.toInt()} pt/${activity.unit}"
-        } else {
-            "1 pt/${(1.0 / activity.costPerUnit).toInt()} ${activity.unit}"
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(activity.name, style = MaterialTheme.typography.bodyLarge)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (pending != null) {
+                    Text(
+                        "×${pending.count}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = Spacing.md),
+                    )
+                }
+                val costText = if (activity.costPerUnit >= 1.0) {
+                    "${activity.costPerUnit.toInt()} pt/${activity.unit}"
+                } else {
+                    "1 pt/${(1.0 / activity.costPerUnit).toInt()} ${activity.unit}"
+                }
+                Text(
+                    costText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        Text(costText, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (pending != null) {
+            Spacer(Modifier.height(Spacing.xs))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Commits in ${pending.secondsRemaining}s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onCancel) { Text("Cancel") }
+            }
+        }
     }
 }
