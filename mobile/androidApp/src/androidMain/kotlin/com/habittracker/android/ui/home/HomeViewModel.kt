@@ -3,12 +3,20 @@ package com.habittracker.android.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
+import com.habittracker.android.ui.common.UndoState
+import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.usecase.LogHabitStatus
 import com.habittracker.domain.usecase.PointCalculator
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -30,10 +38,22 @@ data class HomeUiState(
     val error: String? = null,
 )
 
+sealed interface HomeEvent {
+    data class Message(val text: String) : HomeEvent
+}
+
 class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private val _undoState = MutableStateFlow<UndoState?>(null)
+    val undoState: StateFlow<UndoState?> = _undoState.asStateFlow()
+
+    private val _events = MutableSharedFlow<HomeEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<HomeEvent> = _events.asSharedFlow()
+
+    private var undoJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -90,6 +110,56 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                     isLoading = false,
                 )
             }.collect { _uiState.value = it }
+        }
+    }
+
+    fun quickLogHabit(habit: Habit) {
+        val userId = container.currentUserId()
+        viewModelScope.launch {
+            container.logHabitUseCase.execute(userId, habit.id, habit.thresholdPerPoint)
+                .onSuccess { result ->
+                    when (result.status) {
+                        LogHabitStatus.EARNED -> {
+                            _events.tryEmit(
+                                HomeEvent.Message("+${result.pointsEarned} pts — ${habit.name}")
+                            )
+                            startUndoTimer(result.log.id)
+                        }
+                        LogHabitStatus.DAILY_TARGET_MET -> {
+                            _events.tryEmit(
+                                HomeEvent.Message("Goal already met today — ${habit.name}")
+                            )
+                        }
+                        LogHabitStatus.BELOW_THRESHOLD -> {
+                            _events.tryEmit(HomeEvent.Message("Logged — 0 pts"))
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    _events.tryEmit(HomeEvent.Message("Failed: ${e.message}"))
+                }
+        }
+    }
+
+    fun undoLastHabit() {
+        val current = _undoState.value ?: return
+        val userId = container.currentUserId()
+        viewModelScope.launch {
+            container.undoHabitLogUseCase.execute(current.logId, userId)
+            undoJob?.cancel()
+            _undoState.value = null
+            _events.tryEmit(HomeEvent.Message("Undone"))
+        }
+    }
+
+    private fun startUndoTimer(logId: String) {
+        undoJob?.cancel()
+        undoJob = viewModelScope.launch {
+            for (seconds in 300 downTo 0) {
+                _undoState.value = UndoState(logId, seconds)
+                delay(1000L)
+            }
+            _undoState.value = null
         }
     }
 }

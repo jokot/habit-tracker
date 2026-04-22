@@ -2955,6 +2955,8 @@ git commit -m "feat: guest mode — optional auth with local user id, migration 
 
 ## Task 9: Log Habit Screen + ViewModel
 
+> **SUPERSEDED in a later UX pass.** Quick-log buttons replaced the dedicated Log Habit screen — see `HomeViewModel.quickLogHabit`. This task's original implementation is retained in git history at commit 8acb379.
+
 **Files:**
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogHabitViewModel.kt`
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogHabitScreen.kt`

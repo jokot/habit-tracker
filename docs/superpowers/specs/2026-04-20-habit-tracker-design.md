@@ -37,6 +37,8 @@ Each habit has:
   - `BELOW_THRESHOLD`: quantity too small for 1 pt → "Below threshold — logged, 0 pts". No undo timer (no points to undo).
   - `DAILY_TARGET_MET`: quantity cleared threshold but cap full → "Daily goal already met today — logged, 0 pts". No undo timer.
 
+> **Phase 2 UX note:** logging is single-tap quick-log from the Home screen — tapping a habit card records exactly one `threshold_per_point`-sized entry (so quantity always equals the threshold and status is either `EARNED` or `DAILY_TARGET_MET`; `BELOW_THRESHOLD` is effectively unreachable via quick-log). Custom-quantity entry (the original dedicated Log Habit screen) was removed to reduce friction and can be revisited in a later phase if needed.
+
 **Habit display:** flat list with identity tags. Grouped by identity in onboarding only.
 
 **Default need habits by identity:**

@@ -22,8 +22,6 @@ import com.habittracker.android.ui.auth.AuthScreen
 import com.habittracker.android.ui.auth.AuthViewModel
 import com.habittracker.android.ui.home.HomeScreen
 import com.habittracker.android.ui.home.HomeViewModel
-import com.habittracker.android.ui.log.LogHabitScreen
-import com.habittracker.android.ui.log.LogHabitViewModel
 import com.habittracker.android.ui.log.LogWantScreen
 import com.habittracker.android.ui.log.LogWantViewModel
 import com.habittracker.android.ui.onboarding.OnboardingScreen
@@ -33,10 +31,6 @@ sealed class Screen(val route: String) {
     object Auth : Screen("auth")
     object Onboarding : Screen("onboarding")
     object Home : Screen("home")
-    object LogHabit : Screen("log_habit/{habitId}") {
-        const val ARG = "habitId"
-        fun route(habitId: String) = "log_habit/$habitId"
-    }
     object LogWant : Screen("log_want/{activityId}") {
         const val ARG = "activityId"
         fun route(activityId: String) = "log_want/$activityId"
@@ -93,19 +87,9 @@ fun AppNavigation(container: AppContainer) {
             val vm = viewModel { HomeViewModel(container) }
             HomeScreen(
                 viewModel = vm,
-                onLogHabit = { habitId -> navController.navigate(Screen.LogHabit.route(habitId)) },
                 onLogWant = { activityId -> navController.navigate(Screen.LogWant.route(activityId)) },
                 onSignIn = { navController.navigate(Screen.Auth.route) },
             )
-        }
-
-        composable(
-            route = Screen.LogHabit.route,
-            arguments = listOf(navArgument(Screen.LogHabit.ARG) { type = NavType.StringType }),
-        ) { backStack ->
-            val habitId = backStack.arguments?.getString(Screen.LogHabit.ARG) ?: return@composable
-            val vm = viewModel(key = habitId) { LogHabitViewModel(habitId, container) }
-            LogHabitScreen(viewModel = vm, onBack = { navController.popBackStack() })
         }
 
         composable(

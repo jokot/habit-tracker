@@ -3,6 +3,7 @@ package com.habittracker.android.ui.log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
+import com.habittracker.android.ui.common.UndoState
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantActivity
 import kotlinx.coroutines.Job

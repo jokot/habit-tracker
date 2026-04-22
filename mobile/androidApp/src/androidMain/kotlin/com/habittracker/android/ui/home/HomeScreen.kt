@@ -18,15 +18,22 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.habittracker.android.ui.theme.Spacing
 import com.habittracker.android.ui.theme.streakCompleteColor
 import com.habittracker.domain.model.HabitWithProgress
@@ -36,11 +43,20 @@ import com.habittracker.domain.model.WantActivity
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onLogHabit: (String) -> Unit,
     onLogWant: (String) -> Unit,
     onSignIn: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val undoState by viewModel.undoState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is HomeEvent.Message -> snackbarHostState.showSnackbar(event.text)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -61,7 +77,37 @@ fun HomeScreen(
                     }
                 },
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
+        bottomBar = {
+            val current = undoState
+            if (current != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 3.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.xl, vertical = Spacing.md),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val minutes = current.secondsRemaining / 60
+                        val seconds = current.secondsRemaining % 60
+                        val timeText = "${minutes}:${seconds.toString().padStart(2, '0')}"
+                        Text(
+                            text = "Undo available: $timeText",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = { viewModel.undoLastHabit() }) {
+                            Text("Undo")
+                        }
+                    }
+                }
+            }
+        },
     ) { padding ->
         if (uiState.isLoading) {
             Column(
@@ -100,7 +146,10 @@ fun HomeScreen(
                 }
             } else {
                 items(uiState.habitsWithProgress) { hwp ->
-                    HabitCard(habitWithProgress = hwp, onClick = { onLogHabit(hwp.habit.id) })
+                    HabitCard(
+                        habitWithProgress = hwp,
+                        onQuickLog = { viewModel.quickLogHabit(hwp.habit) },
+                    )
                 }
             }
 
@@ -143,9 +192,9 @@ private fun PointBalanceCard(earned: Int, spent: Int, balance: Int) {
 }
 
 @Composable
-private fun HabitCard(habitWithProgress: HabitWithProgress, onClick: () -> Unit) {
+private fun HabitCard(habitWithProgress: HabitWithProgress, onQuickLog: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onQuickLog),
     ) {
         Column(modifier = Modifier.padding(Spacing.xl)) {
             Row(
