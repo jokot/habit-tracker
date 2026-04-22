@@ -1,7 +1,9 @@
 package com.habittracker.android.ui.home
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,22 +11,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,6 +37,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.habittracker.android.ui.theme.Spacing
 import com.habittracker.android.ui.theme.streakCompleteColor
 import com.habittracker.domain.model.HabitWithProgress
@@ -59,20 +66,19 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Habit Tracker") },
+                title = {
+                    Text(
+                        "Habit Tracker",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
                 actions = {
                     if (uiState.isAuthenticated) {
-                        Text(
-                            text = "Synced",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Spacing.md),
-                        )
+                        SyncedPill()
                     } else {
-                        TextButton(onClick = onSignIn) {
-                            Text("Sign in")
-                        }
+                        TextButton(onClick = onSignIn) { Text("Sign in") }
                     }
+                    Spacer(Modifier.width(Spacing.sm))
                 },
             )
         },
@@ -91,30 +97,29 @@ fun HomeScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             item {
-                Spacer(Modifier.height(Spacing.md))
+                Spacer(Modifier.height(Spacing.sm))
                 PointBalanceCard(
                     earned = uiState.pointBalance.earned,
                     spent = uiState.pointBalance.spent,
                     balance = uiState.pointBalance.balance,
                 )
-                Spacer(Modifier.height(Spacing.xl))
-                Text("Today's Habits", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(Spacing.sm))
+            }
+
+            item {
+                SectionHeader(
+                    title = "Today's Habits",
+                    subtitle = if (uiState.habitsWithProgress.isEmpty()) null
+                    else "${uiState.habitsWithProgress.count { it.isGoalMet }} of ${uiState.habitsWithProgress.size} goals met",
+                )
             }
 
             if (uiState.habitsWithProgress.isEmpty()) {
-                item {
-                    Text(
-                        "No habits yet. Complete onboarding to add habits.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                item { EmptyState("No habits yet. Complete onboarding to add them.") }
             } else {
-                items(uiState.habitsWithProgress) { hwp ->
+                items(uiState.habitsWithProgress, key = { it.habit.id }) { hwp ->
                     HabitCard(
                         habitWithProgress = hwp,
                         pending = pendingMap[hwp.habit.id],
@@ -126,14 +131,11 @@ fun HomeScreen(
 
             if (uiState.wantActivities.isNotEmpty()) {
                 item {
-                    Spacer(Modifier.height(Spacing.xl))
-                    HorizontalDivider()
                     Spacer(Modifier.height(Spacing.md))
-                    Text("Want Activities", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(Spacing.sm))
+                    SectionHeader(title = "Want Activities", subtitle = "Each tap = 1 session")
                 }
-                items(uiState.wantActivities) { activity ->
-                    WantActivityRow(
+                items(uiState.wantActivities, key = { it.id }) { activity ->
+                    WantActivityCard(
                         activity = activity,
                         pending = pendingWantMap[activity.id],
                         onTap = { viewModel.tapWant(activity) },
@@ -148,22 +150,122 @@ fun HomeScreen(
 }
 
 @Composable
+private fun SyncedPill() {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.padding(horizontal = Spacing.md),
+    ) {
+        Text(
+            text = "Synced",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, subtitle: String? = null) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (subtitle != null) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(message: String) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(Spacing.xl),
+        )
+    }
+}
+
+@Composable
 private fun PointBalanceCard(earned: Int, spent: Int, balance: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
-        Column(modifier = Modifier.padding(Spacing.xl)) {
-            Text("Point Balance", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Column(modifier = Modifier.padding(Spacing.xxl)) {
+            Text(
+                text = "Point Balance",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+            )
             Spacer(Modifier.height(Spacing.sm))
-            Text("$balance pts", style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Spacer(Modifier.height(Spacing.xs))
-            Text("Earned: $earned  ·  Spent: $spent",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "$balance",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(
+                    text = "pts",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(bottom = Spacing.md),
+                )
+            }
+            Spacer(Modifier.height(Spacing.lg))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xxl),
+            ) {
+                BalanceStat("Earned", earned)
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(32.dp)
+                        .padding(vertical = Spacing.xs),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {}
+                }
+                BalanceStat("Spent", spent)
+            }
         }
+    }
+}
+
+@Composable
+private fun BalanceStat(label: String, value: Int) {
+    val color = MaterialTheme.colorScheme.onPrimaryContainer
+    Column {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = color.copy(alpha = 0.6f),
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = "$value",
+            style = MaterialTheme.typography.titleLarge,
+            color = color,
+        )
     }
 }
 
@@ -174,8 +276,15 @@ private fun HabitCard(
     onTap: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    val accent =
+        if (habitWithProgress.isGoalMet) streakCompleteColor() else MaterialTheme.colorScheme.primary
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onTap),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap)
+            .animateContentSize(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(modifier = Modifier.padding(Spacing.xl)) {
             Row(
@@ -183,110 +292,164 @@ private fun HabitCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(habitWithProgress.habit.name, style = MaterialTheme.typography.bodyLarge)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (pending != null) {
-                        Text(
-                            "×${pending.count}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = Spacing.md),
-                        )
-                    }
+                Column(modifier = Modifier.padding(end = Spacing.md)) {
                     Text(
-                        habitWithProgress.progressText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (habitWithProgress.isGoalMet) streakCompleteColor()
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = habitWithProgress.habit.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                }
-            }
-            Spacer(Modifier.height(Spacing.sm))
-            LinearProgressIndicator(
-                progress = { habitWithProgress.progressFraction },
-                modifier = Modifier.fillMaxWidth(),
-                color = if (habitWithProgress.isGoalMet) streakCompleteColor()
-                else MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                "Threshold: ${habitWithProgress.habit.thresholdPerPoint.toInt()} ${habitWithProgress.habit.unit} = 1 pt",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (pending != null) {
-                Spacer(Modifier.height(Spacing.md))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                    Spacer(Modifier.height(Spacing.xs))
                     Text(
-                        "Commits in ${pending.secondsRemaining}s",
+                        text = "${habitWithProgress.habit.thresholdPerPoint.toInt()} ${habitWithProgress.habit.unit} = 1 pt",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    TextButton(onClick = onCancel) { Text("Cancel") }
                 }
+                if (pending != null) {
+                    CountPill(pending.count, accent)
+                } else {
+                    ProgressPill(habitWithProgress.progressText, habitWithProgress.isGoalMet, accent)
+                }
+            }
+            Spacer(Modifier.height(Spacing.lg))
+            LinearProgressIndicator(
+                progress = { habitWithProgress.progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = accent,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+            if (pending != null) {
+                Spacer(Modifier.height(Spacing.md))
+                PendingFooter(pending.secondsRemaining, onCancel, accent)
             }
         }
     }
 }
 
 @Composable
-private fun WantActivityRow(
+private fun WantActivityCard(
     activity: WantActivity,
     pending: PendingWantLog?,
     onTap: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Column(
+    val accent = MaterialTheme.colorScheme.tertiary
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onTap)
-            .padding(vertical = Spacing.md),
+            .animateContentSize(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(activity.name, style = MaterialTheme.typography.bodyLarge)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (pending != null) {
-                    Text(
-                        "×${pending.count}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = Spacing.md),
-                    )
-                }
-                val costText = if (activity.costPerUnit >= 1.0) {
-                    "${activity.costPerUnit.toInt()} pt/${activity.unit}"
-                } else {
-                    "1 pt/${(1.0 / activity.costPerUnit).toInt()} ${activity.unit}"
-                }
-                Text(
-                    costText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (pending != null) {
-            Spacer(Modifier.height(Spacing.xs))
+        Column(modifier = Modifier.padding(Spacing.xl)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    "Commits in ${pending.secondsRemaining}s",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = onCancel) { Text("Cancel") }
+                Column(modifier = Modifier.padding(end = Spacing.md)) {
+                    Text(
+                        text = activity.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = costText(activity),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (pending != null) {
+                    CountPill(pending.count, accent)
+                } else {
+                    CostPill(perTapCost(activity))
+                }
+            }
+            if (pending != null) {
+                Spacer(Modifier.height(Spacing.md))
+                PendingFooter(pending.secondsRemaining, onCancel, accent)
             }
         }
     }
+}
+
+@Composable
+private fun CountPill(count: Int, accent: Color) {
+    Surface(
+        shape = CircleShape,
+        color = accent,
+    ) {
+        Text(
+            text = "×$count",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+    }
+}
+
+@Composable
+private fun ProgressPill(text: String, isGoalMet: Boolean, accent: Color) {
+    val (bg, fg) = if (isGoalMet) {
+        accent to MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(shape = CircleShape, color = bg) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = fg,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+    }
+}
+
+@Composable
+private fun CostPill(text: String) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+    }
+}
+
+@Composable
+private fun PendingFooter(secondsRemaining: Int, onCancel: () -> Unit, accent: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Commits in ${secondsRemaining}s",
+            style = MaterialTheme.typography.bodySmall,
+            color = accent,
+        )
+        TextButton(onClick = onCancel) { Text("Cancel") }
+    }
+}
+
+private fun costText(activity: WantActivity): String =
+    if (activity.costPerUnit >= 1.0) {
+        "${activity.costPerUnit.toInt()} pt per ${activity.unit}"
+    } else {
+        "1 pt per ${(1.0 / activity.costPerUnit).toInt()} ${activity.unit}"
+    }
+
+private fun perTapCost(activity: WantActivity): String {
+    val perTap = if (activity.costPerUnit >= 1.0) activity.costPerUnit.toInt()
+    else 1 // ceil(1 × cost) with min-1 — matches PointCalculator.pointsSpent
+    return "-$perTap pt"
 }
