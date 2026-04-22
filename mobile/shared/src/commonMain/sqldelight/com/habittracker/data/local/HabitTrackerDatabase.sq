@@ -108,7 +108,7 @@ INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, i
 VALUES (?, ?, ?, ?, ?, ?);
 
 getWantActivitiesForUser:
-SELECT * FROM LocalWantActivity WHERE userId = ? OR userId IS NULL;
+SELECT * FROM LocalWantActivity WHERE userId = ?;
 
 -- User id migration (guest → authenticated)
 migrateHabitsUserId:

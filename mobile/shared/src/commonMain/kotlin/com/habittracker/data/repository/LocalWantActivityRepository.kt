@@ -29,7 +29,7 @@ class LocalWantActivityRepository(
     override suspend fun saveWantActivity(activity: WantActivity, userId: String) {
         db.habitTrackerDatabaseQueries.upsertWantActivity(
             id = activity.id,
-            userId = if (activity.isCustom) userId else null,
+            userId = userId,
             name = activity.name,
             unit = activity.unit,
             costPerUnit = activity.costPerUnit,

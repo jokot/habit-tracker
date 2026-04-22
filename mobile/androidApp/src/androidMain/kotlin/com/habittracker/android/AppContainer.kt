@@ -59,12 +59,9 @@ class AppContainer(context: Context) {
         if (identityRepository.getAllIdentities().isEmpty()) {
             identityRepository.upsertIdentities(SeedData.identities)
         }
-        val userId = currentUserId()
-        if (wantActivityRepository.getWantActivities(userId).isEmpty()) {
-            SeedData.wantActivities.forEach { activity ->
-                wantActivityRepository.saveWantActivity(activity, userId)
-            }
-        }
+        // Want activities are NOT auto-seeded — user picks their subset during
+        // onboarding's WantsStep, which writes only the selected rows scoped to
+        // currentUserId(). Home shows exactly what the user selected.
     }
 
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
