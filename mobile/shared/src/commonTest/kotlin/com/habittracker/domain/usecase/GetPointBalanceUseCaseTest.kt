@@ -65,11 +65,12 @@ class GetPointBalanceUseCaseTest {
     }
 
     @Test
-    fun `balance can go negative when spending exceeds earning`() = runTest {
+    fun `balance clamps at zero even if raw spent exceeds earned`() = runTest {
+        // Direct write (bypasses LogWantUseCase lock) to verify display clamp.
         activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1.0))
         wantLogRepo.insertLog("l1", userId, "a1", 10.0, DeviceMode.OTHER, Clock.System.now())
         val result = useCase.execute(userId).getOrThrow()
-        assertEquals(-10, result.balance)
+        assertEquals(0, result.balance)
     }
 
     @Test

@@ -136,7 +136,7 @@ FOOD INDULGENCE
 - **Rollover cap:** unspent points carry to next day, max = `daily_earn_cap × 2`
 - **Rollover resets:** every Monday 00:00
 - **Point balance** = always computed from log history, never stored as a field
-- **Negative balance allowed:** if user spends more than they earn, `balance = earned - spent` can go below zero. UI shows debt state (error color + "Point Balance (debt)" label). v1 does not block want-logging when balance ≤ 0 — relies on user self-awareness. Hard lock can be added later.
+- **No negative balance (hard lock):** `balance = maxOf(0, earned - spent)`. Logging a want activity whose cost would drive balance below zero is **rejected** — `LogWantUseCase` returns `Result.failure(InsufficientPointsException)` and no row is inserted. UI surfaces "Not enough points" error. Users must earn first, spend second.
 - **Per-habit daily earn cap:** a single habit cannot contribute more than its `daily_target` to daily/weekly earned totals. Logging past the target is still recorded (for exchange-rate algorithm data) but contributes 0 points.
 
 ### 2.4 Progress Bar

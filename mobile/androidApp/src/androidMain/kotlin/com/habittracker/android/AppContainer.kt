@@ -42,11 +42,11 @@ class AppContainer(context: Context) {
 
     val userIdentityProvider = UserIdentityProvider(authRepository, localUserIdStore)
 
+    val getPointBalanceUseCase = GetPointBalanceUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
     val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
-    val logWantUseCase = LogWantUseCase(wantLogRepository, wantActivityRepository)
+    val logWantUseCase = LogWantUseCase(wantLogRepository, wantActivityRepository, getPointBalanceUseCase)
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
-    val getPointBalanceUseCase = GetPointBalanceUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
     val isOnboardedUseCase = IsOnboardedUseCase(habitRepository)
     val getHabitTemplatesForIdentityUseCase = GetHabitTemplatesForIdentityUseCase()
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
