@@ -2610,11 +2610,356 @@ rtk git commit -m "feat: add Home screen with habit progress and point balance"
 
 ---
 
+## Task 8.5: Guest Mode — LocalUserIdProvider + Navigation Rework
+
+**Motivation:** Spec §8.3 revised — auth is optional. App must work fully offline without sign-in. Auth is reachable from Home via "Sign in to sync" CTA. `currentUserId()` returns the Supabase `auth.uid()` if logged in, else a persisted `localUserId`.
+
+**Files:**
+- Create: `mobile/shared/src/commonMain/kotlin/com/habittracker/data/local/LocalUserIdStore.kt` (expect)
+- Create: `mobile/shared/src/androidMain/kotlin/com/habittracker/data/local/LocalUserIdStore.android.kt` (actual — SharedPreferences)
+- Create: `mobile/shared/src/iosMain/kotlin/com/habittracker/data/local/LocalUserIdStore.ios.kt` (actual — NSUserDefaults)
+- Create: `mobile/shared/src/commonMain/kotlin/com/habittracker/domain/UserIdentityProvider.kt`
+- Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/AppContainer.kt`
+- Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/navigation/AppNavigation.kt`
+- Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/auth/AuthViewModel.kt`
+- Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/home/HomeScreen.kt`
+- Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/home/HomeViewModel.kt`
+- Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/onboarding/OnboardingViewModel.kt`
+- Modify: `mobile/shared/src/commonMain/sqldelight/com/habittracker/data/local/HabitTrackerDatabase.sq` (add `migrateLocalUserIdTo`, `clearUserData` queries)
+- Modify: `mobile/shared/src/commonMain/kotlin/com/habittracker/data/repository/*` (add migrate/clear hooks on each repo)
+
+### Step 1: `LocalUserIdStore` expect
+
+`mobile/shared/src/commonMain/kotlin/com/habittracker/data/local/LocalUserIdStore.kt`:
+
+```kotlin
+package com.habittracker.data.local
+
+expect class LocalUserIdStore {
+    fun getOrCreate(): String
+}
+```
+
+### Step 2: Android actual (SharedPreferences)
+
+`mobile/shared/src/androidMain/kotlin/com/habittracker/data/local/LocalUserIdStore.android.kt`:
+
+```kotlin
+package com.habittracker.data.local
+
+import android.content.Context
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+actual class LocalUserIdStore(context: Context) {
+    private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    @OptIn(ExperimentalUuidApi::class)
+    actual fun getOrCreate(): String {
+        val existing = prefs.getString(KEY_LOCAL_USER_ID, null)
+        if (existing != null) return existing
+        val fresh = Uuid.random().toString()
+        prefs.edit().putString(KEY_LOCAL_USER_ID, fresh).apply()
+        return fresh
+    }
+
+    private companion object {
+        const val PREFS_NAME = "habit_tracker_identity"
+        const val KEY_LOCAL_USER_ID = "local_user_id"
+    }
+}
+```
+
+### Step 3: iOS actual (NSUserDefaults)
+
+`mobile/shared/src/iosMain/kotlin/com/habittracker/data/local/LocalUserIdStore.ios.kt`:
+
+```kotlin
+package com.habittracker.data.local
+
+import platform.Foundation.NSUserDefaults
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+actual class LocalUserIdStore {
+    private val defaults = NSUserDefaults.standardUserDefaults
+
+    @OptIn(ExperimentalUuidApi::class)
+    actual fun getOrCreate(): String {
+        val existing = defaults.stringForKey(KEY)
+        if (existing != null) return existing
+        val fresh = Uuid.random().toString()
+        defaults.setObject(fresh, KEY)
+        return fresh
+    }
+
+    private companion object {
+        const val KEY = "habit_tracker.local_user_id"
+    }
+}
+```
+
+### Step 4: `UserIdentityProvider`
+
+`mobile/shared/src/commonMain/kotlin/com/habittracker/domain/UserIdentityProvider.kt`:
+
+```kotlin
+package com.habittracker.domain
+
+import com.habittracker.data.local.LocalUserIdStore
+import com.habittracker.data.repository.AuthRepository
+
+class UserIdentityProvider(
+    private val authRepository: AuthRepository,
+    private val localUserIdStore: LocalUserIdStore,
+) {
+    fun currentUserId(): String =
+        authRepository.currentUserId() ?: localUserIdStore.getOrCreate()
+
+    fun localUserId(): String = localUserIdStore.getOrCreate()
+
+    fun isAuthenticated(): Boolean = authRepository.isLoggedIn()
+}
+```
+
+### Step 5: Add SQLDelight migrate + clear queries
+
+Append to `HabitTrackerDatabase.sq`:
+
+```sql
+-- User id migration (guest → authenticated)
+migrateHabitsUserId:
+UPDATE LocalHabit SET userId = ? WHERE userId = ?;
+
+migrateHabitLogsUserId:
+UPDATE HabitLog SET userId = ? WHERE userId = ?;
+
+migrateWantLogsUserId:
+UPDATE WantLog SET userId = ? WHERE userId = ?;
+
+migrateWantActivitiesUserId:
+UPDATE LocalWantActivity SET userId = ? WHERE userId = ?;
+
+-- Logout wipe
+clearHabitsForUser:
+DELETE FROM LocalHabit WHERE userId = ?;
+
+clearHabitLogsForUser:
+DELETE FROM HabitLog WHERE userId = ?;
+
+clearWantLogsForUser:
+DELETE FROM WantLog WHERE userId = ?;
+
+clearCustomWantActivitiesForUser:
+DELETE FROM LocalWantActivity WHERE userId = ?;
+```
+
+### Step 6: Repo hooks
+
+Add to `HabitRepository` interface:
+```kotlin
+suspend fun migrateUserId(oldUserId: String, newUserId: String)
+suspend fun clearForUser(userId: String)
+```
+
+Add to `HabitLogRepository`, `WantLogRepository`, `WantActivityRepository` the same pair. `IdentityRepository` is user-agnostic (seed data) — skip.
+
+`LocalHabitRepository` impl:
+```kotlin
+override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
+    db.habitTrackerDatabaseQueries.migrateHabitsUserId(newUserId, oldUserId)
+}
+
+override suspend fun clearForUser(userId: String) {
+    db.habitTrackerDatabaseQueries.clearHabitsForUser(userId)
+}
+```
+
+Mirror pattern on `LocalHabitLogRepository`, `LocalWantLogRepository`, `LocalWantActivityRepository`. `FakeHabitRepository` / `FakeHabitLogRepository` / `FakeWantActivityRepository` / `FakeWantLogRepository` in commonTest also add trivial implementations.
+
+### Step 7: AppContainer rework
+
+Replace the existing `AppContainer`:
+
+```kotlin
+package com.habittracker.android
+
+import android.content.Context
+import com.habittracker.data.local.DatabaseDriverFactory
+import com.habittracker.data.local.HabitTrackerDatabase
+import com.habittracker.data.local.LocalUserIdStore
+import com.habittracker.data.local.SeedData
+import com.habittracker.data.remote.SupabaseClientFactory
+import com.habittracker.data.repository.LocalHabitLogRepository
+import com.habittracker.data.repository.LocalHabitRepository
+import com.habittracker.data.repository.LocalIdentityRepository
+import com.habittracker.data.repository.LocalWantActivityRepository
+import com.habittracker.data.repository.LocalWantLogRepository
+import com.habittracker.data.repository.SupabaseAuthRepository
+import com.habittracker.domain.UserIdentityProvider
+import com.habittracker.domain.usecase.GetHabitTemplatesForIdentityUseCase
+import com.habittracker.domain.usecase.GetPointBalanceUseCase
+import com.habittracker.domain.usecase.IsOnboardedUseCase
+import com.habittracker.domain.usecase.LogHabitUseCase
+import com.habittracker.domain.usecase.LogWantUseCase
+import com.habittracker.domain.usecase.SetupUserHabitsUseCase
+import com.habittracker.domain.usecase.SetupUserWantActivitiesUseCase
+import com.habittracker.domain.usecase.UndoHabitLogUseCase
+import com.habittracker.domain.usecase.UndoWantLogUseCase
+
+class AppContainer(context: Context) {
+
+    private val supabase = SupabaseClientFactory.create(
+        url = BuildConfig.SUPABASE_URL,
+        key = BuildConfig.SUPABASE_ANON_KEY,
+    )
+
+    private val db = HabitTrackerDatabase(DatabaseDriverFactory(context).createDriver())
+    private val localUserIdStore = LocalUserIdStore(context)
+
+    val authRepository = SupabaseAuthRepository(supabase)
+    val identityRepository = LocalIdentityRepository(db)
+    val habitRepository = LocalHabitRepository(db)
+    val habitLogRepository = LocalHabitLogRepository(db)
+    val wantActivityRepository = LocalWantActivityRepository(db)
+    val wantLogRepository = LocalWantLogRepository(db)
+
+    val userIdentityProvider = UserIdentityProvider(authRepository, localUserIdStore)
+
+    val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
+    val logWantUseCase = LogWantUseCase(wantLogRepository, wantActivityRepository)
+    val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
+    val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
+    val getPointBalanceUseCase = GetPointBalanceUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
+    val isOnboardedUseCase = IsOnboardedUseCase(habitRepository)
+    val getHabitTemplatesForIdentityUseCase = GetHabitTemplatesForIdentityUseCase()
+    val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
+    val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
+
+    fun currentUserId(): String = userIdentityProvider.currentUserId()
+    fun isAuthenticated(): Boolean = userIdentityProvider.isAuthenticated()
+
+    suspend fun seedLocalDataIfEmpty() {
+        if (identityRepository.getAllIdentities().isEmpty()) {
+            identityRepository.upsertIdentities(SeedData.identities)
+        }
+        val userId = currentUserId()
+        if (wantActivityRepository.getWantActivities(userId).isEmpty()) {
+            SeedData.wantActivities.forEach { activity ->
+                wantActivityRepository.saveWantActivity(activity, userId)
+            }
+        }
+    }
+
+    /** Guest → authenticated: rewrite user_id on all local rows from local → auth. Call after successful sign-in/sign-up. */
+    suspend fun migrateLocalToAuthenticated(authUserId: String) {
+        val localId = userIdentityProvider.localUserId()
+        if (localId == authUserId) return
+        habitRepository.migrateUserId(localId, authUserId)
+        habitLogRepository.migrateUserId(localId, authUserId)
+        wantLogRepository.migrateUserId(localId, authUserId)
+        wantActivityRepository.migrateUserId(localId, authUserId)
+    }
+
+    /** Authenticated → guest: wipe everything owned by auth user. Call inside logout flow after unsynced rows are handled. */
+    suspend fun clearAuthenticatedUserData(authUserId: String) {
+        habitRepository.clearForUser(authUserId)
+        habitLogRepository.clearForUser(authUserId)
+        wantLogRepository.clearForUser(authUserId)
+        wantActivityRepository.clearForUser(authUserId)
+    }
+}
+```
+
+### Step 8: Dynamic startDestination in AppNavigation
+
+Replace the NavHost construction:
+
+```kotlin
+@Composable
+fun AppNavigation(container: AppContainer) {
+    val navController = rememberNavController()
+    var startDestination by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        container.seedLocalDataIfEmpty()
+        val userId = container.currentUserId()
+        startDestination = if (container.isOnboardedUseCase.execute(userId)) {
+            Screen.Home.route
+        } else {
+            Screen.Onboarding.route
+        }
+    }
+
+    val start = startDestination ?: return  // composing a loader is fine too
+    NavHost(navController = navController, startDestination = start) {
+        composable(Screen.Auth.route) {
+            val vm = viewModel { AuthViewModel(container) }
+            AuthScreen(
+                viewModel = vm,
+                onSuccess = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.Onboarding.route) { /* unchanged */ }
+        composable(Screen.Home.route) {
+            val vm = viewModel { HomeViewModel(container) }
+            HomeScreen(
+                viewModel = vm,
+                onLogHabit = { habitId -> navController.navigate(Screen.LogHabit.route(habitId)) },
+                onLogWant = { activityId -> navController.navigate(Screen.LogWant.route(activityId)) },
+                onSignIn = { navController.navigate(Screen.Auth.route) },
+            )
+        }
+        composable(Screen.LogHabit.route, ...) { /* unchanged */ }
+        composable(Screen.LogWant.route, ...) { /* unchanged */ }
+    }
+}
+```
+
+Imports to add: `androidx.compose.runtime.remember`, `mutableStateOf`, `setValue`, `getValue`, `LaunchedEffect`. Drop the `AuthNavigation` collection block (Auth is no longer the entry point).
+
+### Step 9: AuthViewModel rework
+
+- Drop the `init {}` auto-navigate block.
+- Replace `AuthNavigation` sealed interface with `sealed interface AuthEvent { object Success : AuthEvent }`.
+- On successful sign-in/sign-up:
+  - call `container.migrateLocalToAuthenticated(session.userId)` (merges guest data into the authenticated account).
+  - call `container.seedLocalDataIfEmpty()` (safety net — want activities may not have seeded under the new user id).
+  - emit `AuthEvent.Success` → screen calls `onSuccess()` → pops back to Home.
+- `AuthScreen` signature: `onSuccess: () -> Unit, onBack: () -> Unit`.
+
+### Step 10: Home sign-in CTA
+
+- `HomeScreen` signature adds `onSignIn: () -> Unit`.
+- In the `TopAppBar`, show an "IconButton / TextButton: Sign in" action when `uiState.isAuthenticated == false`. When authenticated, show email + sign-out (sign-out UI is Phase 4 scope — for Phase 2 leave a placeholder "Sign out — coming in Phase 4" that just logs).
+- `HomeViewModel.HomeUiState` gains `isAuthenticated: Boolean = false`. Populate from `container.isAuthenticated()` inside `load()`.
+
+### Step 11: OnboardingViewModel rework
+
+Replace `val userId = container.authRepository.currentUserId() ?: run { ...error... }` with `val userId = container.currentUserId()`. The "Not logged in" error path goes away — guest flow is supported.
+
+### Step 12: Build + test + commit
+
+```bash
+./gradlew :mobile:shared:compileDebugKotlinAndroid
+./gradlew :mobile:androidApp:assembleDebug
+./gradlew :mobile:shared:allTests
+git add mobile/shared/src mobile/androidApp/src
+git commit -m "feat: guest mode — optional auth with local user id, migration on sign-in"
+```
+
+**Logout UI is deferred to Phase 4** (sync layer owns the push-before-wipe + confirmation dialog). Phase 2 ships with sign-in-only; sign-out path stays as a TODO.
+
+---
+
 ## Task 9: Log Habit Screen + ViewModel
 
 **Files:**
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogHabitViewModel.kt`
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogHabitScreen.kt`
+
+> **Guest-mode retrofit:** Replace every `container.authRepository.currentUserId() ?: return…` with `container.currentUserId()`. Auth is optional (Task 8.5); `currentUserId()` always returns a non-null id (falls back to `localUserId`).
 
 - [ ] **Step 1: Write full LogHabitViewModel.kt**
 
@@ -2898,6 +3243,8 @@ rtk git commit -m "feat: add Log Habit screen with point display and 5-min undo"
 **Files:**
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogWantViewModel.kt`
 - Modify: `mobile/androidApp/src/androidMain/kotlin/com/habittracker/android/ui/log/LogWantScreen.kt`
+
+> **Guest-mode retrofit:** Replace every `container.authRepository.currentUserId() ?: return…` with `container.currentUserId()`. Same rationale as Task 9.
 
 - [ ] **Step 1: Write full LogWantViewModel.kt**
 

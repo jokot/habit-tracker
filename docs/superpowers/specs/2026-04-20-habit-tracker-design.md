@@ -313,7 +313,45 @@ habit-tracker/
 
 ### 8.3 Offline-First Sync
 
-**Principle:** Local DB is source of truth. Supabase is backup + cross-device sync.
+**Principle:** Local DB is source of truth. Supabase is backup + cross-device sync. **Auth is optional** — the app is fully usable without sign-in.
+
+**Guest mode (no auth):**
+- On first launch, app generates a random UUID (`localUserId`) and persists it in platform settings (Android DataStore / iOS UserDefaults).
+- All local rows (`habits`, `habit_logs`, `want_logs`, `want_activities` with `isCustom`) store `user_id = localUserId`.
+- Everything works offline: onboarding, log need/want, point balance, undo, streak.
+- Supabase client is created but not called; no network required.
+
+**Authenticated mode (opt-in, for sync across devices):**
+- User reaches `AuthScreen` from Home → "Sign in to sync" CTA (not forced on launch).
+- After successful sign-in/sign-up, `currentUserId` switches from `localUserId` to Supabase `auth.uid()`.
+- Phase 4 sync: migrate local rows where `user_id = localUserId` → remote `auth.uid()` on first sign-in, then push unsynced rows. Local DB remains source of truth.
+- Sign-out: revert to `localUserId` (local data untouched); Phase 4 handles detach/reattach semantics.
+
+**`currentUserId()` contract:** returns the remote user id if a Supabase session is active, otherwise the persisted `localUserId`. Never null once the app has launched (local id is generated before first read).
+
+**Startup navigation:**
+- If local habits exist for `currentUserId` → `HomeScreen`.
+- Else → `OnboardingScreen`.
+- `AuthScreen` is never a mandatory gate.
+
+**Auth state transitions:**
+
+*Guest → Authenticated (sign-in / sign-up):*
+1. User reaches `AuthScreen` from Home's "Sign in to sync" CTA.
+2. On success, Supabase session is stored. `currentUserId()` now returns `auth.uid()`.
+3. One-time migration: `UPDATE habits/habit_logs/want_logs/want_activities SET user_id = auth.uid() WHERE user_id = localUserId`. Runs inside a single SQL transaction.
+4. `synced_at` stays null on migrated rows — Phase 4 sync will push them.
+5. On sign-in from a second device (cloud data already exists): pull remote rows, merge by `id`; local guest data is still migrated and pushed.
+6. `localUserId` is preserved in settings so sign-out can revert to the same guest identity.
+
+*Authenticated → Guest (sign-out):*
+1. Confirmation dialog: "Sign out? Local data on this device will be cleared. Cloud data stays."
+2. Before clearing, push any `synced_at = null` rows. If push fails (offline, network error): dialog becomes "N unsynced logs will be lost. Sign out anyway?" — user can retry or force.
+3. On confirm: clear all local rows where `user_id = auth.uid()` (habits, habit_logs, want_logs, custom want_activities, local identities).
+4. Clear Supabase session. `currentUserId()` reverts to the persisted `localUserId`.
+5. App returns to Onboarding (local DB is empty under `localUserId` again).
+
+*Re-sign-in after sign-out:* Phase 4 pulls from Supabase into local DB under `auth.uid()`. Instant recovery of cloud data.
 
 **Log record structure:**
 ```
@@ -390,7 +428,7 @@ want_logs (
 )
 ```
 
-All tables: RLS `user_id = auth.uid()`.
+All tables: RLS `user_id = auth.uid()` (Supabase side). Local SQLite holds `user_id` as a plain TEXT — it can be either `auth.uid()` (authenticated) or a client-generated `localUserId` (guest). The sync layer (Phase 4) maps `localUserId → auth.uid()` on first sign-in.
 
 ---
 
