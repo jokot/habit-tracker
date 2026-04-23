@@ -331,8 +331,8 @@ habit-tracker/
 **Authenticated mode (opt-in, for sync across devices):**
 - User reaches `AuthScreen` from Home → "Sign in to sync" CTA (not forced on launch).
 - After successful sign-in/sign-up, `currentUserId` switches from `localUserId` to Supabase `auth.uid()`.
-- Phase 4 sync: migrate local rows where `user_id = localUserId` → remote `auth.uid()` on first sign-in, then push unsynced rows. Local DB remains source of truth.
-- Sign-out: revert to `localUserId` (local data untouched); Phase 4 handles detach/reattach semantics.
+- Phase 3 sync: migrate local rows where `user_id = localUserId` → remote `auth.uid()` on first sign-in, then push unsynced rows. Local DB remains source of truth.
+- Sign-out: revert to `localUserId` (local data untouched); Phase 3 handles detach/reattach semantics.
 
 **`currentUserId()` contract:** returns the remote user id if a Supabase session is active, otherwise the persisted `localUserId`. Never null once the app has launched (local id is generated before first read).
 
@@ -347,7 +347,7 @@ habit-tracker/
 1. User reaches `AuthScreen` from Home's "Sign in to sync" CTA.
 2. On success, Supabase session is stored. `currentUserId()` now returns `auth.uid()`.
 3. One-time migration: `UPDATE habits/habit_logs/want_logs/want_activities SET user_id = auth.uid() WHERE user_id = localUserId`. Runs inside a single SQL transaction.
-4. `synced_at` stays null on migrated rows — Phase 4 sync will push them.
+4. `synced_at` stays null on migrated rows — Phase 3 sync will push them.
 5. On sign-in from a second device (cloud data already exists): pull remote rows, merge by `id`; local guest data is still migrated and pushed.
 6. `localUserId` is preserved in settings so sign-out can revert to the same guest identity.
 
@@ -358,7 +358,7 @@ habit-tracker/
 4. Clear Supabase session. `currentUserId()` reverts to the persisted `localUserId`.
 5. App returns to Onboarding (local DB is empty under `localUserId` again).
 
-*Re-sign-in after sign-out:* Phase 4 pulls from Supabase into local DB under `auth.uid()`. Instant recovery of cloud data.
+*Re-sign-in after sign-out:* Phase 3 pulls from Supabase into local DB under `auth.uid()`. Instant recovery of cloud data.
 
 **Log record structure:**
 ```
@@ -435,7 +435,7 @@ want_logs (
 )
 ```
 
-All tables: RLS `user_id = auth.uid()` (Supabase side). Local SQLite holds `user_id` as a plain TEXT — it can be either `auth.uid()` (authenticated) or a client-generated `localUserId` (guest). The sync layer (Phase 4) maps `localUserId → auth.uid()` on first sign-in.
+All tables: RLS `user_id = auth.uid()` (Supabase side). Local SQLite holds `user_id` as a plain TEXT — it can be either `auth.uid()` (authenticated) or a client-generated `localUserId` (guest). The sync layer (Phase 3) maps `localUserId → auth.uid()` on first sign-in.
 
 ---
 
@@ -503,8 +503,8 @@ Identity Reinforced by data
 |---|---|---|
 | 1 | Supabase schema + RLS + auth, KMP skeleton, SQLDelight setup, Ktor client, UI theme (Material 3 + tokens + dark/light), offline-first log model with soft delete | Week 1–2 |
 | 2 | Core habit loop (Android): onboarding, identity→habit setup, log need→earn, log want→spend (both modes), point balance, 3-second tap-to-commit, guest mode, Supabase email/password auth | Week 3–5 |
-| 3 | Streak 30-day view (3 states, rounded squares), progress bar per habit, basic notifications | Week 6–7 |
-| 4 | Sync + auth hardening: push local → Supabase, pull, merge; logout UI with confirm + push-before-wipe; email-confirmation-required UX ("Check your email" state); Google OAuth sign-in; `AuthRepository` gains confirmation-pending result; iOS-ready session handling | Week 8–9 |
+| 3 | Sync + auth hardening: push local → Supabase, pull, merge; logout UI with confirm + push-before-wipe; email-confirmation-required UX ("Check your email" state); Google OAuth sign-in; `AuthRepository` gains confirmation-pending result; cross-device restore (pull on login + skip onboarding when cloud has data); iOS-ready session handling | Week 6–7 |
+| 4 | Streak 30-day view (3 states, rounded squares), progress bar per habit, basic notifications | Week 8–9 |
 | 5 | Android widgets: point balance + quick log, 30-day streak grid | Week 10 |
 | 5+ | On-device timer for want activities (Android), alarm notification on timer end | Week 10–11 |
 | 6 | iOS: SwiftUI screens + WidgetKit extensions (same shared KMP logic) | Week 11–13 |
@@ -516,9 +516,12 @@ Identity Reinforced by data
 - No exchange rate until Phase 7 — needs real usage data
 - Widgets after core app + sync stable, not before
 - Android overlay = Phase 6+ backlog, not core scope
-- Per-habit streak widget = Phase 3+ backlog
+- Per-habit streak widget = Phase 5+ backlog
+- **Phase 3 before Phase 4 rationale:** cross-device data continuity is the most visible promise ("Sign in to sync"). Fresh reinstall + sign-in without Phase 3 = data gone (bad UX). Streaks are motivational polish, valuable but not critical — safe to land after sync is solid.
 
-**Phase 4 — known follow-ups from Phase 2:**
-- **Email-confirmation UX.** Currently `SupabaseAuthRepository.signUp` throws `"Sign up returned no session"` if email confirmation is enabled on the Supabase project. Phase 4 introduces a `SignUpResult` sealed type (`SignedIn(UserSession)` | `ConfirmationRequired(email)`); AuthViewModel surfaces a "Check your email to confirm your account" state; local data is NOT migrated until the user confirms + signs in, so guest state is preserved.
-- **Google OAuth.** Add `supabase-oauth` integration, Android deep-link handler for the return URI, and a "Continue with Google" primary button on AuthScreen (above email fields). Shares the same post-success flow as email/password (migrate → refresh authState → navigate Home).
-- **Logout UI** (also deferred from Phase 2): confirmation dialog, push-unsynced-rows guard, `clearAuthenticatedUserData` wiring already exists in AppContainer.
+**Phase 3 — known follow-ups from Phase 2:**
+- **Sync push/pull.** Worker reads rows with `synced_at IS NULL`, pushes to Supabase under `auth.uid()`, stamps `synced_at` on ack. Pull since `last_pull_timestamp`, merge by `id`. Drives fresh-reinstall-+-login restore: on app launch, if session exists and local DB is empty under `auth.uid()`, pull first, then skip onboarding if rows exist; onboard if cloud is also empty.
+- **Email-confirmation UX.** `SupabaseAuthRepository.signUp` currently throws `"Sign up returned no session"` if email confirmation is enabled. Introduce `SignUpResult` sealed type (`SignedIn(UserSession)` | `ConfirmationRequired(email)`). AuthViewModel surfaces "Check your email to confirm your account"; local data is NOT migrated until the user confirms + signs in, so guest state is preserved.
+- **Google OAuth.** Add `supabase-oauth`, Android deep-link handler for the return URI (`com.habittracker.android://auth-callback`), "Continue with Google" primary button on AuthScreen above email fields. Shares the same post-success flow as email/password (migrate → refreshAuthState → navigate Home).
+- **Logout UI.** Confirmation dialog, push-unsynced-rows guard, session clear, `clearAuthenticatedUserData` (already wired in AppContainer), `refreshAuthState` → Home reverts to guest.
+- **Startup auth flow.** On launch: session restored + local empty → pull → populate → Home. Pull fails offline → offer retry + onboard-now choices. Session restored + local has rows → straight to Home (already behaves this way).
