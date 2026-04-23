@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
 import com.habittracker.data.repository.SignUpResult
+import com.habittracker.data.repository.UserSession
+import com.habittracker.data.sync.SyncReason
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -14,6 +16,7 @@ import kotlinx.coroutines.launch
 
 sealed interface AuthEvent {
     object Success : AuthEvent
+    data class ConfirmationEmailSent(val email: String) : AuthEvent
 }
 
 data class AuthUiState(
@@ -90,19 +93,10 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 container.authRepository.signUp(state.email.trim(), state.password)
                     .onSuccess { outcome ->
                         when (outcome) {
-                            is SignUpResult.SignedIn -> {
-                                val session = outcome.session
-                                container.migrateLocalToAuthenticated(session.userId)
-                                container.refreshAuthState()
-                                container.seedLocalDataIfEmpty()
-                                _events.emit(AuthEvent.Success)
-                            }
+                            is SignUpResult.SignedIn -> completeSignIn(outcome.session)
                             is SignUpResult.ConfirmationRequired -> {
-                                // Task 14 will emit a proper event; for now surface as error so UI isn't silently stuck.
-                                _uiState.value = _uiState.value.copy(
-                                    isLoading = false,
-                                    error = "Check your email (${outcome.email}) to confirm your account.",
-                                )
+                                _uiState.value = _uiState.value.copy(isLoading = false)
+                                _events.emit(AuthEvent.ConfirmationEmailSent(outcome.email))
                             }
                         }
                     }.onFailure { e ->
@@ -110,15 +104,33 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                     }
             } else {
                 container.authRepository.signIn(state.email.trim(), state.password)
-                    .onSuccess { session ->
-                        container.migrateLocalToAuthenticated(session.userId)
-                        container.refreshAuthState()
-                        container.seedLocalDataIfEmpty()
-                        _events.emit(AuthEvent.Success)
-                    }.onFailure { e ->
+                    .onSuccess { session -> completeSignIn(session) }
+                    .onFailure { e ->
                         _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Auth failed")
                     }
             }
         }
+    }
+
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            container.authRepository.signInWithGoogle(idToken)
+                .onSuccess { session -> completeSignIn(session) }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message ?: "Google sign-in failed",
+                    )
+                }
+        }
+    }
+
+    private suspend fun completeSignIn(session: UserSession) {
+        container.migrateLocalToAuthenticated(session.userId)
+        container.refreshAuthState()
+        container.seedLocalDataIfEmpty()
+        container.syncEngine.sync(SyncReason.POST_SIGN_IN)
+        _events.emit(AuthEvent.Success)
     }
 }

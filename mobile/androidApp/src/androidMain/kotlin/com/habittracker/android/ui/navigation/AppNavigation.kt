@@ -58,6 +58,7 @@ fun AppNavigation(container: AppContainer) {
             val vm = viewModel { AuthViewModel(container) }
             AuthScreen(
                 viewModel = vm,
+                launcher = container.googleSignInLauncher,
                 onSuccess = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
             )

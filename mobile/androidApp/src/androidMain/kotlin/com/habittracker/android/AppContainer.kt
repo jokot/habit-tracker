@@ -5,6 +5,9 @@ import com.habittracker.data.local.DatabaseDriverFactory
 import com.habittracker.data.local.HabitTrackerDatabase
 import com.habittracker.data.local.LocalUserIdStore
 import com.habittracker.data.local.SeedData
+import com.habittracker.data.local.SyncPreferences
+import com.habittracker.data.local.SyncWatermarkStore
+import com.habittracker.data.remote.GoogleSignInLauncher
 import com.habittracker.data.remote.SupabaseClientFactory
 import com.habittracker.data.repository.LocalHabitLogRepository
 import com.habittracker.data.repository.LocalHabitRepository
@@ -12,6 +15,10 @@ import com.habittracker.data.repository.LocalIdentityRepository
 import com.habittracker.data.repository.LocalWantActivityRepository
 import com.habittracker.data.repository.LocalWantLogRepository
 import com.habittracker.data.repository.SupabaseAuthRepository
+import com.habittracker.data.sync.PostgrestSupabaseSyncClient
+import com.habittracker.data.sync.SupabaseSyncClient
+import com.habittracker.data.sync.SyncEngine
+import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentityUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
@@ -31,6 +38,8 @@ data class AuthState(val userId: String, val isAuthenticated: Boolean)
 
 class AppContainer(context: Context) {
 
+    val appContext: Context = context.applicationContext
+
     private val supabase = SupabaseClientFactory.create(
         url = BuildConfig.SUPABASE_URL,
         key = BuildConfig.SUPABASE_ANON_KEY,
@@ -45,6 +54,30 @@ class AppContainer(context: Context) {
     val habitLogRepository = LocalHabitLogRepository(db)
     val wantActivityRepository = LocalWantActivityRepository(db)
     val wantLogRepository = LocalWantLogRepository(db)
+
+    private val syncPreferences = SyncPreferences(appContext)
+    private val watermarks = SyncWatermarkStore(syncPreferences)
+    private val supabaseSyncClient: SupabaseSyncClient = PostgrestSupabaseSyncClient(supabase)
+
+    private val syncIdentity = object : SyncIdentity {
+        override fun currentUserId(): String = this@AppContainer.currentUserId()
+        override fun isAuthenticated(): Boolean = this@AppContainer.isAuthenticated()
+    }
+
+    val syncEngine = SyncEngine(
+        habitRepository,
+        habitLogRepository,
+        wantActivityRepository,
+        wantLogRepository,
+        supabaseSyncClient,
+        watermarks,
+        syncIdentity,
+    )
+
+    val googleSignInLauncher = GoogleSignInLauncher(
+        context = appContext,
+        webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID,
+    )
 
     val userIdentityProvider = UserIdentityProvider(authRepository, localUserIdStore)
 
