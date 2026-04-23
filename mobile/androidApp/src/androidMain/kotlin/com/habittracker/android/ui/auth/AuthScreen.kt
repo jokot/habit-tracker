@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.habittracker.android.ui.theme.Spacing
 
@@ -107,14 +109,50 @@ fun AuthScreen(
                 label = { Text("Password") },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (uiState.isPasswordVisible) VisualTransformation.None
+                else PasswordVisualTransformation(),
+                trailingIcon = {
+                    VisibilityToggle(
+                        visible = uiState.isPasswordVisible,
+                        onClick = viewModel::togglePasswordVisibility,
+                    )
+                },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
+                    imeAction = if (uiState.isSignUp) ImeAction.Next else ImeAction.Done,
                 ),
                 keyboardActions = KeyboardActions(onDone = { viewModel.submit() }),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            Box(modifier = Modifier.animateContentSize()) {
+                if (uiState.isSignUp) {
+                    Column {
+                        Spacer(Modifier.height(Spacing.md))
+                        OutlinedTextField(
+                            value = uiState.confirmPassword,
+                            onValueChange = viewModel::onConfirmPasswordChange,
+                            label = { Text("Confirm password") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            visualTransformation = if (uiState.isConfirmPasswordVisible) VisualTransformation.None
+                            else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                VisibilityToggle(
+                                    visible = uiState.isConfirmPasswordVisible,
+                                    onClick = viewModel::toggleConfirmPasswordVisibility,
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done,
+                            ),
+                            keyboardActions = KeyboardActions(onDone = { viewModel.submit() }),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
 
             Box(modifier = Modifier.animateContentSize()) {
                 uiState.error?.let { errorMsg ->
@@ -236,6 +274,17 @@ private fun ToggleSignUpRow(isSignUp: Boolean, enabled: Boolean, onToggle: () ->
         TextButton(onClick = onToggle, enabled = enabled) {
             Text(if (isSignUp) "Sign In" else "Create an account")
         }
+    }
+}
+
+@Composable
+private fun VisibilityToggle(visible: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Text(
+            text = if (visible) "Hide" else "Show",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 

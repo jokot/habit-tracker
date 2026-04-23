@@ -18,7 +18,10 @@ sealed interface AuthEvent {
 data class AuthUiState(
     val email: String = "",
     val password: String = "",
+    val confirmPassword: String = "",
     val isSignUp: Boolean = false,
+    val isPasswordVisible: Boolean = false,
+    val isConfirmPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -39,8 +42,28 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         _uiState.value = _uiState.value.copy(password = value, error = null)
     }
 
+    fun onConfirmPasswordChange(value: String) {
+        _uiState.value = _uiState.value.copy(confirmPassword = value, error = null)
+    }
+
+    fun togglePasswordVisibility() {
+        _uiState.value = _uiState.value.copy(isPasswordVisible = !_uiState.value.isPasswordVisible)
+    }
+
+    fun toggleConfirmPasswordVisibility() {
+        _uiState.value = _uiState.value.copy(
+            isConfirmPasswordVisible = !_uiState.value.isConfirmPasswordVisible,
+        )
+    }
+
     fun toggleSignUp() {
-        _uiState.value = _uiState.value.copy(isSignUp = !_uiState.value.isSignUp, error = null)
+        val current = _uiState.value
+        _uiState.value = current.copy(
+            isSignUp = !current.isSignUp,
+            confirmPassword = "",
+            isConfirmPasswordVisible = false,
+            error = null,
+        )
     }
 
     fun submit() {
@@ -48,6 +71,16 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         if (state.email.isBlank() || state.password.isBlank()) {
             _uiState.value = state.copy(error = "Email and password required")
             return
+        }
+        if (state.isSignUp) {
+            if (state.confirmPassword.isBlank()) {
+                _uiState.value = state.copy(error = "Please confirm your password")
+                return
+            }
+            if (state.password != state.confirmPassword) {
+                _uiState.value = state.copy(error = "Passwords don't match")
+                return
+            }
         }
         if (state.isLoading) return
         viewModelScope.launch {
