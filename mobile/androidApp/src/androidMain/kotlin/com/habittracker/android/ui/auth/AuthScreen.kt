@@ -20,7 +20,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -111,12 +115,14 @@ fun AuthScreen(
                 shape = RoundedCornerShape(14.dp),
                 visualTransformation = if (uiState.isPasswordVisible) VisualTransformation.None
                 else PasswordVisualTransformation(),
-                trailingIcon = {
-                    VisibilityToggle(
-                        visible = uiState.isPasswordVisible,
-                        onClick = viewModel::togglePasswordVisibility,
-                    )
-                },
+                trailingIcon = if (uiState.password.isNotEmpty()) {
+                    {
+                        VisibilityToggle(
+                            visible = uiState.isPasswordVisible,
+                            onClick = viewModel::togglePasswordVisibility,
+                        )
+                    }
+                } else null,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = if (uiState.isSignUp) ImeAction.Next else ImeAction.Done,
@@ -137,12 +143,14 @@ fun AuthScreen(
                             shape = RoundedCornerShape(14.dp),
                             visualTransformation = if (uiState.isConfirmPasswordVisible) VisualTransformation.None
                             else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                VisibilityToggle(
-                                    visible = uiState.isConfirmPasswordVisible,
-                                    onClick = viewModel::toggleConfirmPasswordVisibility,
-                                )
-                            },
+                            trailingIcon = if (uiState.confirmPassword.isNotEmpty()) {
+                                {
+                                    VisibilityToggle(
+                                        visible = uiState.isConfirmPasswordVisible,
+                                        onClick = viewModel::toggleConfirmPasswordVisibility,
+                                    )
+                                }
+                            } else null,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Password,
                                 imeAction = ImeAction.Done,
@@ -280,10 +288,10 @@ private fun ToggleSignUpRow(isSignUp: Boolean, enabled: Boolean, onToggle: () ->
 @Composable
 private fun VisibilityToggle(visible: Boolean, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Text(
-            text = if (visible) "Hide" else "Show",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
+        Icon(
+            imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+            contentDescription = if (visible) "Hide password" else "Show password",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
