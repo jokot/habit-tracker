@@ -22,6 +22,12 @@ import com.habittracker.domain.usecase.SetupUserHabitsUseCase
 import com.habittracker.domain.usecase.SetupUserWantActivitiesUseCase
 import com.habittracker.domain.usecase.UndoHabitLogUseCase
 import com.habittracker.domain.usecase.UndoWantLogUseCase
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/** Observable snapshot of who the app is currently acting as. */
+data class AuthState(val userId: String, val isAuthenticated: Boolean)
 
 class AppContainer(context: Context) {
 
@@ -52,8 +58,21 @@ class AppContainer(context: Context) {
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
     val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
 
-    fun currentUserId(): String = userIdentityProvider.currentUserId()
-    fun isAuthenticated(): Boolean = userIdentityProvider.isAuthenticated()
+    private val _authState = MutableStateFlow(snapshotAuthState())
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    fun currentUserId(): String = _authState.value.userId
+    fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
+
+    /** Re-reads auth session and publishes the new AuthState. Call after sign-in/out. */
+    fun refreshAuthState() {
+        _authState.value = snapshotAuthState()
+    }
+
+    private fun snapshotAuthState(): AuthState = AuthState(
+        userId = userIdentityProvider.currentUserId(),
+        isAuthenticated = userIdentityProvider.isAuthenticated(),
+    )
 
     suspend fun seedLocalDataIfEmpty() {
         if (identityRepository.getAllIdentities().isEmpty()) {

@@ -104,7 +104,7 @@ User logs time spent AFTER the activity (v1 = manual post-log, C mode).
 
 **Spending modes:**
 
-Phase 2 ships with a single implicit mode: `OTHER` (post-hoc manual log). The `This device` timer/overlay flow is deferred to Phase 5+ when the Android `SYSTEM_ALERT_WINDOW` overlay lands. `device_mode` is still stored on every log (defaulting to `OTHER`) so the column is ready when Phase 5 adds the UI toggle back.
+Phase 2 ships with a single implicit mode: `OTHER` (post-hoc manual log). The timer flow ("This device") lands in Phase 5+, and the overlay-enforcement flow lands in Phase 6+ when the Android `SYSTEM_ALERT_WINDOW` overlay is wired. `device_mode` is still stored on every log (defaulting to `OTHER`) so the column is ready when the UI toggle comes back.
 
 **Default spend rates (user-customizable):**
 ```
@@ -234,7 +234,7 @@ Users can add custom habits and custom want activities beyond defaults.
 
 ---
 
-## 6. Exchange Rate Algorithm (Phase 6)
+## 6. Exchange Rate Algorithm (Phase 7)
 
 Adjusts `threshold_per_point` based on rolling completion rate.
 
@@ -264,7 +264,7 @@ If completion_rate < 0.50 for 1 week:
 - Streak reset — "Streak reset. Start fresh today."
 - Want timer end — alarm-style notification when on-device timer expires (Phase 2 timer feature)
 
-**Phase 6 (with exchange rate):**
+**Phase 7 (with exchange rate):**
 - Friction increase — "Raising the bar on [habit]."
 - Milestones — 7-day, 30-day, 100-day streak
 
@@ -486,7 +486,7 @@ Recommended Habits selected
 Log Need → Earn Points → Log Want → Spend Points
     ↓ (visibility)
 Streak + Progress (proof of identity)
-    ↓ (Phase 6)
+    ↓ (Phase 7)
 Exchange Rate Increase (bar rises because you rose)
     ↓ (long-term)
 Identity Reinforced by data
@@ -502,17 +502,23 @@ Identity Reinforced by data
 | Phase | Scope | Timeline |
 |---|---|---|
 | 1 | Supabase schema + RLS + auth, KMP skeleton, SQLDelight setup, Ktor client, UI theme (Material 3 + tokens + dark/light), offline-first log model with soft delete | Week 1–2 |
-| 2 | Core habit loop (Android): onboarding, identity→habit setup, log need→earn, log want→spend (both modes), point balance, 5-min undo | Week 3–5 |
+| 2 | Core habit loop (Android): onboarding, identity→habit setup, log need→earn, log want→spend (both modes), point balance, 3-second tap-to-commit, guest mode, Supabase email/password auth | Week 3–5 |
 | 3 | Streak 30-day view (3 states, rounded squares), progress bar per habit, basic notifications | Week 6–7 |
-| 4 | Android widgets: point balance + quick log, 30-day streak grid | Week 8 |
-| 4+ | On-device timer for want activities (Android), alarm notification on timer end | Week 8–9 |
-| 5 | iOS: SwiftUI screens + WidgetKit extensions (same shared KMP logic) | Week 9–11 |
-| 5+ | Android overlay enforcement (SYSTEM_ALERT_WINDOW) — backlog, post-iOS validation | TBD |
-| 6 | Exchange rate algorithm, friction increase + milestone notifications | Week 12 |
+| 4 | Sync + auth hardening: push local → Supabase, pull, merge; logout UI with confirm + push-before-wipe; email-confirmation-required UX ("Check your email" state); Google OAuth sign-in; `AuthRepository` gains confirmation-pending result; iOS-ready session handling | Week 8–9 |
+| 5 | Android widgets: point balance + quick log, 30-day streak grid | Week 10 |
+| 5+ | On-device timer for want activities (Android), alarm notification on timer end | Week 10–11 |
+| 6 | iOS: SwiftUI screens + WidgetKit extensions (same shared KMP logic) | Week 11–13 |
+| 6+ | Android overlay enforcement (SYSTEM_ALERT_WINDOW) — backlog, post-iOS validation | TBD |
+| 7 | Exchange rate algorithm, friction increase + milestone notifications | Week 14 |
 
 **Guardrails:**
-- No iOS work until Phase 4 complete
-- No exchange rate until Phase 6 — needs real usage data
-- Widgets after core app stable, not before
-- Android overlay = Phase 5+ backlog, not core scope
-- Per-habit streak widget = Phase 2+ backlog
+- No iOS work until Phase 5 complete (widgets stable on Android first)
+- No exchange rate until Phase 7 — needs real usage data
+- Widgets after core app + sync stable, not before
+- Android overlay = Phase 6+ backlog, not core scope
+- Per-habit streak widget = Phase 3+ backlog
+
+**Phase 4 — known follow-ups from Phase 2:**
+- **Email-confirmation UX.** Currently `SupabaseAuthRepository.signUp` throws `"Sign up returned no session"` if email confirmation is enabled on the Supabase project. Phase 4 introduces a `SignUpResult` sealed type (`SignedIn(UserSession)` | `ConfirmationRequired(email)`); AuthViewModel surfaces a "Check your email to confirm your account" state; local data is NOT migrated until the user confirms + signs in, so guest state is preserved.
+- **Google OAuth.** Add `supabase-oauth` integration, Android deep-link handler for the return URI, and a "Continue with Google" primary button on AuthScreen (above email fields). Shares the same post-success flow as email/password (migrate → refresh authState → navigate Home).
+- **Logout UI** (also deferred from Phase 2): confirmation dialog, push-unsynced-rows guard, `clearAuthenticatedUserData` wiring already exists in AppContainer.

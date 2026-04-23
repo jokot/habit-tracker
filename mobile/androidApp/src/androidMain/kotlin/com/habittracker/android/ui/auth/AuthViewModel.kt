@@ -92,6 +92,7 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
             }
             result.onSuccess { session ->
                 container.migrateLocalToAuthenticated(session.userId)
+                container.refreshAuthState()
                 container.seedLocalDataIfEmpty()
                 _events.emit(AuthEvent.Success)
             }.onFailure { e ->

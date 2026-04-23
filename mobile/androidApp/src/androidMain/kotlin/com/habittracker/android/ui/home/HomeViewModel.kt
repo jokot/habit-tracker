@@ -19,7 +19,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -80,63 +82,69 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /** One countdown coroutine per want activity. */
     private val wantTimers = mutableMapOf<String, Job>()
 
-    init {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeHomeUiState() {
         viewModelScope.launch {
-            val userId = container.currentUserId()
-            val now = Clock.System.now()
-            val todayDate = now.toLocalDateTime(TimeZone.UTC).date
-            val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
-            val dayEnd = dayStart + 1.days
-            val weekStart = weekStartUtc()
-            val isAuthed = container.isAuthenticated()
+            container.authState
+                .flatMapLatest { auth ->
+                    val userId = auth.userId
+                    val now = Clock.System.now()
+                    val todayDate = now.toLocalDateTime(TimeZone.UTC).date
+                    val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
+                    val dayEnd = dayStart + 1.days
+                    val weekStart = weekStartUtc()
 
-            combine(
-                container.habitRepository.observeHabitsForUser(userId),
-                container.habitLogRepository.observeAllActiveLogsForUser(userId),
-                container.wantActivityRepository.observeWantActivities(userId),
-                container.wantLogRepository.observeAllActiveLogsForUser(userId),
-            ) { habits, habitLogs, wants, wantLogs ->
-                val habitsById = habits.associateBy { it.id }
-                val habitsWithProgress = habits.map { habit ->
-                    val pointsToday = habitLogs
-                        .filter {
-                            it.habitId == habit.id && it.loggedAt >= dayStart && it.loggedAt < dayEnd
+                    combine(
+                        container.habitRepository.observeHabitsForUser(userId),
+                        container.habitLogRepository.observeAllActiveLogsForUser(userId),
+                        container.wantActivityRepository.observeWantActivities(userId),
+                        container.wantLogRepository.observeAllActiveLogsForUser(userId),
+                    ) { habits, habitLogs, wants, wantLogs ->
+                        val habitsById = habits.associateBy { it.id }
+                        val habitsWithProgress = habits.map { habit ->
+                            val pointsToday = habitLogs
+                                .filter {
+                                    it.habitId == habit.id && it.loggedAt >= dayStart && it.loggedAt < dayEnd
+                                }
+                                .sumOf {
+                                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                }
+                            HabitWithProgress(habit, pointsToday)
                         }
-                        .sumOf {
-                            PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
-                        }
-                    HabitWithProgress(habit, pointsToday)
+
+                        val earned = habitLogs
+                            .filter { it.loggedAt >= weekStart }
+                            .groupBy { log ->
+                                log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date
+                            }
+                            .entries.sumOf { (key, dayLogs) ->
+                                val habit = habitsById[key.first] ?: return@sumOf 0
+                                dayLogs.sumOf {
+                                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                }.coerceAtMost(habit.dailyTarget)
+                            }
+                        val spent = wantLogs
+                            .filter { it.loggedAt >= weekStart }
+                            .sumOf { log ->
+                                wants.firstOrNull { it.id == log.activityId }?.let {
+                                    PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
+                                } ?: 0
+                            }
+
+                        HomeUiState(
+                            habitsWithProgress = habitsWithProgress,
+                            pointBalance = PointBalance(earned, spent),
+                            wantActivities = wants,
+                            isAuthenticated = auth.isAuthenticated,
+                            isLoading = false,
+                        )
+                    }
                 }
-
-                val earned = habitLogs
-                    .filter { it.loggedAt >= weekStart }
-                    .groupBy { log ->
-                        log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date
-                    }
-                    .entries.sumOf { (key, dayLogs) ->
-                        val habit = habitsById[key.first] ?: return@sumOf 0
-                        dayLogs.sumOf {
-                            PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
-                        }.coerceAtMost(habit.dailyTarget)
-                    }
-                val spent = wantLogs
-                    .filter { it.loggedAt >= weekStart }
-                    .sumOf { log ->
-                        wants.firstOrNull { it.id == log.activityId }?.let {
-                            PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
-                        } ?: 0
-                    }
-
-                HomeUiState(
-                    habitsWithProgress = habitsWithProgress,
-                    pointBalance = PointBalance(earned, spent),
-                    wantActivities = wants,
-                    isAuthenticated = isAuthed,
-                    isLoading = false,
-                )
-            }.collect { _uiState.value = it }
+                .collect { _uiState.value = it }
         }
     }
+
+    init { observeHomeUiState() }
 
     /** Tap handler: bump pending count for this habit and (re)start its 3s countdown. */
     fun tapHabit(habit: Habit) {
