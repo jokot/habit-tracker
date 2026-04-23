@@ -108,4 +108,30 @@ INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, i
 VALUES (?, ?, ?, ?, ?, ?);
 
 getWantActivitiesForUser:
-SELECT * FROM LocalWantActivity WHERE userId = ? OR userId IS NULL;
+SELECT * FROM LocalWantActivity WHERE userId = ?;
+
+-- User id migration (guest → authenticated)
+migrateHabitsUserId:
+UPDATE LocalHabit SET userId = ? WHERE userId = ?;
+
+migrateHabitLogsUserId:
+UPDATE HabitLog SET userId = ? WHERE userId = ?;
+
+migrateWantLogsUserId:
+UPDATE WantLog SET userId = ? WHERE userId = ?;
+
+migrateWantActivitiesUserId:
+UPDATE LocalWantActivity SET userId = ? WHERE userId = ?;
+
+-- Logout wipe
+clearHabitsForUser:
+DELETE FROM LocalHabit WHERE userId = ?;
+
+clearHabitLogsForUser:
+DELETE FROM HabitLog WHERE userId = ?;
+
+clearWantLogsForUser:
+DELETE FROM WantLog WHERE userId = ?;
+
+clearCustomWantActivitiesForUser:
+DELETE FROM LocalWantActivity WHERE userId = ?;

@@ -30,9 +30,14 @@ Each habit has:
 
 **Earning rules:**
 - Log quantity → `floor(quantity / threshold_per_point)` = points earned
-- Completions ≤ `daily_target` → earns points
-- Completions > `daily_target` → logged, no points (data feeds exchange rate algorithm)
+- Daily cap: cumulative daily earned per habit ≤ `daily_target`. Logs past the cap still save (data for exchange-rate algorithm) but award 0 pts.
 - Partial progress = lost (no carryover). UI shows progress bar toward next threshold.
+- Three log statuses surfaced to UI (`LogHabitStatus`):
+  - `EARNED`: ≥ 1 pt awarded → show "+N pts earned!" + 5-min undo timer.
+  - `BELOW_THRESHOLD`: quantity too small for 1 pt → "Below threshold — logged, 0 pts". No undo timer (no points to undo).
+  - `DAILY_TARGET_MET`: quantity cleared threshold but cap full → "Daily goal already met today — logged, 0 pts". No undo timer.
+
+> **Phase 2 UX note:** habit logging uses a 3-second tap-to-commit batch on the Home screen. Each tap on a habit card bumps a pending-count badge (`×N`) and resets a 3-second countdown shown inline on the card with a Cancel button. When the countdown expires, one log is written with `quantity = threshold × N`, so LogHabitStatus derives naturally (EARNED if points were awarded; DAILY_TARGET_MET if the cap was full). `BELOW_THRESHOLD` is only reachable for quantities < threshold, which can't happen via a whole-number tap count. Cancel drops the pending state before commit; after commit the log is final (no post-commit undo in Phase 2 — batch window replaces it).
 
 **Habit display:** flat list with identity tags. Grouped by identity in onboarding only.
 
@@ -91,17 +96,15 @@ HEALTH-CONSCIOUS
 
 User logs time spent AFTER the activity (v1 = manual post-log, C mode).
 
-**Spending:** user inputs actual duration/quantity → `floor(quantity / cost_per_unit)` = points spent.  
-Example: watch 30 min YouTube → `floor(30 / 10)` = 3 points spent.
+**Spending:** user inputs actual duration/quantity → `ceil(quantity × cost_per_unit)` = points spent (`cost_per_unit` = pts per unit; rounds up, minimum 1 pt for any positive consumption).
+
+- Watch 30 min YouTube (0.1 pt/min) → `ceil(30 × 0.1)` = 3 pts.
+- Browse Twitter 1 min (0.5 pt/min) → `ceil(1 × 0.5)` = 1 pt (prevents "free" micro-sessions).
+- Browse Twitter 3 min → `ceil(1.5)` = 2 pts.
 
 **Spending modes:**
 
-| Mode | Flow |
-|---|---|
-| This device | Log want → deduct points → start timer → alarm notification when done (Phase 2) |
-| Other device / physical | Log want → deduct points → done |
-
-Timer enforcement (Android overlay, Phase 5+): shows overlay notification when timer ends to prompt user to close the want app. Requires `SYSTEM_ALERT_WINDOW` permission — user must grant manually. iOS: timer + notification only (no overlay).
+Phase 2 ships with a single implicit mode: `OTHER` (post-hoc manual log). The timer flow ("This device") lands in Phase 5+, and the overlay-enforcement flow lands in Phase 6+ when the Android `SYSTEM_ALERT_WINDOW` overlay is wired. `device_mode` is still stored on every log (defaulting to `OTHER`) so the column is ready when the UI toggle comes back.
 
 **Default spend rates (user-customizable):**
 ```
@@ -131,11 +134,15 @@ FOOD INDULGENCE
   Eat donut / dessert           → 1 pt / piece
 ```
 
+> **Phase 2 UX note:** want spending uses the same 3-second tap-to-commit batch as habits. Tapping a want activity row on Home bumps a `×N` badge and starts/resets a 3s countdown with an inline Cancel button. On commit, the Home view writes **N separate logs of `quantity = 1`** (each tap is an independent session). This means every tap costs at least 1 pt after `pointsSpent(1, cost_per_unit)` → `ceil(cost_per_unit).coerceAtLeast(1)` — Twitter at 0.5 pt/min becomes 1 pt per tap, YouTube long-form at 0.1 pt/min also becomes 1 pt per tap. Cost scales linearly with tap count. Pre-tap balance guard: each tap pre-computes `(N+1) × perTap` against the live balance; if the next tap would overdraw, the tap is rejected instantly with a "Not enough points" snackbar and no state change. If the mid-batch commit loop hits insufficient balance (rare — balance can shift between pre-check and commit), the snackbar reports partial success ("-$X pts — N/M logged, balance empty"). Cancel drops the pending batch before commit.
+
 ### 2.3 Point Balance
 
 - **Rollover cap:** unspent points carry to next day, max = `daily_earn_cap × 2`
 - **Rollover resets:** every Monday 00:00
 - **Point balance** = always computed from log history, never stored as a field
+- **No negative balance (hard lock):** `balance = maxOf(0, earned - spent)`. Logging a want activity whose cost would drive balance below zero is **rejected** — `LogWantUseCase` returns `Result.failure(InsufficientPointsException)` and no row is inserted. UI surfaces "Not enough points" error. Users must earn first, spend second.
+- **Per-habit daily earn cap:** a single habit cannot contribute more than its `daily_target` to daily/weekly earned totals. Logging past the target is still recorded (for exchange-rate algorithm data) but contributes 0 points.
 
 ### 2.4 Progress Bar
 
@@ -227,7 +234,7 @@ Users can add custom habits and custom want activities beyond defaults.
 
 ---
 
-## 6. Exchange Rate Algorithm (Phase 6)
+## 6. Exchange Rate Algorithm (Phase 7)
 
 Adjusts `threshold_per_point` based on rolling completion rate.
 
@@ -257,7 +264,7 @@ If completion_rate < 0.50 for 1 week:
 - Streak reset — "Streak reset. Start fresh today."
 - Want timer end — alarm-style notification when on-device timer expires (Phase 2 timer feature)
 
-**Phase 6 (with exchange rate):**
+**Phase 7 (with exchange rate):**
 - Friction increase — "Raising the bar on [habit]."
 - Milestones — 7-day, 30-day, 100-day streak
 
@@ -313,7 +320,45 @@ habit-tracker/
 
 ### 8.3 Offline-First Sync
 
-**Principle:** Local DB is source of truth. Supabase is backup + cross-device sync.
+**Principle:** Local DB is source of truth. Supabase is backup + cross-device sync. **Auth is optional** — the app is fully usable without sign-in.
+
+**Guest mode (no auth):**
+- On first launch, app generates a random UUID (`localUserId`) and persists it in platform settings (Android DataStore / iOS UserDefaults).
+- All local rows (`habits`, `habit_logs`, `want_logs`, `want_activities` with `isCustom`) store `user_id = localUserId`.
+- Everything works offline: onboarding, log need/want, point balance, undo, streak.
+- Supabase client is created but not called; no network required.
+
+**Authenticated mode (opt-in, for sync across devices):**
+- User reaches `AuthScreen` from Home → "Sign in to sync" CTA (not forced on launch).
+- After successful sign-in/sign-up, `currentUserId` switches from `localUserId` to Supabase `auth.uid()`.
+- Phase 3 sync: migrate local rows where `user_id = localUserId` → remote `auth.uid()` on first sign-in, then push unsynced rows. Local DB remains source of truth.
+- Sign-out: revert to `localUserId` (local data untouched); Phase 3 handles detach/reattach semantics.
+
+**`currentUserId()` contract:** returns the remote user id if a Supabase session is active, otherwise the persisted `localUserId`. Never null once the app has launched (local id is generated before first read).
+
+**Startup navigation:**
+- If local habits exist for `currentUserId` → `HomeScreen`.
+- Else → `OnboardingScreen`.
+- `AuthScreen` is never a mandatory gate.
+
+**Auth state transitions:**
+
+*Guest → Authenticated (sign-in / sign-up):*
+1. User reaches `AuthScreen` from Home's "Sign in to sync" CTA.
+2. On success, Supabase session is stored. `currentUserId()` now returns `auth.uid()`.
+3. One-time migration: `UPDATE habits/habit_logs/want_logs/want_activities SET user_id = auth.uid() WHERE user_id = localUserId`. Runs inside a single SQL transaction.
+4. `synced_at` stays null on migrated rows — Phase 3 sync will push them.
+5. On sign-in from a second device (cloud data already exists): pull remote rows, merge by `id`; local guest data is still migrated and pushed.
+6. `localUserId` is preserved in settings so sign-out can revert to the same guest identity.
+
+*Authenticated → Guest (sign-out):*
+1. Confirmation dialog: "Sign out? Local data on this device will be cleared. Cloud data stays."
+2. Before clearing, push any `synced_at = null` rows. If push fails (offline, network error): dialog becomes "N unsynced logs will be lost. Sign out anyway?" — user can retry or force.
+3. On confirm: clear all local rows where `user_id = auth.uid()` (habits, habit_logs, want_logs, custom want_activities, local identities).
+4. Clear Supabase session. `currentUserId()` reverts to the persisted `localUserId`.
+5. App returns to Onboarding (local DB is empty under `localUserId` again).
+
+*Re-sign-in after sign-out:* Phase 3 pulls from Supabase into local DB under `auth.uid()`. Instant recovery of cloud data.
 
 **Log record structure:**
 ```
@@ -390,7 +435,7 @@ want_logs (
 )
 ```
 
-All tables: RLS `user_id = auth.uid()`.
+All tables: RLS `user_id = auth.uid()` (Supabase side). Local SQLite holds `user_id` as a plain TEXT — it can be either `auth.uid()` (authenticated) or a client-generated `localUserId` (guest). The sync layer (Phase 3) maps `localUserId → auth.uid()` on first sign-in.
 
 ---
 
@@ -441,7 +486,7 @@ Recommended Habits selected
 Log Need → Earn Points → Log Want → Spend Points
     ↓ (visibility)
 Streak + Progress (proof of identity)
-    ↓ (Phase 6)
+    ↓ (Phase 7)
 Exchange Rate Increase (bar rises because you rose)
     ↓ (long-term)
 Identity Reinforced by data
@@ -457,17 +502,26 @@ Identity Reinforced by data
 | Phase | Scope | Timeline |
 |---|---|---|
 | 1 | Supabase schema + RLS + auth, KMP skeleton, SQLDelight setup, Ktor client, UI theme (Material 3 + tokens + dark/light), offline-first log model with soft delete | Week 1–2 |
-| 2 | Core habit loop (Android): onboarding, identity→habit setup, log need→earn, log want→spend (both modes), point balance, 5-min undo | Week 3–5 |
-| 3 | Streak 30-day view (3 states, rounded squares), progress bar per habit, basic notifications | Week 6–7 |
-| 4 | Android widgets: point balance + quick log, 30-day streak grid | Week 8 |
-| 4+ | On-device timer for want activities (Android), alarm notification on timer end | Week 8–9 |
-| 5 | iOS: SwiftUI screens + WidgetKit extensions (same shared KMP logic) | Week 9–11 |
-| 5+ | Android overlay enforcement (SYSTEM_ALERT_WINDOW) — backlog, post-iOS validation | TBD |
-| 6 | Exchange rate algorithm, friction increase + milestone notifications | Week 12 |
+| 2 | Core habit loop (Android): onboarding, identity→habit setup, log need→earn, log want→spend (both modes), point balance, 3-second tap-to-commit, guest mode, Supabase email/password auth | Week 3–5 |
+| 3 | Sync + auth hardening: push local → Supabase, pull, merge; logout UI with confirm + push-before-wipe; email-confirmation-required UX ("Check your email" state); Google OAuth sign-in; `AuthRepository` gains confirmation-pending result; cross-device restore (pull on login + skip onboarding when cloud has data); iOS-ready session handling | Week 6–7 |
+| 4 | Streak 30-day view (3 states, rounded squares), progress bar per habit, basic notifications | Week 8–9 |
+| 5 | Android widgets: point balance + quick log, 30-day streak grid | Week 10 |
+| 5+ | On-device timer for want activities (Android), alarm notification on timer end | Week 10–11 |
+| 6 | iOS: SwiftUI screens + WidgetKit extensions (same shared KMP logic) | Week 11–13 |
+| 6+ | Android overlay enforcement (SYSTEM_ALERT_WINDOW) — backlog, post-iOS validation | TBD |
+| 7 | Exchange rate algorithm, friction increase + milestone notifications | Week 14 |
 
 **Guardrails:**
-- No iOS work until Phase 4 complete
-- No exchange rate until Phase 6 — needs real usage data
-- Widgets after core app stable, not before
-- Android overlay = Phase 5+ backlog, not core scope
-- Per-habit streak widget = Phase 2+ backlog
+- No iOS work until Phase 5 complete (widgets stable on Android first)
+- No exchange rate until Phase 7 — needs real usage data
+- Widgets after core app + sync stable, not before
+- Android overlay = Phase 6+ backlog, not core scope
+- Per-habit streak widget = Phase 5+ backlog
+- **Phase 3 before Phase 4 rationale:** cross-device data continuity is the most visible promise ("Sign in to sync"). Fresh reinstall + sign-in without Phase 3 = data gone (bad UX). Streaks are motivational polish, valuable but not critical — safe to land after sync is solid.
+
+**Phase 3 — known follow-ups from Phase 2:**
+- **Sync push/pull.** Worker reads rows with `synced_at IS NULL`, pushes to Supabase under `auth.uid()`, stamps `synced_at` on ack. Pull since `last_pull_timestamp`, merge by `id`. Drives fresh-reinstall-+-login restore: on app launch, if session exists and local DB is empty under `auth.uid()`, pull first, then skip onboarding if rows exist; onboard if cloud is also empty.
+- **Email-confirmation UX.** `SupabaseAuthRepository.signUp` currently throws `"Sign up returned no session"` if email confirmation is enabled. Introduce `SignUpResult` sealed type (`SignedIn(UserSession)` | `ConfirmationRequired(email)`). AuthViewModel surfaces "Check your email to confirm your account"; local data is NOT migrated until the user confirms + signs in, so guest state is preserved.
+- **Google OAuth.** Add `supabase-oauth`, Android deep-link handler for the return URI (`com.habittracker.android://auth-callback`), "Continue with Google" primary button on AuthScreen above email fields. Shares the same post-success flow as email/password (migrate → refreshAuthState → navigate Home).
+- **Logout UI.** Confirmation dialog, push-unsynced-rows guard, session clear, `clearAuthenticatedUserData` (already wired in AppContainer), `refreshAuthState` → Home reverts to guest.
+- **Startup auth flow.** On launch: session restored + local empty → pull → populate → Home. Pull fails offline → offer retry + onboard-now choices. Session restored + local has rows → straight to Home (already behaves this way).
