@@ -61,7 +61,7 @@ UPDATE HabitLog SET deletedAt = ? WHERE id = ? AND userId = ?;
 markHabitLogSynced:
 UPDATE HabitLog SET syncedAt = ? WHERE id = ?;
 
-getUnsyncedHabitLogs:
+getUnsyncedHabitLogsForUser:
 SELECT * FROM HabitLog WHERE syncedAt IS NULL AND userId = ?;
 
 getActiveHabitLogsForHabitOnDay:
@@ -82,7 +82,7 @@ UPDATE WantLog SET deletedAt = ? WHERE id = ? AND userId = ?;
 markWantLogSynced:
 UPDATE WantLog SET syncedAt = ? WHERE id = ?;
 
-getUnsyncedWantLogs:
+getUnsyncedWantLogsForUser:
 SELECT * FROM WantLog WHERE syncedAt IS NULL AND userId = ?;
 
 getAllActiveWantLogsForUser:
