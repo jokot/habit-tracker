@@ -36,8 +36,20 @@ class PointCalculatorTest {
     }
 
     @Test
-    fun pointsSpent_lessThanOneUnit_returnsZero() {
-        assertEquals(0, PointCalculator.pointsSpent(quantity = 5.0, costPerUnit = 0.1))
+    fun pointsSpent_partialUnit_roundsUpToOne() {
+        // 5 min × 0.1 pt/min = 0.5 → ceil 1. Any positive consumption costs ≥ 1 pt.
+        assertEquals(1, PointCalculator.pointsSpent(quantity = 5.0, costPerUnit = 0.1))
+    }
+
+    @Test
+    fun pointsSpent_zeroQuantity_returnsZero() {
+        assertEquals(0, PointCalculator.pointsSpent(quantity = 0.0, costPerUnit = 1.0))
+    }
+
+    @Test
+    fun pointsSpent_fractional_roundsUp() {
+        // 3 min × 0.5 pt/min = 1.5 → ceil 2.
+        assertEquals(2, PointCalculator.pointsSpent(quantity = 3.0, costPerUnit = 0.5))
     }
 
     @Test
