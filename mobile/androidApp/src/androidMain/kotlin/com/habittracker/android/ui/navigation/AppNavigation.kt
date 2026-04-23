@@ -22,6 +22,8 @@ import com.habittracker.android.ui.home.HomeScreen
 import com.habittracker.android.ui.home.HomeViewModel
 import com.habittracker.android.ui.onboarding.OnboardingScreen
 import com.habittracker.android.ui.onboarding.OnboardingViewModel
+import com.habittracker.data.sync.SyncReason
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed class Screen(val route: String) {
     object Auth : Screen("auth")
@@ -37,6 +39,16 @@ fun AppNavigation(container: AppContainer) {
     LaunchedEffect(Unit) {
         container.seedLocalDataIfEmpty()
         val userId = container.currentUserId()
+
+        // Fresh device with existing session — try a 2s cloud restore before routing.
+        if (container.isAuthenticated() &&
+            container.habitRepository.getHabitsForUser(userId).isEmpty()
+        ) {
+            withTimeoutOrNull(2_000L) {
+                container.syncEngine.sync(SyncReason.POST_SIGN_IN)
+            }
+        }
+
         startDestination = if (container.isOnboardedUseCase.execute(userId)) {
             Screen.Home.route
         } else {
