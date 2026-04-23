@@ -2,7 +2,9 @@ package com.habittracker.data.repository
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
 
 class SupabaseAuthRepository(
     private val client: SupabaseClient,
@@ -30,6 +32,16 @@ class SupabaseAuthRepository(
         val user = client.auth.currentSessionOrNull()?.user
             ?: error("Sign in returned no session")
         UserSession(userId = user.id, email = user.email ?: email)
+    }
+
+    override suspend fun signInWithGoogle(idToken: String): Result<UserSession> = runCatching {
+        client.auth.signInWith(IDToken) {
+            provider = Google
+            this.idToken = idToken
+        }
+        val user = client.auth.currentSessionOrNull()?.user
+            ?: error("Google sign-in returned no session")
+        UserSession(userId = user.id, email = user.email ?: "")
     }
 
     override suspend fun signOut(): Result<Unit> = runCatching {

@@ -30,6 +30,13 @@ class FakeAuthRepository(
         return Result.success(s)
     }
 
+    override suspend fun signInWithGoogle(idToken: String): Result<UserSession> {
+        if (shouldFailAuth) return Result.failure(Exception("Auth failed"))
+        val s = UserSession(userId = "google-fake-$idToken", email = "google@fake.test")
+        session = s
+        return Result.success(s)
+    }
+
     override suspend fun signOut(): Result<Unit> {
         session = null
         return Result.success(Unit)
