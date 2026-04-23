@@ -3582,12 +3582,13 @@ After all 10 tasks complete, verify manually on Android emulator/device:
 
 ---
 
-## Phase 4 follow-ups from Phase 2
+## Phase 3 follow-ups from Phase 2
 
-Deferred auth/sync work; implement in Phase 4:
+Deferred auth/sync work; implement in Phase 3 (reordered ahead of streaks so cross-device data continuity lands before motivational polish):
 
-1. **Reactive auth state propagation (landed late in Phase 2).** `AppContainer` now exposes `authState: StateFlow<AuthState>` and `refreshAuthState()`. After sign-in, `AuthViewModel` calls `refreshAuthState()` and HomeViewModel `flatMapLatest`es on `authState` so the Home re-subscribes with the new user id. Keep this pattern for Phase 4 sign-out: after `clearAuthenticatedUserData` + session clear, call `refreshAuthState()` so Home reverts to guest view.
-2. **Email-confirmation UX.** `SupabaseAuthRepository.signUp` currently throws `"Sign up returned no session"` when the Supabase project has email confirmation enabled. Replace with a `SignUpResult` sealed type: `SignedIn(UserSession)` | `ConfirmationRequired(email)`. `AuthViewModel` surfaces a "Check your email to confirm your account" state; no migration happens until the user confirms + signs in. Dev shortcut for Phase 2 was disabling "Confirm email" in the Supabase dashboard.
-3. **Google OAuth.** Add `supabase-oauth` dep, Android deep-link handler for return URI (`com.habittracker.android://auth-callback`), "Continue with Google" primary button on AuthScreen (above email/password fields). Reuses the same migrate → refreshAuthState → navigate flow on success.
-4. **Logout UI.** Confirmation dialog, push-unsynced-rows guard, session clear, `clearAuthenticatedUserData` (already wired in AppContainer), `refreshAuthState` → Home reverts to guest.
-5. **Sync push/pull.** Worker that reads rows where `synced_at IS NULL`, pushes to Supabase under `auth.uid()`, stamps `synced_at` on success. Pull since `last_pull_timestamp` and merge by `id`.
+1. **Reactive auth state propagation (landed late in Phase 2).** `AppContainer` now exposes `authState: StateFlow<AuthState>` and `refreshAuthState()`. After sign-in, `AuthViewModel` calls `refreshAuthState()` and HomeViewModel `flatMapLatest`es on `authState` so Home re-subscribes with the new user id. Keep this pattern for Phase 3 sign-out: after `clearAuthenticatedUserData` + session clear, call `refreshAuthState()` so Home reverts to guest view.
+2. **Sync push/pull.** Worker reads rows where `synced_at IS NULL`, pushes to Supabase under `auth.uid()`, stamps `synced_at` on ack. Pull since `last_pull_timestamp`, merge by `id`. This is what fixes the reported bug: fresh reinstall + sign-in currently shows empty Home because Phase 2 never pushed anything to the cloud.
+3. **Startup restore.** On launch with an existing session: if local DB is empty under `auth.uid()`, pull first, populate local, then resolve start destination (Home if rows exist, Onboarding if cloud is also empty). Offline pull failure → offer retry or "onboard now and sync later".
+4. **Email-confirmation UX.** `SupabaseAuthRepository.signUp` currently throws `"Sign up returned no session"` when the Supabase project has email confirmation enabled. Replace with a `SignUpResult` sealed type: `SignedIn(UserSession)` | `ConfirmationRequired(email)`. `AuthViewModel` surfaces a "Check your email to confirm your account" state; no migration happens until the user confirms + signs in. Dev shortcut for Phase 2 was disabling "Confirm email" in the Supabase dashboard.
+5. **Google OAuth.** Add `supabase-oauth` dep, Android deep-link handler for return URI (`com.habittracker.android://auth-callback`), "Continue with Google" primary button on AuthScreen above email/password fields. Reuses the same migrate → refreshAuthState → navigate flow on success.
+6. **Logout UI.** Confirmation dialog, push-unsynced-rows guard, session clear, `clearAuthenticatedUserData` (already wired in AppContainer), `refreshAuthState` → Home reverts to guest.
