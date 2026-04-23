@@ -3,6 +3,8 @@ package com.habittracker.android.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
+import com.habittracker.android.sync.SyncTriggers
+import com.habittracker.data.sync.SyncReason
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
@@ -187,6 +189,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         "Logged — 0 pts"
                 }
                 _events.tryEmit(HomeEvent.Message(msg))
+                SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
             }
             .onFailure { e ->
                 _events.tryEmit(HomeEvent.Message("Failed: ${e.message}"))
@@ -254,9 +257,15 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 else -> "Failed: ${e?.message}"
             }
             _events.tryEmit(HomeEvent.Message(msg))
+            if (succeeded > 0) {
+                SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
+            }
             return
         }
         _events.tryEmit(HomeEvent.Message("-$totalSpent pts — ${activity.name}"))
+        if (succeeded > 0) {
+            SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
+        }
     }
 
     override fun onCleared() {
