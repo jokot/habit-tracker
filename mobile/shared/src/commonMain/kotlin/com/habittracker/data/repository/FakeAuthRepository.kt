@@ -10,11 +10,17 @@ class FakeAuthRepository(
 
     private var session: UserSession? = null
 
-    override suspend fun signUp(email: String, password: String): Result<UserSession> {
+    var confirmationRequiredOnNext: Boolean = false
+
+    override suspend fun signUp(email: String, password: String): Result<SignUpResult> {
         if (shouldFailAuth) return Result.failure(Exception("Auth failed"))
+        if (confirmationRequiredOnNext) {
+            confirmationRequiredOnNext = false
+            return Result.success(SignUpResult.ConfirmationRequired(email))
+        }
         val s = UserSession(userId = Uuid.random().toString(), email = email)
         session = s
-        return Result.success(s)
+        return Result.success(SignUpResult.SignedIn(s))
     }
 
     override suspend fun signIn(email: String, password: String): Result<UserSession> {

@@ -3,6 +3,7 @@ package com.habittracker.android.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
+import com.habittracker.data.repository.SignUpResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -85,18 +86,38 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         if (state.isLoading) return
         viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, error = null)
-            val result = if (state.isSignUp) {
+            if (state.isSignUp) {
                 container.authRepository.signUp(state.email.trim(), state.password)
+                    .onSuccess { outcome ->
+                        when (outcome) {
+                            is SignUpResult.SignedIn -> {
+                                val session = outcome.session
+                                container.migrateLocalToAuthenticated(session.userId)
+                                container.refreshAuthState()
+                                container.seedLocalDataIfEmpty()
+                                _events.emit(AuthEvent.Success)
+                            }
+                            is SignUpResult.ConfirmationRequired -> {
+                                // Task 14 will emit a proper event; for now surface as error so UI isn't silently stuck.
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    error = "Check your email (${outcome.email}) to confirm your account.",
+                                )
+                            }
+                        }
+                    }.onFailure { e ->
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Auth failed")
+                    }
             } else {
                 container.authRepository.signIn(state.email.trim(), state.password)
-            }
-            result.onSuccess { session ->
-                container.migrateLocalToAuthenticated(session.userId)
-                container.refreshAuthState()
-                container.seedLocalDataIfEmpty()
-                _events.emit(AuthEvent.Success)
-            }.onFailure { e ->
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Auth failed")
+                    .onSuccess { session ->
+                        container.migrateLocalToAuthenticated(session.userId)
+                        container.refreshAuthState()
+                        container.seedLocalDataIfEmpty()
+                        _events.emit(AuthEvent.Success)
+                    }.onFailure { e ->
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Auth failed")
+                    }
             }
         }
     }

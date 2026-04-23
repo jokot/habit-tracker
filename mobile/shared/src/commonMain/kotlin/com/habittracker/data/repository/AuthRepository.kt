@@ -6,7 +6,7 @@ data class UserSession(
 )
 
 interface AuthRepository {
-    suspend fun signUp(email: String, password: String): Result<UserSession>
+    suspend fun signUp(email: String, password: String): Result<SignUpResult>
     suspend fun signIn(email: String, password: String): Result<UserSession>
     suspend fun signOut(): Result<Unit>
     fun currentUserId(): String?

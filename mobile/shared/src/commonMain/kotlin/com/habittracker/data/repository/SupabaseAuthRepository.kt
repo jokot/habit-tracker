@@ -8,14 +8,18 @@ class SupabaseAuthRepository(
     private val client: SupabaseClient,
 ) : AuthRepository {
 
-    override suspend fun signUp(email: String, password: String): Result<UserSession> = runCatching {
+    override suspend fun signUp(email: String, password: String): Result<SignUpResult> = runCatching {
         client.auth.signUpWith(Email) {
             this.email = email
             this.password = password
         }
-        val user = client.auth.currentSessionOrNull()?.user
-            ?: error("Sign up returned no session")
-        UserSession(userId = user.id, email = user.email ?: email)
+        val session = client.auth.currentSessionOrNull()
+        if (session != null) {
+            val user = session.user!!
+            SignUpResult.SignedIn(UserSession(userId = user.id, email = user.email ?: email))
+        } else {
+            SignUpResult.ConfirmationRequired(email)
+        }
     }
 
     override suspend fun signIn(email: String, password: String): Result<UserSession> = runCatching {
