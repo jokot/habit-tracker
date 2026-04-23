@@ -1,0 +1,47 @@
+-- Migrate HabitTrackerDatabase from version 0 → 1
+-- Adds updatedAt + syncedAt columns to LocalHabit and LocalWantActivity.
+--
+-- SQLite's ALTER TABLE ADD COLUMN NOT NULL requires a DEFAULT, which would
+-- leave a persistent DEFAULT clause on the column and diverge from the
+-- declared .sq schema. Instead we recreate the tables via the documented
+-- SQLite "12-step" approach and backfill updatedAt in the copy.
+
+-- LocalHabit: backfill updatedAt from createdAt.
+CREATE TABLE LocalHabit_new (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    templateId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    thresholdPerPoint REAL NOT NULL,
+    dailyTarget INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER
+);
+
+INSERT INTO LocalHabit_new (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt)
+SELECT id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, createdAt, NULL
+FROM LocalHabit;
+
+DROP TABLE LocalHabit;
+ALTER TABLE LocalHabit_new RENAME TO LocalHabit;
+
+-- LocalWantActivity: backfill updatedAt with current wall-clock ms.
+CREATE TABLE LocalWantActivity_new (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    costPerUnit REAL NOT NULL,
+    isCustom INTEGER NOT NULL DEFAULT 0,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER
+);
+
+INSERT INTO LocalWantActivity_new (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
+SELECT id, userId, name, unit, costPerUnit, isCustom, CAST(strftime('%s', 'now') AS INTEGER) * 1000, NULL
+FROM LocalWantActivity;
+
+DROP TABLE LocalWantActivity;
+ALTER TABLE LocalWantActivity_new RENAME TO LocalWantActivity;

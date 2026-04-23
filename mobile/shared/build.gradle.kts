@@ -70,6 +70,8 @@ sqldelight {
     databases {
         create("HabitTrackerDatabase") {
             packageName.set("com.habittracker.data.local")
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
+            verifyMigrations.set(true)
         }
     }
 }
