@@ -42,4 +42,17 @@ class FakeWantLogRepository : WantLogRepository {
     override suspend fun clearForUser(userId: String) {
         _logs.value = _logs.value.filterNot { it.userId == userId }
     }
+
+    override suspend fun getUnsyncedFor(userId: String): List<WantLog> =
+        _logs.value.filter { it.userId == userId && it.syncedAt == null }
+
+    override suspend fun markSynced(id: String, syncedAt: Instant) {
+        _logs.value = _logs.value.map {
+            if (it.id == id) it.copy(syncedAt = syncedAt) else it
+        }
+    }
+
+    override suspend fun mergePulled(row: WantLog) {
+        _logs.value = _logs.value.filterNot { it.id == row.id } + row
+    }
 }

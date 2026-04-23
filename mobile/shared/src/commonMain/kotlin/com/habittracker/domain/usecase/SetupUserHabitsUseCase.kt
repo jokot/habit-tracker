@@ -23,6 +23,7 @@ class SetupUserHabitsUseCase(private val habitRepository: HabitRepository) {
                         thresholdPerPoint = template.defaultThreshold,
                         dailyTarget = template.defaultDailyTarget,
                         createdAt = now,
+                        updatedAt = now,
                     )
                 )
             }

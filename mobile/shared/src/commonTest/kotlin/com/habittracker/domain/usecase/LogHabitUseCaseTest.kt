@@ -15,11 +15,14 @@ class LogHabitUseCaseTest {
     private val useCase = LogHabitUseCase(habitLogRepo, habitRepo)
     private val userId = "user1"
 
-    private fun makeHabit(id: String, threshold: Double) = Habit(
-        id = id, userId = userId, templateId = "tpl", name = "Read",
-        unit = "pages", thresholdPerPoint = threshold, dailyTarget = 3,
-        createdAt = Clock.System.now(),
-    )
+    private fun makeHabit(id: String, threshold: Double): Habit {
+        val now = Clock.System.now()
+        return Habit(
+            id = id, userId = userId, templateId = "tpl", name = "Read",
+            unit = "pages", thresholdPerPoint = threshold, dailyTarget = 3,
+            createdAt = now, updatedAt = now,
+        )
+    }
 
     @Test
     fun `returns correct points earned`() = runTest {
