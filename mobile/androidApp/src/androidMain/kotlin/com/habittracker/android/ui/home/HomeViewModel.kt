@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.habittracker.android.AppContainer
 import com.habittracker.android.sync.SyncTriggers
 import com.habittracker.data.sync.SyncReason
+import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
@@ -66,6 +67,14 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    val syncState: StateFlow<SyncState> = container.syncEngine.syncState
+
+    private val _showLogoutDialog = MutableStateFlow(false)
+    val showLogoutDialog: StateFlow<Boolean> = _showLogoutDialog.asStateFlow()
+
+    private val _logoutUnsyncedCount = MutableStateFlow(0)
+    val logoutUnsyncedCount: StateFlow<Int> = _logoutUnsyncedCount.asStateFlow()
 
     /** habitId → pending tap batch. Drops to empty on commit or cancel. */
     private val _pending = MutableStateFlow<Map<String, PendingHabitLog>>(emptyMap())
@@ -266,6 +275,41 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         if (succeeded > 0) {
             SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
         }
+    }
+
+    fun triggerManualSync() {
+        SyncTriggers.enqueue(container.appContext, SyncReason.MANUAL)
+    }
+
+    fun beginSignOut() {
+        viewModelScope.launch {
+            val userId = container.currentUserId()
+            val unsynced = container.habitLogRepository.getUnsyncedFor(userId).size +
+                container.wantLogRepository.getUnsyncedFor(userId).size
+            _logoutUnsyncedCount.value = unsynced
+            _showLogoutDialog.value = true
+        }
+    }
+
+    fun confirmSignOut(forceWhenUnsynced: Boolean) {
+        val userId = container.currentUserId()
+        viewModelScope.launch {
+            val unsynced = _logoutUnsyncedCount.value
+            if (unsynced > 0 && !forceWhenUnsynced) return@launch
+            // Best-effort push; proceed regardless
+            runCatching { container.syncEngine.sync(SyncReason.MANUAL) }
+            container.clearAuthenticatedUserData(userId)
+            container.authRepository.signOut()
+            container.refreshAuthState()
+            _showLogoutDialog.value = false
+            _logoutUnsyncedCount.value = 0
+            _events.tryEmit(HomeEvent.Message("Signed out"))
+        }
+    }
+
+    fun dismissLogoutDialog() {
+        _showLogoutDialog.value = false
+        _logoutUnsyncedCount.value = 0
     }
 
     override fun onCleared() {
