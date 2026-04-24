@@ -76,6 +76,14 @@ fun HomeScreen(
         }
     }
 
+    // Surface the actual sync error so the user can report it.
+    LaunchedEffect(syncState) {
+        val state = syncState
+        if (state is SyncState.Error) {
+            snackbarHostState.showSnackbar("Sync error: ${state.message}")
+        }
+    }
+
     if (showLogoutDialog) {
         LogoutDialog(
             unsyncedCount = logoutUnsyncedCount,
