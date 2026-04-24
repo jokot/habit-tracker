@@ -80,7 +80,12 @@ fun AppNavigation(container: AppContainer) {
             AuthScreen(
                 viewModel = vm,
                 launcher = container.googleSignInLauncher,
-                onSuccess = { navController.popBackStack() },
+                onSuccess = {
+                    // After sign-in, go to Home and wipe any Onboarding/Auth from the stack.
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
                 onBack = { navController.popBackStack() },
             )
         }
