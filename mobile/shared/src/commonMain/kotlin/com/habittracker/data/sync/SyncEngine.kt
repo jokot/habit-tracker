@@ -47,7 +47,12 @@ class SyncEngine(
             _state.value = SyncState.Synced(Clock.System.now(), pushed, pulled)
             outcome
         }.onFailure { e ->
-            _state.value = SyncState.Error(e.message ?: "Sync failed", Clock.System.now())
+            println("SyncEngine: sync($reason) failed — ${e::class.simpleName}: ${e.message}")
+            e.printStackTrace()
+            _state.value = SyncState.Error(
+                message = "${e::class.simpleName}: ${e.message ?: "unknown"}",
+                since = Clock.System.now(),
+            )
         }
     }
 
