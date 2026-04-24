@@ -55,6 +55,10 @@ insertHabitLog:
 INSERT INTO HabitLog (id, userId, habitId, quantity, loggedAt, deletedAt, syncedAt)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
+mergePulledHabitLog:
+INSERT OR REPLACE INTO HabitLog (id, userId, habitId, quantity, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
 softDeleteHabitLog:
 UPDATE HabitLog SET deletedAt = ? WHERE id = ? AND userId = ?;
 
@@ -74,6 +78,10 @@ SELECT * FROM HabitLog WHERE userId = ? AND deletedAt IS NULL ORDER BY loggedAt 
 -- WantLog queries
 insertWantLog:
 INSERT INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+mergePulledWantLog:
+INSERT OR REPLACE INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 softDeleteWantLog:

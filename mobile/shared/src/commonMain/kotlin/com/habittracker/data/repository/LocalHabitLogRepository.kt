@@ -107,7 +107,7 @@ class LocalHabitLogRepository(
     }
 
     override suspend fun mergePulled(row: HabitLog) {
-        db.habitTrackerDatabaseQueries.insertHabitLog(
+        db.habitTrackerDatabaseQueries.mergePulledHabitLog(
             id = row.id,
             userId = row.userId,
             habitId = row.habitId,

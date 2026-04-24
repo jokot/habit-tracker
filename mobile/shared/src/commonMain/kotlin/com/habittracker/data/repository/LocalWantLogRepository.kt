@@ -77,7 +77,7 @@ class LocalWantLogRepository(
     }
 
     override suspend fun mergePulled(row: WantLog) {
-        db.habitTrackerDatabaseQueries.insertWantLog(
+        db.habitTrackerDatabaseQueries.mergePulledWantLog(
             id = row.id,
             userId = row.userId,
             activityId = row.activityId,
