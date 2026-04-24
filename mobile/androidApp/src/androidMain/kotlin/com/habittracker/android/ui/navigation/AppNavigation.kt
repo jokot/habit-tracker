@@ -37,6 +37,15 @@ fun AppNavigation(container: AppContainer) {
     var startDestination by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
+        // Wait for supabase-kt to finish loading any persisted session from storage
+        // before deciding who the current user is. Without this, currentUserId()
+        // returns the local guest UUID until the session lazily loads, and we
+        // falsely route authenticated users through onboarding.
+        withTimeoutOrNull(3_000L) {
+            container.authRepository.awaitSessionRestored()
+        }
+        container.refreshAuthState()
+
         container.seedLocalDataIfEmpty()
         val userId = container.currentUserId()
 

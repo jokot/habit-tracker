@@ -12,4 +12,7 @@ interface AuthRepository {
     suspend fun signOut(): Result<Unit>
     fun currentUserId(): String?
     fun isLoggedIn(): Boolean
+
+    /** Suspends until the auth client has finished loading any persisted session from storage. */
+    suspend fun awaitSessionRestored()
 }

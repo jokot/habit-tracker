@@ -53,4 +53,10 @@ class SupabaseAuthRepository(
 
     override fun isLoggedIn(): Boolean =
         client.auth.currentSessionOrNull() != null
+
+    override suspend fun awaitSessionRestored() {
+        // Wait for the first non-Initializing session status — session is either
+        // Authenticated (loaded from storage) or NotAuthenticated (no session).
+        client.auth.awaitInitialization()
+    }
 }
