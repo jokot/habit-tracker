@@ -94,6 +94,7 @@ fun AppNavigation(container: AppContainer) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 },
+                onSignIn = { navController.navigate(Screen.Auth.route) },
             )
         }
 

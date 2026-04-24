@@ -46,6 +46,7 @@ import com.habittracker.domain.model.WantActivity
 fun OnboardingScreen(
     viewModel: OnboardingViewModel,
     onFinished: () -> Unit,
+    onSignIn: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -68,6 +69,7 @@ fun OnboardingScreen(
                 selectedId = uiState.selectedIdentityId,
                 onSelect = viewModel::selectIdentity,
                 onContinue = viewModel::continueFromIdentity,
+                onSignIn = onSignIn,
                 modifier = Modifier.padding(padding),
             )
             OnboardingStep.HABITS -> HabitsStep(
@@ -172,6 +174,7 @@ private fun IdentityStep(
     selectedId: String?,
     onSelect: (String) -> Unit,
     onContinue: () -> Unit,
+    onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -201,6 +204,12 @@ private fun IdentityStep(
             primaryEnabled = selectedId != null,
             onPrimary = onContinue,
         )
+        androidx.compose.material3.TextButton(
+            onClick = onSignIn,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        ) {
+            androidx.compose.material3.Text("Already have an account? Sign in")
+        }
         Spacer(Modifier.height(Spacing.xl))
     }
 }
