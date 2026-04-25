@@ -64,11 +64,11 @@ class SyncEngine(
             habitRepo.markSynced(row.id, now)
             count++
         }
-        // TODO(phase3-followup): push want_activities once remote schema supports
-        // user-scoped copies without conflicting with the public want_activities
-        // catalog. Current remote design splits into want_activities + user_want_activities
-        // which doesn't match our flat local shape. Temporarily skipping to avoid
-        // RLS rejections on non-custom seed activities.
+        wantActivityRepo.getUnsyncedFor(userId).forEach { row ->
+            supabase.upsertWantActivity(row, userId)
+            wantActivityRepo.markSynced(row.id, now)
+            count++
+        }
         habitLogRepo.getUnsyncedFor(userId).forEach { row ->
             val stamped = row.copy(syncedAt = now)
             supabase.upsertHabitLog(stamped)
@@ -86,7 +86,7 @@ class SyncEngine(
 
     private suspend fun pull(userId: String): Int =
         pullHabits(userId) +
-            // TODO(phase3-followup): pullWantActivities once push is re-enabled.
+            pullWantActivities(userId) +
             pullHabitLogs(userId) +
             pullWantLogs(userId)
 

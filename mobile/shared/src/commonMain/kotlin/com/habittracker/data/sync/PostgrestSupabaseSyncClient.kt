@@ -48,10 +48,7 @@ class PostgrestSupabaseSyncClient(
         supabase.postgrest.from("want_activities")
             .select {
                 filter {
-                    or {
-                        eq("created_by_user_id", userId)
-                        exact("created_by_user_id", null)
-                    }
+                    eq("user_id", userId)
                     gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
                 }
                 order("updated_at", Order.ASCENDING)
@@ -127,7 +124,7 @@ private fun HabitDto.toDomain(): Habit = Habit(
 @Serializable
 private data class WantActivityDto(
     val id: String,
-    @SerialName("created_by_user_id") val createdByUserId: String?,
+    @SerialName("user_id") val userId: String,
     val name: String,
     val unit: String,
     @SerialName("cost_per_unit") val costPerUnit: Double,
@@ -137,7 +134,7 @@ private data class WantActivityDto(
 
 private fun WantActivity.toDto(ownerUserId: String) = WantActivityDto(
     id = id,
-    createdByUserId = if (isCustom) ownerUserId else null,
+    userId = ownerUserId,
     name = name,
     unit = unit,
     costPerUnit = costPerUnit,
@@ -151,7 +148,7 @@ private fun WantActivityDto.toDomain() = WantActivity(
     unit = unit,
     costPerUnit = costPerUnit,
     isCustom = isCustom,
-    createdByUserId = createdByUserId,
+    createdByUserId = userId,
     updatedAt = Instant.parse(updatedAt),
     syncedAt = Instant.parse(updatedAt),
 )
