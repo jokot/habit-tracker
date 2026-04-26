@@ -76,11 +76,11 @@ fun HomeScreen(
         }
     }
 
-    // Surface the actual sync error so the user can report it.
+    // Short categorized label only; full stack trace stays in logcat.
     LaunchedEffect(syncState) {
         val state = syncState
         if (state is SyncState.Error) {
-            snackbarHostState.showSnackbar("Sync error: ${state.message}")
+            snackbarHostState.showSnackbar(state.message)
         }
     }
 
@@ -102,16 +102,8 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    when (val state = syncState) {
-                        is SyncState.Running -> SyncRunningChip()
-                        is SyncState.Error -> SyncErrorChip(
-                            message = state.message,
-                            onRetry = viewModel::triggerManualSync,
-                        )
-                        else -> Unit
-                    }
                     if (uiState.isAuthenticated) {
-                        SyncedPill()
+                        SyncStatusChip(syncState, onRetry = viewModel::triggerManualSync)
                     } else {
                         TextButton(onClick = onSignIn) { Text("Sign in") }
                     }
@@ -516,45 +508,61 @@ private fun perTapCost(activity: WantActivity): String {
 }
 
 @Composable
-private fun SyncRunningChip() {
+private fun SyncStatusChip(state: SyncState, onRetry: () -> Unit) {
+    val container: androidx.compose.ui.graphics.Color
+    val onContainer: androidx.compose.ui.graphics.Color
+    val label: String
+    val showSpinner: Boolean
+    val clickable: Boolean
+
+    when (state) {
+        is SyncState.Running -> {
+            container = MaterialTheme.colorScheme.tertiaryContainer
+            onContainer = MaterialTheme.colorScheme.onTertiaryContainer
+            label = "Syncing"
+            showSpinner = true
+            clickable = false
+        }
+        is SyncState.Error -> {
+            container = MaterialTheme.colorScheme.errorContainer
+            onContainer = MaterialTheme.colorScheme.onErrorContainer
+            label = "Sync failed"
+            showSpinner = false
+            clickable = true
+        }
+        else -> {
+            container = MaterialTheme.colorScheme.primaryContainer
+            onContainer = MaterialTheme.colorScheme.onPrimaryContainer
+            label = "Synced"
+            showSpinner = false
+            clickable = false
+        }
+    }
+
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.padding(horizontal = Spacing.xs),
+        color = container,
+        modifier = Modifier
+            .padding(horizontal = Spacing.xs)
+            .let { if (clickable) it.clickable(onClick = onRetry) else it },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(12.dp),
-                strokeWidth = 1.5.dp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            Spacer(Modifier.width(Spacing.xs))
+            if (showSpinner) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.5.dp,
+                    color = onContainer,
+                )
+                Spacer(Modifier.width(Spacing.xs))
+            }
             Text(
-                "Syncing",
+                text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = onContainer,
             )
         }
-    }
-}
-
-@Composable
-private fun SyncErrorChip(message: String, onRetry: () -> Unit) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier
-            .padding(horizontal = Spacing.xs)
-            .clickable(onClick = onRetry),
-    ) {
-        Text(
-            "Sync failed — tap to retry",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
-        )
     }
 }

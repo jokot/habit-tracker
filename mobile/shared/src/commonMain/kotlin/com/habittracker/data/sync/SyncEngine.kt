@@ -47,12 +47,25 @@ class SyncEngine(
             _state.value = SyncState.Synced(Clock.System.now(), pushed, pulled)
             outcome
         }.onFailure { e ->
+            // Full detail goes to logcat; UI gets a short categorized label.
             println("SyncEngine: sync($reason) failed — ${e::class.simpleName}: ${e.message}")
             e.printStackTrace()
             _state.value = SyncState.Error(
-                message = "${e::class.simpleName}: ${e.message ?: "unknown"}",
+                message = categorize(e),
                 since = Clock.System.now(),
             )
+        }
+    }
+
+    private fun categorize(e: Throwable): String {
+        val name = e::class.simpleName.orEmpty()
+        val msg = e.message.orEmpty()
+        return when {
+            "JWT" in msg || "Unauthorized" in name -> "Session expired"
+            "timed out" in msg || "timeout" in msg.lowercase() -> "Network timeout"
+            "BadRequest" in name -> "Sync rejected by server"
+            name.startsWith("UnknownHost") || "network" in msg.lowercase() -> "No network"
+            else -> "Sync failed"
         }
     }
 
