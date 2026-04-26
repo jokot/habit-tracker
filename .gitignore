@@ -9,3 +9,13 @@ local.properties
 build/
 mobile/androidApp/build/
 mobile/shared/build/
+
+# IDE
+.idea/
+.kotlin/
+
+# macOS
+.DS_Store
+
+# Supabase CLI link state (per-machine)
+supabase/.temp/
