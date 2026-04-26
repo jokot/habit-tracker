@@ -95,6 +95,28 @@ class LocalHabitLogRepository(
     override suspend fun clearForUser(userId: String) {
         db.habitTrackerDatabaseQueries.clearHabitLogsForUser(userId)
     }
+
+    override suspend fun getUnsyncedFor(userId: String): List<HabitLog> =
+        db.habitTrackerDatabaseQueries
+            .getUnsyncedHabitLogsForUser(userId)
+            .executeAsList()
+            .map { it.toDomain() }
+
+    override suspend fun markSynced(id: String, syncedAt: Instant) {
+        db.habitTrackerDatabaseQueries.markHabitLogSynced(syncedAt.toEpochMilliseconds(), id)
+    }
+
+    override suspend fun mergePulled(row: HabitLog) {
+        db.habitTrackerDatabaseQueries.mergePulledHabitLog(
+            id = row.id,
+            userId = row.userId,
+            habitId = row.habitId,
+            quantity = row.quantity,
+            loggedAt = row.loggedAt.toEpochMilliseconds(),
+            deletedAt = row.deletedAt?.toEpochMilliseconds(),
+            syncedAt = row.syncedAt?.toEpochMilliseconds(),
+        )
+    }
 }
 
 private fun HabitLogEntity.toDomain(): HabitLog = HabitLog(

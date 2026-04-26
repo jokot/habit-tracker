@@ -24,7 +24,7 @@ class LogWantUseCaseTest {
 
     /** Earns `pts` points via a dummy habit log so spending can be tested. */
     private suspend fun giveBalance(pts: Int) {
-        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Earn", "units", 1.0, pts, Clock.System.now()))
+        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Earn", "units", 1.0, pts, Clock.System.now(), Clock.System.now()))
         habitLogRepo.insertLog("hl1", userId, "h1", pts.toDouble(), Clock.System.now())
     }
 

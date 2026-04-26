@@ -10,16 +10,29 @@ class FakeAuthRepository(
 
     private var session: UserSession? = null
 
-    override suspend fun signUp(email: String, password: String): Result<UserSession> {
+    var confirmationRequiredOnNext: Boolean = false
+
+    override suspend fun signUp(email: String, password: String): Result<SignUpResult> {
+        if (shouldFailAuth) return Result.failure(Exception("Auth failed"))
+        if (confirmationRequiredOnNext) {
+            confirmationRequiredOnNext = false
+            return Result.success(SignUpResult.ConfirmationRequired(email))
+        }
+        val s = UserSession(userId = Uuid.random().toString(), email = email)
+        session = s
+        return Result.success(SignUpResult.SignedIn(s))
+    }
+
+    override suspend fun signIn(email: String, password: String): Result<UserSession> {
         if (shouldFailAuth) return Result.failure(Exception("Auth failed"))
         val s = UserSession(userId = Uuid.random().toString(), email = email)
         session = s
         return Result.success(s)
     }
 
-    override suspend fun signIn(email: String, password: String): Result<UserSession> {
+    override suspend fun signInWithGoogle(idToken: String): Result<UserSession> {
         if (shouldFailAuth) return Result.failure(Exception("Auth failed"))
-        val s = UserSession(userId = Uuid.random().toString(), email = email)
+        val s = UserSession(userId = "google-fake-$idToken", email = "google@fake.test")
         session = s
         return Result.success(s)
     }
@@ -32,4 +45,8 @@ class FakeAuthRepository(
     override fun currentUserId(): String? = session?.userId
 
     override fun isLoggedIn(): Boolean = session != null
+
+    override suspend fun awaitSessionRestored() {
+        // No storage; nothing to wait for.
+    }
 }

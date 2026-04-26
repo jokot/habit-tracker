@@ -24,11 +24,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +43,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,20 +55,31 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.habittracker.android.ui.theme.Spacing
+import com.habittracker.data.remote.GoogleSignInLauncher
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     viewModel: AuthViewModel,
+    launcher: GoogleSignInLauncher,
     onSuccess: () -> Unit,
     onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 AuthEvent.Success -> onSuccess()
+                is AuthEvent.ConfirmationEmailSent -> {
+                    snackbarHostState.showSnackbar(
+                        "Check your email (${event.email}) to confirm your account.",
+                    )
+                    onBack()
+                }
             }
         }
     }
@@ -78,6 +96,7 @@ fun AuthScreen(
                 ),
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -91,6 +110,44 @@ fun AuthScreen(
             AuthHero(isSignUp = uiState.isSignUp)
 
             Spacer(Modifier.height(Spacing.xxxl))
+
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        launcher.requestIdToken()
+                            .onSuccess { token -> viewModel.signInWithGoogle(token) }
+                            .onFailure { e ->
+                                snackbarHostState.showSnackbar(
+                                    e.message ?: "Google sign-in failed",
+                                )
+                            }
+                    }
+                },
+                enabled = !uiState.isLoading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(
+                    "Continue with Google",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+
+            Spacer(Modifier.height(Spacing.lg))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    text = "  or  ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+
+            Spacer(Modifier.height(Spacing.lg))
 
             OutlinedTextField(
                 value = uiState.email,

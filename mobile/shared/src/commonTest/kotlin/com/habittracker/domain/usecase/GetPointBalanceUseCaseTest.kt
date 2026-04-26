@@ -38,7 +38,7 @@ class GetPointBalanceUseCaseTest {
 
     @Test
     fun `computes earned from habit logs this week`() = runTest {
-        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now()))
+        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now(), Clock.System.now()))
         habitLogRepo.insertLog("l1", userId, "h1", 9.0, Clock.System.now())
         val result = useCase.execute(userId).getOrThrow()
         assertEquals(3, result.earned)
@@ -54,7 +54,7 @@ class GetPointBalanceUseCaseTest {
 
     @Test
     fun `balance is earned minus spent`() = runTest {
-        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now()))
+        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now(), Clock.System.now()))
         activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 0.1))
         habitLogRepo.insertLog("l1", userId, "h1", 9.0, Clock.System.now())
         wantLogRepo.insertLog("l2", userId, "a1", 30.0, DeviceMode.OTHER, Clock.System.now())
@@ -76,7 +76,7 @@ class GetPointBalanceUseCaseTest {
     @Test
     fun `earned is capped at daily_target per habit per day`() = runTest {
         // Habit: 3 pages = 1 pt, daily target 3 (max 3 pts/day).
-        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now()))
+        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now(), Clock.System.now()))
         // Log 30 pages → raw 10 pts, capped to 3.
         habitLogRepo.insertLog("l1", userId, "h1", 30.0, Clock.System.now())
         val result = useCase.execute(userId).getOrThrow()
@@ -85,7 +85,7 @@ class GetPointBalanceUseCaseTest {
 
     @Test
     fun `excludes logs from before this week`() = runTest {
-        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now()))
+        habitRepo.saveHabit(Habit("h1", userId, "tpl", "Read", "pages", 3.0, 3, Clock.System.now(), Clock.System.now()))
         val lastWeek = weekStart() - 1.days
         habitLogRepo.insertLog("l1", userId, "h1", 3.0, lastWeek)
         habitLogRepo.insertLog("l2", userId, "h1", 3.0, Clock.System.now())

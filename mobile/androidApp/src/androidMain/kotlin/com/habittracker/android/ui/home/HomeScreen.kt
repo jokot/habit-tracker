@@ -11,15 +11,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -34,13 +41,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.habittracker.android.ui.theme.Spacing
 import com.habittracker.android.ui.theme.streakCompleteColor
+import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
 
@@ -53,6 +63,9 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
     val pendingWantMap by viewModel.pendingWants.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
+    val showLogoutDialog by viewModel.showLogoutDialog.collectAsState()
+    val logoutUnsyncedCount by viewModel.logoutUnsyncedCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -61,6 +74,22 @@ fun HomeScreen(
                 is HomeEvent.Message -> snackbarHostState.showSnackbar(event.text)
             }
         }
+    }
+
+    // Surface the actual sync error so the user can report it.
+    LaunchedEffect(syncState) {
+        val state = syncState
+        if (state is SyncState.Error) {
+            snackbarHostState.showSnackbar("Sync error: ${state.message}")
+        }
+    }
+
+    if (showLogoutDialog) {
+        LogoutDialog(
+            unsyncedCount = logoutUnsyncedCount,
+            onConfirm = { force -> viewModel.confirmSignOut(force) },
+            onDismiss = viewModel::dismissLogoutDialog,
+        )
     }
 
     Scaffold(
@@ -73,10 +102,42 @@ fun HomeScreen(
                     )
                 },
                 actions = {
+                    when (val state = syncState) {
+                        is SyncState.Running -> SyncRunningChip()
+                        is SyncState.Error -> SyncErrorChip(
+                            message = state.message,
+                            onRetry = viewModel::triggerManualSync,
+                        )
+                        else -> Unit
+                    }
                     if (uiState.isAuthenticated) {
                         SyncedPill()
                     } else {
                         TextButton(onClick = onSignIn) { Text("Sign in") }
+                    }
+                    Box {
+                        var menuOpen by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Sync now") },
+                                onClick = {
+                                    menuOpen = false
+                                    viewModel.triggerManualSync()
+                                },
+                            )
+                            if (uiState.isAuthenticated) {
+                                DropdownMenuItem(
+                                    text = { Text("Sign out") },
+                                    onClick = {
+                                        menuOpen = false
+                                        viewModel.beginSignOut()
+                                    },
+                                )
+                            }
+                        }
                     }
                     Spacer(Modifier.width(Spacing.sm))
                 },
@@ -452,4 +513,48 @@ private fun perTapCost(activity: WantActivity): String {
     val perTap = if (activity.costPerUnit >= 1.0) activity.costPerUnit.toInt()
     else 1 // ceil(1 × cost) with min-1 — matches PointCalculator.pointsSpent
     return "-$perTap pt"
+}
+
+@Composable
+private fun SyncRunningChip() {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.padding(horizontal = Spacing.xs),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Spacer(Modifier.width(Spacing.xs))
+            Text(
+                "Syncing",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncErrorChip(message: String, onRetry: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier
+            .padding(horizontal = Spacing.xs)
+            .clickable(onClick = onRetry),
+    ) {
+        Text(
+            "Sync failed — tap to retry",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        )
+    }
 }

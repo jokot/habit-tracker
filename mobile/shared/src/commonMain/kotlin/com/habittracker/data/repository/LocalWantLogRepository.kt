@@ -65,6 +65,29 @@ class LocalWantLogRepository(
     override suspend fun clearForUser(userId: String) {
         db.habitTrackerDatabaseQueries.clearWantLogsForUser(userId)
     }
+
+    override suspend fun getUnsyncedFor(userId: String): List<WantLog> =
+        db.habitTrackerDatabaseQueries
+            .getUnsyncedWantLogsForUser(userId)
+            .executeAsList()
+            .map { it.toDomain() }
+
+    override suspend fun markSynced(id: String, syncedAt: Instant) {
+        db.habitTrackerDatabaseQueries.markWantLogSynced(syncedAt.toEpochMilliseconds(), id)
+    }
+
+    override suspend fun mergePulled(row: WantLog) {
+        db.habitTrackerDatabaseQueries.mergePulledWantLog(
+            id = row.id,
+            userId = row.userId,
+            activityId = row.activityId,
+            quantity = row.quantity,
+            deviceMode = row.deviceMode.toDbValue(),
+            loggedAt = row.loggedAt.toEpochMilliseconds(),
+            deletedAt = row.deletedAt?.toEpochMilliseconds(),
+            syncedAt = row.syncedAt?.toEpochMilliseconds(),
+        )
+    }
 }
 
 private fun DeviceMode.toDbValue(): String = when (this) {

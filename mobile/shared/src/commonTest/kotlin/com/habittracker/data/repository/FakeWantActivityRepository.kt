@@ -4,6 +4,7 @@ import com.habittracker.domain.model.WantActivity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.Instant
 
 class FakeWantActivityRepository : WantActivityRepository {
     private val _activities = MutableStateFlow<List<WantActivity>>(emptyList())
@@ -50,5 +51,25 @@ class FakeWantActivityRepository : WantActivityRepository {
 
     override suspend fun clearForUser(userId: String) {
         _activities.value = _activities.value.filterNot { it.createdByUserId == userId }
+    }
+
+    override suspend fun getUnsyncedFor(userId: String): List<WantActivity> =
+        _activities.value.filter {
+            (it.createdByUserId == userId || it.createdByUserId == null) && it.syncedAt == null
+        }
+
+    override suspend fun markSynced(id: String, syncedAt: Instant) {
+        _activities.value = _activities.value.map { row ->
+            if (row.id == id) row.copy(syncedAt = syncedAt) else row
+        }
+    }
+
+    override suspend fun getByIdsForUser(userId: String, ids: List<String>): List<WantActivity> =
+        _activities.value.filter {
+            (it.createdByUserId == userId || it.createdByUserId == null) && it.id in ids
+        }
+
+    override suspend fun mergePulled(row: WantActivity) {
+        _activities.value = _activities.value.filterNot { it.id == row.id } + row
     }
 }

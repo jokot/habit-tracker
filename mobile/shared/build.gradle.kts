@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.cocoapods)
     alias(libs.plugins.android.library)
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -47,6 +48,9 @@ kotlin {
             implementation(libs.sqldelight.android.driver)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services)
+            implementation(libs.googleid)
         }
 
         iosMain.dependencies {
@@ -70,6 +74,8 @@ sqldelight {
     databases {
         create("HabitTrackerDatabase") {
             packageName.set("com.habittracker.data.local")
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
+            verifyMigrations.set(true)
         }
     }
 }

@@ -22,6 +22,8 @@ import com.habittracker.android.ui.home.HomeScreen
 import com.habittracker.android.ui.home.HomeViewModel
 import com.habittracker.android.ui.onboarding.OnboardingScreen
 import com.habittracker.android.ui.onboarding.OnboardingViewModel
+import com.habittracker.data.sync.SyncReason
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed class Screen(val route: String) {
     object Auth : Screen("auth")
@@ -35,8 +37,27 @@ fun AppNavigation(container: AppContainer) {
     var startDestination by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
+        // Wait for supabase-kt to finish loading any persisted session from storage
+        // before deciding who the current user is. Without this, currentUserId()
+        // returns the local guest UUID until the session lazily loads, and we
+        // falsely route authenticated users through onboarding.
+        withTimeoutOrNull(3_000L) {
+            container.authRepository.awaitSessionRestored()
+        }
+        container.refreshAuthState()
+
         container.seedLocalDataIfEmpty()
         val userId = container.currentUserId()
+
+        // Fresh device with existing session — try a 2s cloud restore before routing.
+        if (container.isAuthenticated() &&
+            container.habitRepository.getHabitsForUser(userId).isEmpty()
+        ) {
+            withTimeoutOrNull(2_000L) {
+                container.syncEngine.sync(SyncReason.POST_SIGN_IN)
+            }
+        }
+
         startDestination = if (container.isOnboardedUseCase.execute(userId)) {
             Screen.Home.route
         } else {
@@ -58,7 +79,13 @@ fun AppNavigation(container: AppContainer) {
             val vm = viewModel { AuthViewModel(container) }
             AuthScreen(
                 viewModel = vm,
-                onSuccess = { navController.popBackStack() },
+                launcher = container.googleSignInLauncher,
+                onSuccess = {
+                    // After sign-in, go to Home and wipe any Onboarding/Auth from the stack.
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -72,6 +99,7 @@ fun AppNavigation(container: AppContainer) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 },
+                onSignIn = { navController.navigate(Screen.Auth.route) },
             )
         }
 

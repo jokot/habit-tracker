@@ -24,4 +24,10 @@ interface WantLogRepository {
     suspend fun migrateUserId(oldUserId: String, newUserId: String)
 
     suspend fun clearForUser(userId: String)
+
+    suspend fun getUnsyncedFor(userId: String): List<WantLog>
+
+    suspend fun markSynced(id: String, syncedAt: Instant)
+
+    suspend fun mergePulled(row: WantLog)
 }
