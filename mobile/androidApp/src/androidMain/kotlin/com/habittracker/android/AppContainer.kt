@@ -134,5 +134,8 @@ class AppContainer(context: Context) {
             db.habitTrackerDatabaseQueries.clearWantLogsForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(authUserId)
         }
+        // Reset pull watermarks so the next sign-in pulls everything from
+        // the cloud instead of skipping rows older than the cached watermark.
+        watermarks.reset()
     }
 }

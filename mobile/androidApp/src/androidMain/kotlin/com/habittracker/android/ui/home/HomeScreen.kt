@@ -517,22 +517,22 @@ private fun SyncStatusChip(state: SyncState, onRetry: () -> Unit) {
 
     when (state) {
         is SyncState.Running -> {
-            container = MaterialTheme.colorScheme.tertiaryContainer
-            onContainer = MaterialTheme.colorScheme.onTertiaryContainer
+            container = androidx.compose.ui.graphics.Color(0xFFFFF3C4)        // amber 100
+            onContainer = androidx.compose.ui.graphics.Color(0xFF7A4F01)      // amber 900
             label = "Syncing"
             showSpinner = true
             clickable = false
         }
         is SyncState.Error -> {
-            container = MaterialTheme.colorScheme.errorContainer
-            onContainer = MaterialTheme.colorScheme.onErrorContainer
+            container = androidx.compose.ui.graphics.Color(0xFFFFD9D9)        // red 100
+            onContainer = androidx.compose.ui.graphics.Color(0xFFB71C1C)      // red 900
             label = "Sync failed"
             showSpinner = false
             clickable = true
         }
         else -> {
-            container = MaterialTheme.colorScheme.primaryContainer
-            onContainer = MaterialTheme.colorScheme.onPrimaryContainer
+            container = androidx.compose.ui.graphics.Color(0xFFD7E8FF)        // blue 100
+            onContainer = androidx.compose.ui.graphics.Color(0xFF0D47A1)      // blue 900
             label = "Synced"
             showSpinner = false
             clickable = false
