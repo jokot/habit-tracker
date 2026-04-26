@@ -1,4 +1,4 @@
-package com.habittracker.android
+package com.jktdeveloper.habitto
 
 import android.content.Context
 import com.habittracker.data.local.DatabaseDriverFactory

@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.onboarding
+package com.jktdeveloper.habitto.ui.onboarding
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -37,7 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
-import com.habittracker.android.ui.theme.Spacing
+import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.habittracker.domain.model.HabitTemplate
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.WantActivity

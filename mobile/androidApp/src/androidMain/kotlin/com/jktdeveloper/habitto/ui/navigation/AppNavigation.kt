@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.navigation
+package com.jktdeveloper.habitto.ui.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,13 +15,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.habittracker.android.AppContainer
-import com.habittracker.android.ui.auth.AuthScreen
-import com.habittracker.android.ui.auth.AuthViewModel
-import com.habittracker.android.ui.home.HomeScreen
-import com.habittracker.android.ui.home.HomeViewModel
-import com.habittracker.android.ui.onboarding.OnboardingScreen
-import com.habittracker.android.ui.onboarding.OnboardingViewModel
+import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.ui.auth.AuthScreen
+import com.jktdeveloper.habitto.ui.auth.AuthViewModel
+import com.jktdeveloper.habitto.ui.home.HomeScreen
+import com.jktdeveloper.habitto.ui.home.HomeViewModel
+import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
+import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
 import com.habittracker.data.sync.SyncReason
 import kotlinx.coroutines.withTimeoutOrNull
 

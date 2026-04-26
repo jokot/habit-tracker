@@ -4,7 +4,7 @@
     <application
         android:name=".HabitTrackerApplication"
         android:allowBackup="true"
-        android:label="Habit Tracker"
+        android:label="habitto"
         android:theme="@style/Theme.HabitTracker">
         <activity
             android:name=".MainActivity"
@@ -19,7 +19,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.habittracker.android" android:host="auth-callback" />
+                <data android:scheme="com.jktdeveloper.habitto" android:host="auth-callback" />
             </intent-filter>
         </activity>
     </application>

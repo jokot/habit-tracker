@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.theme
+package com.jktdeveloper.habitto.ui.theme
 
 import androidx.compose.ui.unit.dp
 

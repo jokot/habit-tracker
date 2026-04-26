@@ -19,11 +19,11 @@ kotlin {
 }
 
 android {
-    namespace = "com.habittracker.android"
+    namespace = "com.jktdeveloper.habitto"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.habittracker.android"
+        applicationId = "com.jktdeveloper.habitto"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

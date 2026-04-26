@@ -1,9 +1,9 @@
-package com.habittracker.android.ui.home
+package com.jktdeveloper.habitto.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.habittracker.android.AppContainer
-import com.habittracker.android.sync.SyncTriggers
+import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.sync.SyncTriggers
 import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.DeviceMode

@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.auth
+package com.jktdeveloper.habitto.ui.auth
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -54,7 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.habittracker.android.ui.theme.Spacing
+import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.habittracker.data.remote.GoogleSignInLauncher
 import kotlinx.coroutines.launch
 

@@ -1,12 +1,12 @@
-package com.habittracker.android
+package com.jktdeveloper.habitto
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.habittracker.android.sync.SyncTriggers
-import com.habittracker.android.ui.navigation.AppNavigation
-import com.habittracker.android.ui.theme.HabitTrackerTheme
+import com.jktdeveloper.habitto.sync.SyncTriggers
+import com.jktdeveloper.habitto.ui.navigation.AppNavigation
+import com.jktdeveloper.habitto.ui.theme.HabitTrackerTheme
 import com.habittracker.data.sync.SyncReason
 
 class MainActivity : ComponentActivity() {

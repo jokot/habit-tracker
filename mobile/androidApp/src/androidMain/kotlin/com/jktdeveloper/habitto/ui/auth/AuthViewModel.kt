@@ -1,8 +1,8 @@
-package com.habittracker.android.ui.auth
+package com.jktdeveloper.habitto.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.habittracker.android.AppContainer
+import com.jktdeveloper.habitto.AppContainer
 import com.habittracker.data.repository.SignUpResult
 import com.habittracker.data.repository.UserSession
 import com.habittracker.data.sync.SyncReason

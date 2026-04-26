@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.home
+package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text

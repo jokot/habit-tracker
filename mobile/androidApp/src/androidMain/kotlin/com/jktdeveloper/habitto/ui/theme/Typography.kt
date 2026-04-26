@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.theme
+package com.jktdeveloper.habitto.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

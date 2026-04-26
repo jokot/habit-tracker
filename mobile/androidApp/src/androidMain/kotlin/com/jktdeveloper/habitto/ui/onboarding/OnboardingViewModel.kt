@@ -1,8 +1,8 @@
-package com.habittracker.android.ui.onboarding
+package com.jktdeveloper.habitto.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.habittracker.android.AppContainer
+import com.jktdeveloper.habitto.AppContainer
 import com.habittracker.data.local.SeedData
 import com.habittracker.domain.model.HabitTemplate
 import com.habittracker.domain.model.Identity

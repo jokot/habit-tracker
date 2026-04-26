@@ -1,4 +1,4 @@
-package com.habittracker.android.ui.home
+package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
@@ -48,8 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.habittracker.android.ui.theme.Spacing
-import com.habittracker.android.ui.theme.streakCompleteColor
+import com.jktdeveloper.habitto.ui.theme.Spacing
+import com.jktdeveloper.habitto.ui.theme.streakCompleteColor
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity

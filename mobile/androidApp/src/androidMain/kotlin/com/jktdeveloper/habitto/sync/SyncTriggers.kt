@@ -1,4 +1,4 @@
-package com.habittracker.android.sync
+package com.jktdeveloper.habitto.sync
 
 import android.content.Context
 import androidx.work.BackoffPolicy

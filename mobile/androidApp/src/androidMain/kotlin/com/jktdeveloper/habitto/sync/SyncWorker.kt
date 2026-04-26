@@ -1,9 +1,9 @@
-package com.habittracker.android.sync
+package com.jktdeveloper.habitto.sync
 
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.habittracker.android.HabitTrackerApplication
+import com.jktdeveloper.habitto.HabitTrackerApplication
 import com.habittracker.data.sync.SyncReason
 
 class SyncWorker(
