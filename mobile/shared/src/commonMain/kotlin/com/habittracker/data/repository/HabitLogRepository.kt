@@ -36,4 +36,10 @@ interface HabitLogRepository {
     suspend fun migrateUserId(oldUserId: String, newUserId: String)
 
     suspend fun clearForUser(userId: String)
+
+    suspend fun getUnsyncedFor(userId: String): List<HabitLog>
+
+    suspend fun markSynced(id: String, syncedAt: Instant)
+
+    suspend fun mergePulled(row: HabitLog)
 }

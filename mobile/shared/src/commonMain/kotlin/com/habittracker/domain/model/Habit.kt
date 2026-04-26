@@ -11,4 +11,6 @@ data class Habit(
     val thresholdPerPoint: Double,
     val dailyTarget: Int,
     val createdAt: Instant,
+    val updatedAt: Instant,
+    val syncedAt: Instant? = null,
 )

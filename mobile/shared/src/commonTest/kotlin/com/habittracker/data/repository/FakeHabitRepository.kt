@@ -4,16 +4,17 @@ import com.habittracker.domain.model.Habit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.Instant
 
 class FakeHabitRepository : HabitRepository {
     private val _habits = MutableStateFlow<List<Habit>>(emptyList())
     val habits: List<Habit> get() = _habits.value
 
-    override fun observeHabitsForUser(userId: String): Flow<List<Habit>> =
-        _habits.map { list -> list.filter { it.userId == userId } }
-
     override suspend fun getHabitsForUser(userId: String): List<Habit> =
         _habits.value.filter { it.userId == userId }
+
+    override fun observeHabitsForUser(userId: String): Flow<List<Habit>> =
+        _habits.map { list -> list.filter { it.userId == userId } }
 
     override suspend fun saveHabit(habit: Habit) {
         _habits.value = _habits.value.filterNot { it.id == habit.id } + habit
@@ -31,5 +32,21 @@ class FakeHabitRepository : HabitRepository {
 
     override suspend fun clearForUser(userId: String) {
         _habits.value = _habits.value.filterNot { it.userId == userId }
+    }
+
+    override suspend fun getUnsyncedFor(userId: String): List<Habit> =
+        _habits.value.filter { it.userId == userId && it.syncedAt == null }
+
+    override suspend fun markSynced(id: String, syncedAt: Instant) {
+        _habits.value = _habits.value.map {
+            if (it.id == id) it.copy(syncedAt = syncedAt) else it
+        }
+    }
+
+    override suspend fun getByIdsForUser(userId: String, ids: List<String>): List<Habit> =
+        _habits.value.filter { it.userId == userId && it.id in ids }
+
+    override suspend fun mergePulled(row: Habit) {
+        _habits.value = _habits.value.filterNot { it.id == row.id } + row
     }
 }

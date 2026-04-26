@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS LocalHabit (
     unit TEXT NOT NULL,
     thresholdPerPoint REAL NOT NULL,
     dailyTarget INTEGER NOT NULL,
-    createdAt INTEGER NOT NULL
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS LocalIdentity (
@@ -43,12 +45,18 @@ CREATE TABLE IF NOT EXISTS LocalWantActivity (
     name TEXT NOT NULL,
     unit TEXT NOT NULL,
     costPerUnit REAL NOT NULL,
-    isCustom INTEGER NOT NULL DEFAULT 0
+    isCustom INTEGER NOT NULL DEFAULT 0,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER
 );
 
 -- HabitLog queries
 insertHabitLog:
 INSERT INTO HabitLog (id, userId, habitId, quantity, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+mergePulledHabitLog:
+INSERT OR REPLACE INTO HabitLog (id, userId, habitId, quantity, loggedAt, deletedAt, syncedAt)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 softDeleteHabitLog:
@@ -57,7 +65,7 @@ UPDATE HabitLog SET deletedAt = ? WHERE id = ? AND userId = ?;
 markHabitLogSynced:
 UPDATE HabitLog SET syncedAt = ? WHERE id = ?;
 
-getUnsyncedHabitLogs:
+getUnsyncedHabitLogsForUser:
 SELECT * FROM HabitLog WHERE syncedAt IS NULL AND userId = ?;
 
 getActiveHabitLogsForHabitOnDay:
@@ -72,13 +80,17 @@ insertWantLog:
 INSERT INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
+mergePulledWantLog:
+INSERT OR REPLACE INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
 softDeleteWantLog:
 UPDATE WantLog SET deletedAt = ? WHERE id = ? AND userId = ?;
 
 markWantLogSynced:
 UPDATE WantLog SET syncedAt = ? WHERE id = ?;
 
-getUnsyncedWantLogs:
+getUnsyncedWantLogsForUser:
 SELECT * FROM WantLog WHERE syncedAt IS NULL AND userId = ?;
 
 getAllActiveWantLogsForUser:
@@ -86,8 +98,8 @@ SELECT * FROM WantLog WHERE userId = ? AND deletedAt IS NULL ORDER BY loggedAt D
 
 -- LocalHabit queries
 upsertHabit:
-INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL);
 
 getHabitsForUser:
 SELECT * FROM LocalHabit WHERE userId = ?;
@@ -104,8 +116,8 @@ SELECT * FROM LocalIdentity;
 
 -- LocalWantActivity queries
 upsertWantActivity:
-INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, NULL);
 
 getWantActivitiesForUser:
 SELECT * FROM LocalWantActivity WHERE userId = ?;
@@ -135,3 +147,31 @@ DELETE FROM WantLog WHERE userId = ?;
 
 clearCustomWantActivitiesForUser:
 DELETE FROM LocalWantActivity WHERE userId = ?;
+
+-- Phase 3 sync helpers
+
+getUnsyncedHabitsForUser:
+SELECT * FROM LocalHabit WHERE userId = ? AND syncedAt IS NULL;
+
+getUnsyncedWantActivitiesForUser:
+SELECT * FROM LocalWantActivity WHERE userId = ? AND syncedAt IS NULL;
+
+markHabitSynced:
+UPDATE LocalHabit SET syncedAt = ? WHERE id = ?;
+
+markWantActivitySynced:
+UPDATE LocalWantActivity SET syncedAt = ? WHERE id = ?;
+
+getHabitsByIdForUser:
+SELECT * FROM LocalHabit WHERE userId = ? AND id IN ?;
+
+getWantActivitiesByIdForUser:
+SELECT * FROM LocalWantActivity WHERE userId = ? AND id IN ?;
+
+mergePulledHabit:
+INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+mergePulledWantActivity:
+INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
