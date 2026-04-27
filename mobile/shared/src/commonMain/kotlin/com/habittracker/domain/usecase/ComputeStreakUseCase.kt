@@ -8,6 +8,7 @@ import com.habittracker.domain.model.StreakDayState
 import com.habittracker.domain.model.StreakRangeResult
 import com.habittracker.domain.model.StreakSummary
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
@@ -37,25 +38,19 @@ class ComputeStreakUseCase(
             emit(StreakSummary(0, 0, 0, null))
             return@flow
         }
-        val today = todayLocal()
-        habitLogRepository.observeActiveLogsBetween(
-            userId = userId,
-            startInclusive = first.atStartOfDayIn(timeZone),
-            endExclusive = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone),
-        ).collect { logs ->
+        habitLogRepository.observeAllActiveLogsForUser(userId).collect { logs ->
+            val today = todayLocal()
             emit(summarize(first, today, logs))
         }
     }
 
     suspend fun computeNow(userId: String, range: DateRange): StreakRangeResult {
         val firstLog = firstLogDateFor(userId)
-        val logs = firstFromFlow(
-            habitLogRepository.observeActiveLogsBetween(
-                userId = userId,
-                startInclusive = range.start.atStartOfDayIn(timeZone),
-                endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
-            )
-        )
+        val logs = habitLogRepository.observeActiveLogsBetween(
+            userId = userId,
+            startInclusive = range.start.atStartOfDayIn(timeZone),
+            endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
+        ).first()
         return buildRangeResult(range, logs, firstLog)
     }
 
@@ -63,13 +58,11 @@ class ComputeStreakUseCase(
         val first = habitLogRepository.firstActiveLogAt(userId)?.toLocalDate()
             ?: return StreakSummary(0, 0, 0, null)
         val today = todayLocal()
-        val logs = firstFromFlow(
-            habitLogRepository.observeActiveLogsBetween(
-                userId = userId,
-                startInclusive = first.atStartOfDayIn(timeZone),
-                endExclusive = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone),
-            )
-        )
+        val logs = habitLogRepository.observeActiveLogsBetween(
+            userId = userId,
+            startInclusive = first.atStartOfDayIn(timeZone),
+            endExclusive = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone),
+        ).first()
         return summarize(first, today, logs)
     }
 
@@ -179,10 +172,4 @@ class ComputeStreakUseCase(
 
     private fun LocalDate.minusOneDay(): LocalDate = this.plus(-1, DateTimeUnit.DAY)
 
-    /** Drain the first emission of a Flow into a list (for the synchronous compute helpers). */
-    private suspend fun firstFromFlow(flow: Flow<List<HabitLog>>): List<HabitLog> {
-        var result: List<HabitLog> = emptyList()
-        flow.collect { result = it; return@collect }
-        return result
-    }
 }
