@@ -38,7 +38,7 @@ import kotlin.time.Duration.Companion.days
 
 data class HomeUiState(
     val habitsWithProgress: List<HabitWithProgress> = emptyList(),
-    val pointBalance: PointBalance = PointBalance(0, 0),
+    val pointBalance: PointBalance = PointBalance(0, 0, 0),
     val wantActivities: List<WantActivity> = emptyList(),
     val isAuthenticated: Boolean = false,
     val isLoading: Boolean = true,
@@ -144,7 +144,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
                         HomeUiState(
                             habitsWithProgress = habitsWithProgress,
-                            pointBalance = PointBalance(earned, spent),
+                            pointBalance = PointBalance(earned, spent, balance = maxOf(0, earned - spent)),
                             wantActivities = wants,
                             isAuthenticated = auth.isAuthenticated,
                             isLoading = false,
