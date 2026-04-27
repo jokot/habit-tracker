@@ -110,6 +110,8 @@ fun AppNavigation(container: AppContainer) {
             HomeScreen(
                 viewModel = vm,
                 onSignIn = { navController.navigate(Screen.Auth.route) },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
             )
         }
     }
