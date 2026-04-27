@@ -30,6 +30,7 @@ import com.habittracker.domain.usecase.SetupUserHabitsUseCase
 import com.habittracker.domain.usecase.SetupUserWantActivitiesUseCase
 import com.habittracker.domain.usecase.UndoHabitLogUseCase
 import com.habittracker.domain.usecase.UndoWantLogUseCase
+import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +59,7 @@ class AppContainer(context: Context) {
     val wantLogRepository = LocalWantLogRepository(db)
 
     val notificationPreferences = NotificationPreferences(appContext)
+    val notificationFiringDateStore = NotificationFiringDateStore(appContext)
     val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository)
 
     private val syncPreferences = SyncPreferences(appContext)
