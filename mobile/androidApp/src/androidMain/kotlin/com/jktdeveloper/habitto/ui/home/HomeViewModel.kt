@@ -33,6 +33,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.days
 
@@ -69,6 +70,16 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     val syncState: StateFlow<SyncState> = container.syncEngine.syncState
+
+    private val _streakStrip = MutableStateFlow(
+        com.habittracker.domain.model.StreakRangeResult(emptyList(), null)
+    )
+    val streakStrip: StateFlow<com.habittracker.domain.model.StreakRangeResult> = _streakStrip.asStateFlow()
+
+    private val _streakSummary = MutableStateFlow(
+        com.habittracker.domain.model.StreakSummary(0, 0, 0, null)
+    )
+    val streakSummary: StateFlow<com.habittracker.domain.model.StreakSummary> = _streakSummary.asStateFlow()
 
     private val _showLogoutDialog = MutableStateFlow(false)
     val showLogoutDialog: StateFlow<Boolean> = _showLogoutDialog.asStateFlow()
@@ -155,7 +166,33 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    init { observeHomeUiState() }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeStreaks() {
+        viewModelScope.launch {
+            container.authState
+                .flatMapLatest { auth ->
+                    val tz = TimeZone.currentSystemDefault()
+                    val today = Clock.System.now().toLocalDateTime(tz).date
+                    val start = today.minus(29, DateTimeUnit.DAY)
+                    val range = com.habittracker.domain.model.DateRange(
+                        start = start,
+                        endExclusive = today.plus(1, DateTimeUnit.DAY),
+                    )
+                    container.computeStreakUseCase.observeRange(auth.userId, range)
+                }
+                .collect { _streakStrip.value = it }
+        }
+        viewModelScope.launch {
+            container.authState
+                .flatMapLatest { auth -> container.computeStreakUseCase.observeCurrent(auth.userId) }
+                .collect { _streakSummary.value = it }
+        }
+    }
+
+    init {
+        observeHomeUiState()
+        observeStreaks()
+    }
 
     /** Tap handler: bump pending count for this habit and (re)start its 3s countdown. */
     fun tapHabit(habit: Habit) {
@@ -274,6 +311,12 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         _events.tryEmit(HomeEvent.Message("-$totalSpent pts — ${activity.name}"))
         if (succeeded > 0) {
             SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
+        }
+    }
+
+    fun manualRefresh() {
+        viewModelScope.launch {
+            container.syncEngine.sync(SyncReason.MANUAL)
         }
     }
 
