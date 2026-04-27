@@ -10,16 +10,22 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [33], application = Application::class)
 class SettingsViewModelTest {
@@ -27,6 +33,7 @@ class SettingsViewModelTest {
 
     @Before
     fun setup() {
+        Dispatchers.setMain(Dispatchers.Unconfined)
         val cfg = Configuration.Builder()
             .setMinimumLoggingLevel(Log.DEBUG)
             .setExecutor(SynchronousExecutor())
@@ -34,29 +41,38 @@ class SettingsViewModelTest {
         WorkManagerTestInitHelper.initializeTestWorkManager(context, cfg)
     }
 
+    @After
+    fun teardown() {
+        Dispatchers.resetMain()
+    }
+
     @Test
-    fun `setDailyReminderEnabled persists to DataStore`() = runTest {
+    fun `setDailyReminderEnabled persists to DataStore`() = runBlocking {
         val prefs = NotificationPreferences(context)
         prefs.setDailyReminderEnabled(true)
         val scheduler = NotificationScheduler(context, prefs)
         val vm = SettingsViewModel(prefs, scheduler)
 
         vm.setDailyReminderEnabled(false)
-        // Allow viewModelScope coroutine to complete the DataStore write.
-        kotlinx.coroutines.delay(50)
 
+        // viewModelScope.launch is fire-and-forget; poll until DataStore reflects the change.
+        withTimeout(2_000) {
+            while (prefs.flow.first().dailyReminderEnabled) delay(20)
+        }
         assertEquals(false, prefs.flow.first().dailyReminderEnabled)
     }
 
     @Test
-    fun `setDailyReminderMinutes clamps and persists`() = runTest {
+    fun `setDailyReminderMinutes clamps and persists`() = runBlocking {
         val prefs = NotificationPreferences(context)
         val scheduler = NotificationScheduler(context, prefs)
         val vm = SettingsViewModel(prefs, scheduler)
 
-        vm.setDailyReminderMinutes(2000) // > 1439, should clamp
-        kotlinx.coroutines.delay(50)
+        vm.setDailyReminderMinutes(2000)
 
+        withTimeout(2_000) {
+            while (prefs.flow.first().dailyReminderMinutes != 1439) delay(20)
+        }
         assertEquals(1439, prefs.flow.first().dailyReminderMinutes)
     }
 }
