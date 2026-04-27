@@ -117,6 +117,42 @@ class LocalHabitLogRepository(
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
         )
     }
+
+    override fun observeActiveLogsBetween(
+        userId: String,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): Flow<List<HabitLog>> =
+        db.habitTrackerDatabaseQueries
+            .observeActiveHabitLogsBetween(
+                userId = userId,
+                loggedAt = startInclusive.toEpochMilliseconds(),
+                loggedAt_ = endExclusive.toEpochMilliseconds(),
+            )
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list -> list.map { it.toDomain() } }
+
+    override suspend fun countActiveLogsBetween(
+        userId: String,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): Int =
+        db.habitTrackerDatabaseQueries
+            .countActiveHabitLogsBetween(
+                userId = userId,
+                loggedAt = startInclusive.toEpochMilliseconds(),
+                loggedAt_ = endExclusive.toEpochMilliseconds(),
+            )
+            .executeAsOne()
+            .toInt()
+
+    override suspend fun firstActiveLogAt(userId: String): Instant? =
+        db.habitTrackerDatabaseQueries
+            .firstActiveHabitLogInstant(userId)
+            .executeAsOneOrNull()
+            ?.MIN
+            ?.let { Instant.fromEpochMilliseconds(it) }
 }
 
 private fun HabitLogEntity.toDomain(): HabitLog = HabitLog(
