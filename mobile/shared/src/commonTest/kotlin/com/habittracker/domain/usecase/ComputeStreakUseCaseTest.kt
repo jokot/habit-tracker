@@ -109,7 +109,7 @@ class ComputeStreakUseCaseTest {
         assertEquals(StreakDayState.COMPLETE, byDate[today]?.state)
 
         val summary = uc.computeSummaryNow(userId)
-        assertEquals(2, summary.currentStreak) // today + yesterday after the freeze ended
+        assertEquals(4, summary.currentStreak) // -4,-3,-1,today all COMPLETE; -2 FROZEN doesn't break
     }
 
     @Test

@@ -148,8 +148,7 @@ class ComputeStreakUseCase(
                     if (run > longest) longest = run
                 }
                 StreakDayState.FROZEN -> {
-                    // streak still alive visually — but reset consecutive run counter
-                    run = 0
+                    // streak still alive — do NOT increment, do NOT reset
                 }
                 StreakDayState.BROKEN -> {
                     run = 0
