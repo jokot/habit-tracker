@@ -42,6 +42,7 @@ lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", v
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workmanager" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version = "1.1.1" }

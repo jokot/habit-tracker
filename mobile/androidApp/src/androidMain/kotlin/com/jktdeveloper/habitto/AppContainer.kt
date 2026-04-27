@@ -20,6 +20,7 @@ import com.habittracker.data.sync.SupabaseSyncClient
 import com.habittracker.data.sync.SyncEngine
 import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.domain.UserIdentityProvider
+import com.habittracker.domain.usecase.ComputeStreakUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentityUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.IsOnboardedUseCase
@@ -29,6 +30,7 @@ import com.habittracker.domain.usecase.SetupUserHabitsUseCase
 import com.habittracker.domain.usecase.SetupUserWantActivitiesUseCase
 import com.habittracker.domain.usecase.UndoHabitLogUseCase
 import com.habittracker.domain.usecase.UndoWantLogUseCase
+import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +56,9 @@ class AppContainer(context: Context) {
     val habitLogRepository = LocalHabitLogRepository(db)
     val wantActivityRepository = LocalWantActivityRepository(db)
     val wantLogRepository = LocalWantLogRepository(db)
+
+    val notificationPreferences = NotificationPreferences(appContext)
+    val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository)
 
     private val syncPreferences = SyncPreferences(appContext)
     private val watermarks = SyncWatermarkStore(syncPreferences)
