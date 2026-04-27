@@ -32,6 +32,8 @@ import com.habittracker.domain.usecase.UndoHabitLogUseCase
 import com.habittracker.domain.usecase.UndoWantLogUseCase
 import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
+import com.habittracker.data.sync.SyncReason
+import com.jktdeveloper.habitto.notifications.NotificationScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +63,7 @@ class AppContainer(context: Context) {
     val notificationPreferences = NotificationPreferences(appContext)
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
     val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository)
+    val notificationScheduler = NotificationScheduler(appContext, notificationPreferences)
 
     private val syncPreferences = SyncPreferences(appContext)
     private val watermarks = SyncWatermarkStore(syncPreferences)
@@ -131,6 +134,22 @@ class AppContainer(context: Context) {
             db.habitTrackerDatabaseQueries.migrateHabitLogsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateWantLogsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateWantActivitiesUserId(authUserId, localId)
+        }
+    }
+
+    /**
+     * Settings-screen sign-out helper. Pushes pending data, signs out, then wipes local DB.
+     * Caller should navigate after this returns.
+     */
+    suspend fun signOutFromSettings(): Result<Unit> = runCatching {
+        // Best-effort push of unsynced rows before clearing.
+        val userId = currentUserId()
+        if (isAuthenticated()) {
+            kotlinx.coroutines.withTimeoutOrNull(5_000) {
+                syncEngine.sync(SyncReason.MANUAL)
+            }
+            authRepository.signOut()
+            clearAuthenticatedUserData(userId)
         }
     }
 

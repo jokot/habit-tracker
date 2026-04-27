@@ -23,6 +23,7 @@ import com.jktdeveloper.habitto.ui.home.HomeViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
 import com.habittracker.data.sync.SyncReason
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 sealed class Screen(val route: String) {
@@ -112,6 +113,44 @@ fun AppNavigation(container: AppContainer) {
                 onSignIn = { navController.navigate(Screen.Auth.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                com.jktdeveloper.habitto.ui.settings.SettingsViewModel(
+                    container.notificationPreferences,
+                    container.notificationScheduler,
+                )
+            }
+            val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+            com.jktdeveloper.habitto.ui.settings.SettingsScreen(
+                viewModel = vm,
+                isAuthenticated = container.isAuthenticated(),
+                accountEmail = null,  // Backlog: AuthRepository doesn't expose email yet.
+                onSignOut = {
+                    coroutineScope.launch {
+                        container.signOutFromSettings()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
+                    }
+                },
+                onSignIn = { navController.navigate(Screen.Auth.route) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Screen.StreakHistory.route) {
+            val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                com.jktdeveloper.habitto.ui.streak.StreakHistoryViewModel(
+                    useCase = container.computeStreakUseCase,
+                    userIdProvider = { container.currentUserId() },
+                )
+            }
+            com.jktdeveloper.habitto.ui.streak.StreakHistoryScreen(
+                viewModel = vm,
+                onBack = { navController.popBackStack() },
             )
         }
     }
