@@ -75,6 +75,26 @@ WHERE userId = ? AND habitId = ? AND loggedAt >= ? AND loggedAt < ? AND deletedA
 getAllActiveHabitLogsForUser:
 SELECT * FROM HabitLog WHERE userId = ? AND deletedAt IS NULL ORDER BY loggedAt DESC;
 
+observeActiveHabitLogsBetween:
+SELECT * FROM HabitLog
+WHERE userId = ?
+  AND loggedAt >= ?
+  AND loggedAt < ?
+  AND deletedAt IS NULL
+ORDER BY loggedAt ASC;
+
+countActiveHabitLogsBetween:
+SELECT COUNT(*) FROM HabitLog
+WHERE userId = ?
+  AND loggedAt >= ?
+  AND loggedAt < ?
+  AND deletedAt IS NULL;
+
+firstActiveHabitLogInstant:
+SELECT MIN(loggedAt) FROM HabitLog
+WHERE userId = ?
+  AND deletedAt IS NULL;
+
 -- WantLog queries
 insertWantLog:
 INSERT INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
