@@ -29,6 +29,8 @@ sealed class Screen(val route: String) {
     object Auth : Screen("auth")
     object Onboarding : Screen("onboarding")
     object Home : Screen("home")
+    object Settings : Screen("settings")
+    object StreakHistory : Screen("streak-history")
 }
 
 @Composable
