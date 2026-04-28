@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,7 +24,6 @@ import com.jktdeveloper.habitto.ui.home.HomeViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
 import com.habittracker.data.sync.SyncReason
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 sealed class Screen(val route: String) {
@@ -119,23 +119,36 @@ fun AppNavigation(container: AppContainer) {
         composable(Screen.Settings.route) {
             val vm = androidx.lifecycle.viewmodel.compose.viewModel {
                 com.jktdeveloper.habitto.ui.settings.SettingsViewModel(
-                    container.notificationPreferences,
-                    container.notificationScheduler,
-                )
-            }
-            val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
-            com.jktdeveloper.habitto.ui.settings.SettingsScreen(
-                viewModel = vm,
-                isAuthenticated = container.isAuthenticated(),
-                accountEmail = null,  // Backlog: AuthRepository doesn't expose email yet.
-                onSignOut = {
-                    coroutineScope.launch {
-                        container.signOutFromSettings()
+                    notificationPrefs = container.notificationPreferences,
+                    scheduler = container.notificationScheduler,
+                    signOutAction = { container.signOutFromSettings() },
+                    unsyncedCountProvider = {
+                        val userId = container.currentUserId()
+                        val habits = container.habitLogRepository.getUnsyncedFor(userId).size
+                        val wants = container.wantLogRepository.getUnsyncedFor(userId).size
+                        habits + wants
+                    },
+                    onSignOutComplete = {
                         navController.navigate(Screen.Home.route) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
-                    }
-                },
+                    },
+                )
+            }
+            val showDialog by vm.showLogoutDialog.collectAsState()
+            val unsyncedCount by vm.logoutUnsyncedCount.collectAsState()
+            if (showDialog) {
+                com.jktdeveloper.habitto.ui.auth.LogoutDialog(
+                    unsyncedCount = unsyncedCount,
+                    onConfirm = { force -> vm.confirmSignOut(force) },
+                    onDismiss = vm::dismissLogoutDialog,
+                )
+            }
+            com.jktdeveloper.habitto.ui.settings.SettingsScreen(
+                viewModel = vm,
+                isAuthenticated = container.isAuthenticated(),
+                accountEmail = null,
+                onSignOut = { vm.beginSignOut() },
                 onSignIn = { navController.navigate(Screen.Auth.route) },
                 onBack = { navController.popBackStack() },
             )
