@@ -45,20 +45,31 @@ class GetPointBalanceUseCase(
         var balance = 0
         var totalEarned = 0
         var totalSpent = 0
+        var earnedToday = 0
+        var spentToday = 0
 
         var day = weekStartDate
         while (day <= today) {
-            val earnedToday = earnedOnDay(day, habitLogs, habits)
-            val spentToday = spentOnDay(day, wantLogs, activities)
-            // Cap carry-in at midnight (skip first day — no prior balance).
+            val earnedThisDay = earnedOnDay(day, habitLogs, habits)
+            val spentThisDay = spentOnDay(day, wantLogs, activities)
             if (day != weekStartDate) balance = minOf(balance, rolloverCap)
-            balance = (balance + earnedToday - spentToday).coerceAtLeast(0)
-            totalEarned += earnedToday
-            totalSpent += spentToday
+            balance = (balance + earnedThisDay - spentThisDay).coerceAtLeast(0)
+            totalEarned += earnedThisDay
+            totalSpent += spentThisDay
+            if (day == today) {
+                earnedToday = earnedThisDay
+                spentToday = spentThisDay
+            }
             day = day.plus(1, DateTimeUnit.DAY)
         }
 
-        PointBalance(earned = totalEarned, spent = totalSpent, balance = balance)
+        PointBalance(
+            earned = totalEarned,
+            spent = totalSpent,
+            balance = balance,
+            earnedToday = earnedToday,
+            spentToday = spentToday,
+        )
     }
 
     private fun earnedOnDay(

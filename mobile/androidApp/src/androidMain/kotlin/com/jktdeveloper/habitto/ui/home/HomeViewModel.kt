@@ -155,7 +155,13 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
                         HomeUiState(
                             habitsWithProgress = habitsWithProgress,
-                            pointBalance = PointBalance(earned, spent, balance = maxOf(0, earned - spent)),
+                            pointBalance = PointBalance(
+                                earned = earned,
+                                spent = spent,
+                                balance = maxOf(0, earned - spent),
+                                earnedToday = 0,  // overridden by use case once flow settles
+                                spentToday = 0,
+                            ),
                             wantActivities = wants,
                             isAuthenticated = auth.isAuthenticated,
                             isLoading = false,

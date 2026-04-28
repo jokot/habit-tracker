@@ -245,6 +245,27 @@ class GetPointBalanceUseCaseTest {
         return Habit(id, userId, "tpl", id, "units", threshold, dailyTarget, now, now)
     }
 
+    @Test
+    fun `earnedToday and spentToday isolate today's day`() = runTest {
+        val tuesday = LocalDate(2026, 4, 21)
+        val wednesday = LocalDate(2026, 4, 22)  // "today"
+        // Use a clock fixed to Wednesday noon (UTC)
+        val clock = makeClock(at(wednesday, hour = 12))
+        val habits = FakeHabitRepository().apply { saveHabit(habit("h2", threshold = 1.0, dailyTarget = 5)) }
+        val acts = FakeWantActivityRepository().apply { activities.add(WantActivity("a2", "X", "min", 1.0)) }
+        val hLogs = FakeHabitLogRepository()
+        val wLogs = FakeWantLogRepository()
+        val uc = GetPointBalanceUseCase(hLogs, wLogs, habits, acts, TimeZone.UTC, clock)
+        hLogs.insertLog("l1", userId, "h2", 5.0, at(tuesday))   // Tuesday: 5 pts
+        hLogs.insertLog("l2", userId, "h2", 3.0, at(wednesday)) // Wednesday: 3 pts
+        wLogs.insertLog("w1", userId, "a2", 2.0, DeviceMode.OTHER, at(wednesday, hour = 11)) // Wednesday: 2 pts spent
+        val r = uc.execute(userId).getOrThrow()
+        assertEquals(3, r.earnedToday)
+        assertEquals(2, r.spentToday)
+        assertEquals(8, r.earned) // 5 Tue + 3 Wed
+        assertEquals(2, r.spent)
+    }
+
     /** Convenience: total earned across the week (ignores rollover semantics). */
     private fun com.habittracker.domain.model.PointBalance.totalEarned() = earned
 }
