@@ -65,7 +65,7 @@ fun DailyStatusCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.xl), // 16dp on all sides
+                .padding(Spacing.lg), // 12dp outer (was 16)
         ) {
             // Streak header
             Row(
@@ -76,25 +76,25 @@ fun DailyStatusCard(
                     imageVector = Icons.Default.Whatshot,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                 )
                 Spacer(Modifier.width(Spacing.md))
                 if (range.firstLogDate == null) {
                     Text(
                         text = "Log your first habit to start a streak.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                 } else {
                     val label = if (currentStreak == 1) "1 day streak" else "$currentStreak day streak"
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight(600),
+                        style = MaterialTheme.typography.titleLarge, // bumped from titleMedium
+                        fontWeight = FontWeight(700),
                     )
                 }
             }
 
-            Spacer(Modifier.height(Spacing.lg)) // 12dp — header → grid
+            Spacer(Modifier.height(Spacing.md)) // 8dp
 
             // 30-day grid
             LazyRow(
@@ -104,13 +104,13 @@ fun DailyStatusCard(
                 streakDayItems(range.days, onDayTap)
             }
 
-            Spacer(Modifier.height(Spacing.xl)) // 16dp — grid → divider
+            Spacer(Modifier.height(Spacing.lg)) // 12dp
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-            Spacer(Modifier.height(Spacing.xl)) // 16dp — divider → KPI
+            Spacer(Modifier.height(Spacing.lg)) // 12dp
 
-            // Points KPI row
+            // KPI row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -133,7 +133,7 @@ fun DailyStatusCard(
                 )
             }
 
-            Spacer(Modifier.height(Spacing.md)) // 8dp — KPI → footer
+            // KPI → footer: rely on TextButton's intrinsic padding (no Spacer)
 
             // Footer
             Row(
@@ -156,13 +156,14 @@ private fun StatColumn(
     Column(horizontalAlignment = Alignment.Start) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelLarge, // 14sp (was 12sp labelMedium)
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(Spacing.xs))
         Text(
             text = value,
-            style = if (emphasize) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            style = if (emphasize) MaterialTheme.typography.headlineSmall  // 24sp (was titleLarge 22sp)
+                    else MaterialTheme.typography.titleLarge, // 22sp (was titleMedium 16sp)
             fontWeight = FontWeight(if (emphasize) 700 else 600),
             color = valueColor,
         )
@@ -200,7 +201,7 @@ private fun StreakDayCell(
     val showOutline = day.state == StreakDayState.TODAY_PENDING
     Box(
         modifier = Modifier
-            .size(16.dp)
+            .size(18.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(color)
             .let { m ->
