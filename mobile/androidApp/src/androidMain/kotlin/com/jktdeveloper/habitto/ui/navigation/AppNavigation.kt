@@ -144,9 +144,10 @@ fun AppNavigation(container: AppContainer) {
                     onDismiss = vm::dismissLogoutDialog,
                 )
             }
+            val authState by container.authState.collectAsState()
             com.jktdeveloper.habitto.ui.settings.SettingsScreen(
                 viewModel = vm,
-                isAuthenticated = container.isAuthenticated(),
+                isAuthenticated = authState.isAuthenticated,
                 accountEmail = null,
                 onSignOut = { vm.beginSignOut() },
                 onSignIn = { navController.navigate(Screen.Auth.route) },

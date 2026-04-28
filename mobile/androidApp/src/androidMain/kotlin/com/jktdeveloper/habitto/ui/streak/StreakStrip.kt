@@ -67,7 +67,7 @@ fun DailyStatusCard(
                 .fillMaxWidth()
                 .padding(20.dp), // 20dp outer for breathing room
         ) {
-            // Streak header
+            // Streak header — flame + label on left, View all on right
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -83,14 +83,17 @@ fun DailyStatusCard(
                     Text(
                         text = "Log your first habit to start a streak.",
                         style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
                     )
                 } else {
                     val label = if (currentStreak == 1) "1 day streak" else "$currentStreak day streak"
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.titleLarge, // bumped from titleMedium
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight(700),
+                        modifier = Modifier.weight(1f),
                     )
+                    TextButton(onClick = onViewAll) { Text("View all") }
                 }
             }
 
@@ -133,15 +136,6 @@ fun DailyStatusCard(
                 )
             }
 
-            // KPI → footer: rely on TextButton's intrinsic padding (no Spacer)
-
-            // Footer
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onViewAll) { Text("View all") }
-            }
         }
     }
 }

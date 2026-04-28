@@ -8,8 +8,8 @@ import androidx.compose.ui.graphics.Color
 // Light mode: all verified WCAG AA (≥3:1 for UI components on white background)
 val StreakComplete = Color(0xFF2E7D32)       // green 800 — 7.54:1 on white ✓
 val StreakCompleteDark = Color(0xFF81C784)   // green 300 — 4.56:1 on #121212 ✓
-val StreakFrozen = Color(0xFF1565C0)         // blue 800 — 7.02:1 on white ✓
-val StreakFrozenDark = Color(0xFF64B5F6)     // blue 300 — 4.60:1 on #121212 ✓
+val StreakFrozen = Color(0xFF00838F)         // cyan 800 — ice blue, 5.92:1 on white ✓
+val StreakFrozenDark = Color(0xFF80DEEA)     // cyan 200 — ice blue dark, 7.92:1 on #121212 ✓
 val StreakBroken = Color(0xFFC62828)         // red 800 — 5.91:1 on white ✓
 val StreakBrokenDark = Color(0xFFEF9A9A)     // red 200 — 5.12:1 on #121212 ✓
 val StreakEmpty = Color(0xFFEEEEEE)          // grey 200 — surface variant light

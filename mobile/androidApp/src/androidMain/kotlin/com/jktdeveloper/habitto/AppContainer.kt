@@ -150,6 +150,7 @@ class AppContainer(context: Context) {
             }
             authRepository.signOut()
             clearAuthenticatedUserData(userId)
+            refreshAuthState()
         }
     }
 
