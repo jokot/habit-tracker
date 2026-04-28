@@ -137,11 +137,13 @@ fun AppNavigation(container: AppContainer) {
             }
             val showDialog by vm.showLogoutDialog.collectAsState()
             val unsyncedCount by vm.logoutUnsyncedCount.collectAsState()
+            val isSigningOut by vm.isSigningOut.collectAsState()
             if (showDialog) {
                 com.jktdeveloper.habitto.ui.auth.LogoutDialog(
                     unsyncedCount = unsyncedCount,
                     onConfirm = { force -> vm.confirmSignOut(force) },
                     onDismiss = vm::dismissLogoutDialog,
+                    isProcessing = isSigningOut,
                 )
             }
             val authState by container.authState.collectAsState()

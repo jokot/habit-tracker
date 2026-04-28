@@ -60,6 +60,9 @@ class SettingsViewModel(
     private val _logoutUnsyncedCount = MutableStateFlow(0)
     val logoutUnsyncedCount: StateFlow<Int> = _logoutUnsyncedCount.asStateFlow()
 
+    private val _isSigningOut = MutableStateFlow(false)
+    val isSigningOut: StateFlow<Boolean> = _isSigningOut.asStateFlow()
+
     fun beginSignOut() {
         viewModelScope.launch {
             _logoutUnsyncedCount.value = unsyncedCountProvider?.invoke() ?: 0
@@ -68,14 +71,21 @@ class SettingsViewModel(
     }
 
     fun confirmSignOut(force: Boolean) {
+        if (_isSigningOut.value) return
         viewModelScope.launch {
-            _showLogoutDialog.value = false
-            signOutAction?.invoke()
-            onSignOutComplete()
+            _isSigningOut.value = true
+            try {
+                signOutAction?.invoke()
+                onSignOutComplete()
+            } finally {
+                _isSigningOut.value = false
+                _showLogoutDialog.value = false
+            }
         }
     }
 
     fun dismissLogoutDialog() {
+        if (_isSigningOut.value) return
         _showLogoutDialog.value = false
     }
 
