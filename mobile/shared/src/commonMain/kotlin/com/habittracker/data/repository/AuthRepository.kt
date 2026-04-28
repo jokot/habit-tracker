@@ -11,6 +11,7 @@ interface AuthRepository {
     suspend fun signInWithGoogle(idToken: String): Result<UserSession>
     suspend fun signOut(): Result<Unit>
     fun currentUserId(): String?
+    fun currentEmail(): String?
     fun isLoggedIn(): Boolean
 
     /** Suspends until the auth client has finished loading any persisted session from storage. */

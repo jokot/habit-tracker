@@ -51,6 +51,9 @@ class SupabaseAuthRepository(
     override fun currentUserId(): String? =
         client.auth.currentSessionOrNull()?.user?.id
 
+    override fun currentEmail(): String? =
+        client.auth.currentSessionOrNull()?.user?.email
+
     override fun isLoggedIn(): Boolean =
         client.auth.currentSessionOrNull() != null
 

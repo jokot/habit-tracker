@@ -147,10 +147,11 @@ fun AppNavigation(container: AppContainer) {
                 )
             }
             val authState by container.authState.collectAsState()
+            val email = remember(authState) { container.currentAccountEmail() }
             com.jktdeveloper.habitto.ui.settings.SettingsScreen(
                 viewModel = vm,
                 isAuthenticated = authState.isAuthenticated,
-                accountEmail = null,
+                accountEmail = email,
                 onSignOut = { vm.beginSignOut() },
                 onSignIn = { navController.navigate(Screen.Auth.route) },
                 onBack = { navController.popBackStack() },

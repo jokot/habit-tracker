@@ -106,6 +106,7 @@ class AppContainer(context: Context) {
 
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
+    fun currentAccountEmail(): String? = authRepository.currentEmail()
 
     /** Re-reads auth session and publishes the new AuthState. Call after sign-in/out. */
     fun refreshAuthState() {
