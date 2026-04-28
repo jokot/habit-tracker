@@ -1,6 +1,5 @@
 package com.jktdeveloper.habitto.ui.settings
 
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -66,11 +65,7 @@ fun SettingsScreen(
             if (!permissionGranted) {
                 item {
                     PermissionBanner(
-                        onOpenSettings = {
-                            val intent = PermissionUtils.appNotificationSettingsIntent(context.packageName)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        },
+                        onOpenSettings = { PermissionUtils.openAppNotificationSettings(context) },
                     )
                 }
             }
