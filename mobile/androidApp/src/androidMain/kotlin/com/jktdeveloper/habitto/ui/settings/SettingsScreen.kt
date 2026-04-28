@@ -41,9 +41,15 @@ fun SettingsScreen(
         permissionGranted = granted
     }
 
-    LaunchedEffect(Unit) {
-        // Re-check on every entrance/resume.
-        permissionGranted = PermissionUtils.hasNotificationPermission(context)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                permissionGranted = PermissionUtils.hasNotificationPermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -73,41 +79,63 @@ fun SettingsScreen(
             // Notifications section
             item { SectionHeader("Notifications") }
             item {
+                ListItem(
+                    headlineContent = { Text("All notifications", style = MaterialTheme.typography.bodyLarge) },
+                    supportingContent = {
+                        Text(
+                            if (prefs.masterEnabled) "Manage individual reminders below" else "All reminders paused",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = prefs.masterEnabled,
+                            enabled = permissionGranted,
+                            onCheckedChange = viewModel::setMasterEnabled,
+                        )
+                    },
+                )
+            }
+            item {
+                val parentEnabled = permissionGranted && prefs.masterEnabled
                 NotifRow(
                     title = "Daily reminder",
                     timeMinutes = prefs.dailyReminderMinutes,
                     enabled = prefs.dailyReminderEnabled,
-                    permissionGranted = permissionGranted,
+                    parentEnabled = parentEnabled,
                     onToggle = viewModel::setDailyReminderEnabled,
                     onTimeChange = viewModel::setDailyReminderMinutes,
                 )
             }
             item {
+                val parentEnabled = permissionGranted && prefs.masterEnabled
                 NotifRow(
                     title = "Streak at risk",
                     timeMinutes = prefs.streakRiskMinutes,
                     enabled = prefs.streakRiskEnabled,
-                    permissionGranted = permissionGranted,
+                    parentEnabled = parentEnabled,
                     onToggle = viewModel::setStreakRiskEnabled,
                     onTimeChange = viewModel::setStreakRiskMinutes,
                 )
             }
             item {
+                val parentEnabled = permissionGranted && prefs.masterEnabled
                 NotifRow(
                     title = "Streak frozen alerts",
                     timeMinutes = null,
                     enabled = prefs.streakFrozenEnabled,
-                    permissionGranted = permissionGranted,
+                    parentEnabled = parentEnabled,
                     onToggle = viewModel::setStreakFrozenEnabled,
                     onTimeChange = {},
                 )
             }
             item {
+                val parentEnabled = permissionGranted && prefs.masterEnabled
                 NotifRow(
                     title = "Streak reset alerts",
                     timeMinutes = null,
                     enabled = prefs.streakResetEnabled,
-                    permissionGranted = permissionGranted,
+                    parentEnabled = parentEnabled,
                     onToggle = viewModel::setStreakResetEnabled,
                     onTimeChange = {},
                 )
@@ -174,27 +202,30 @@ private fun SectionHeader(text: String) {
 @Composable
 private fun PermissionBanner(onOpenSettings: () -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.xl, vertical = Spacing.sm)
+            .clickable(onClick = onOpenSettings),
         color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.lg),
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 Icons.Default.Warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(Spacing.md))
             Text(
-                "Notifications are blocked",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Notifications blocked. Tap to open system settings.",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onOpenSettings) { Text("Open settings") }
         }
     }
 }
@@ -204,13 +235,12 @@ private fun NotifRow(
     title: String,
     timeMinutes: Int?,
     enabled: Boolean,
-    permissionGranted: Boolean,
+    parentEnabled: Boolean,
     onToggle: (Boolean) -> Unit,
     onTimeChange: (Int) -> Unit,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    val canEdit = permissionGranted
-    val rowMod = if (timeMinutes != null && enabled && canEdit)
+    val rowMod = if (parentEnabled && enabled && timeMinutes != null)
         Modifier.fillMaxWidth().clickable { showPicker = true }
     else
         Modifier.fillMaxWidth()
@@ -222,7 +252,7 @@ private fun NotifRow(
             { Text(formatMinutes(timeMinutes), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else null,
         trailingContent = {
-            Switch(checked = enabled, enabled = canEdit, onCheckedChange = onToggle)
+            Switch(checked = enabled, enabled = parentEnabled, onCheckedChange = onToggle)
         },
     )
 

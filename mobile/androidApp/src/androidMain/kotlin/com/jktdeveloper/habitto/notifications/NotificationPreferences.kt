@@ -16,6 +16,7 @@ private val Context.notificationDataStore: DataStore<Preferences> by preferences
 )
 
 data class NotificationPrefs(
+    val masterEnabled: Boolean,
     val dailyReminderEnabled: Boolean,
     val dailyReminderMinutes: Int,
     val streakRiskEnabled: Boolean,
@@ -25,6 +26,7 @@ data class NotificationPrefs(
 ) {
     companion object {
         val DEFAULT = NotificationPrefs(
+            masterEnabled = true,
             dailyReminderEnabled = true,
             dailyReminderMinutes = 9 * 60,   // 09:00
             streakRiskEnabled = true,
@@ -38,6 +40,7 @@ data class NotificationPrefs(
 class NotificationPreferences(private val context: Context) {
 
     private object Keys {
+        val MASTER_ENABLED = booleanPreferencesKey("master_enabled")
         val DAILY_ENABLED = booleanPreferencesKey("daily_reminder_enabled")
         val DAILY_MINUTES = intPreferencesKey("daily_reminder_minutes")
         val RISK_ENABLED = booleanPreferencesKey("streak_risk_enabled")
@@ -49,6 +52,7 @@ class NotificationPreferences(private val context: Context) {
     val flow: Flow<NotificationPrefs> = context.notificationDataStore.data.map { p ->
         val d = NotificationPrefs.DEFAULT
         NotificationPrefs(
+            masterEnabled = p[Keys.MASTER_ENABLED] ?: d.masterEnabled,
             dailyReminderEnabled = p[Keys.DAILY_ENABLED] ?: d.dailyReminderEnabled,
             dailyReminderMinutes = p[Keys.DAILY_MINUTES] ?: d.dailyReminderMinutes,
             streakRiskEnabled = p[Keys.RISK_ENABLED] ?: d.streakRiskEnabled,
@@ -60,6 +64,7 @@ class NotificationPreferences(private val context: Context) {
 
     suspend fun current(): NotificationPrefs = flow.first()
 
+    suspend fun setMasterEnabled(enabled: Boolean) = update { it[Keys.MASTER_ENABLED] = enabled }
     suspend fun setDailyReminderEnabled(enabled: Boolean) = update { it[Keys.DAILY_ENABLED] = enabled }
     suspend fun setDailyReminderMinutes(minutes: Int) = update { it[Keys.DAILY_MINUTES] = minutes.coerceIn(0, 1439) }
     suspend fun setStreakRiskEnabled(enabled: Boolean) = update { it[Keys.RISK_ENABLED] = enabled }

@@ -21,6 +21,10 @@ class SettingsViewModel(
         initialValue = NotificationPrefs.DEFAULT,
     )
 
+    fun setMasterEnabled(enabled: Boolean) = update {
+        notificationPrefs.setMasterEnabled(enabled)
+    }
+
     fun setDailyReminderEnabled(enabled: Boolean) = update {
         notificationPrefs.setDailyReminderEnabled(enabled)
     }

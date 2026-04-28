@@ -32,6 +32,11 @@ class NotificationScheduler(
         val snap = prefs.current()
         val wm = WorkManager.getInstance(context)
 
+        if (!snap.masterEnabled) {
+            cancelAll()
+            return
+        }
+
         if (snap.dailyReminderEnabled)
             wm.enqueueUniquePeriodicWork(
                 WORK_DAILY,

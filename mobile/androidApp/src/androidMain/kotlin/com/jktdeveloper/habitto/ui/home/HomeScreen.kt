@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.streakCompleteColor
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
+import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
@@ -127,7 +128,7 @@ fun HomeScreen(
             return@Scaffold
         }
 
-        val isRefreshing = syncState is SyncState.Running
+        val isRefreshing = (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.manualRefresh() },

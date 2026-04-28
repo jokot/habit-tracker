@@ -7,7 +7,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,7 +65,7 @@ fun DailyStatusCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.xl),
+                .padding(Spacing.xl), // 16dp on all sides
         ) {
             // Streak header
             Row(
@@ -84,7 +83,6 @@ fun DailyStatusCard(
                     Text(
                         text = "Log your first habit to start a streak.",
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
                     )
                 } else {
                     val label = if (currentStreak == 1) "1 day streak" else "$currentStreak day streak"
@@ -96,22 +94,21 @@ fun DailyStatusCard(
                 }
             }
 
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.lg)) // 12dp — header → grid
 
             // 30-day grid
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                contentPadding = PaddingValues(vertical = Spacing.sm),
             ) {
                 streakDayItems(range.days, onDayTap)
             }
 
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.xl)) // 16dp — grid → divider
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.xl)) // 16dp — divider → KPI
 
             // Points KPI row
             Row(
@@ -136,7 +133,7 @@ fun DailyStatusCard(
                 )
             }
 
-            Spacer(Modifier.height(Spacing.sm))
+            Spacer(Modifier.height(Spacing.md)) // 8dp — KPI → footer
 
             // Footer
             Row(
