@@ -7,10 +7,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
@@ -23,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,9 +47,10 @@ import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
 import com.jktdeveloper.habitto.ui.theme.StreakTodayOutline
 
 @Composable
-fun StreakStrip(
+fun DailyStatusCard(
     range: StreakRangeResult,
     currentStreak: Int,
+    pointBalance: Int,
     onViewAll: () -> Unit,
     onDayTap: (StreakDay) -> Unit,
     modifier: Modifier = Modifier,
@@ -56,55 +60,71 @@ fun StreakStrip(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.xl),
+        ) {
+            // Header row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Spacer(Modifier.width(Spacing.xl))
                 Icon(
                     imageVector = Icons.Default.Whatshot,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(Spacing.md))
+
                 if (range.firstLogDate == null) {
                     Text(
                         text = "Log your first habit to start a streak.",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(Spacing.xl))
                 } else {
+                    val streakLabel = if (currentStreak == 1) "1 day streak" else "$currentStreak day streak"
                     Text(
-                        text = "Streak",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.width(Spacing.md))
-                    Text(
-                        text = "$currentStreak ${if (currentStreak == 1) "day" else "days"}",
+                        text = streakLabel,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight(600),
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = onViewAll) { Text("View all") }
                 }
+
+                Spacer(Modifier.width(Spacing.lg))
+                VerticalDivider(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.width(Spacing.lg))
+                Text(
+                    text = "$pointBalance pts",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight(600),
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
-            Spacer(Modifier.height(Spacing.md))
+
+            Spacer(Modifier.height(Spacing.lg))
+
+            // 30-day grid
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = Spacing.xl,
-                    vertical = Spacing.md,
-                ),
+                contentPadding = PaddingValues(vertical = Spacing.sm),
             ) {
                 streakDayItems(range.days, onDayTap)
             }
-            Spacer(Modifier.height(Spacing.sm))
+
+            Spacer(Modifier.height(Spacing.md))
+
+            // Footer row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onViewAll) { Text("View all") }
+            }
         }
     }
 }

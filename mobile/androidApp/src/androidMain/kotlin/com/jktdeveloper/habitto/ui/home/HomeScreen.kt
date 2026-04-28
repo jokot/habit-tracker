@@ -47,7 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.streakCompleteColor
-import com.jktdeveloper.habitto.ui.streak.StreakStrip
+import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
@@ -141,20 +141,12 @@ fun HomeScreen(
                     val streakRange by viewModel.streakStrip.collectAsState()
                     val streakSummary by viewModel.streakSummary.collectAsState()
                     Spacer(Modifier.height(Spacing.sm))
-                    StreakStrip(
+                    DailyStatusCard(
                         range = streakRange,
                         currentStreak = streakSummary.currentStreak,
+                        pointBalance = uiState.pointBalance.balance,
                         onViewAll = onOpenStreakHistory,
                         onDayTap = { onOpenStreakHistory() },
-                    )
-                }
-
-                item {
-                    Spacer(Modifier.height(Spacing.sm))
-                    PointBalanceCard(
-                        earned = uiState.pointBalance.earned,
-                        spent = uiState.pointBalance.spent,
-                        balance = uiState.pointBalance.balance,
                     )
                 }
 
@@ -247,75 +239,6 @@ private fun EmptyState(message: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(Spacing.xl),
-        )
-    }
-}
-
-@Composable
-private fun PointBalanceCard(earned: Int, spent: Int, balance: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    ) {
-        Column(modifier = Modifier.padding(Spacing.xxl)) {
-            Text(
-                text = "Point Balance",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "$balance",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Spacer(Modifier.width(Spacing.sm))
-                Text(
-                    text = "pts",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = Spacing.md),
-                )
-            }
-            Spacer(Modifier.height(Spacing.lg))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xxl),
-            ) {
-                BalanceStat("Earned", earned)
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(32.dp)
-                        .padding(vertical = Spacing.xs),
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {}
-                }
-                BalanceStat("Spent", spent)
-            }
-        }
-    }
-}
-
-@Composable
-private fun BalanceStat(label: String, value: Int) {
-    val color = MaterialTheme.colorScheme.onPrimaryContainer
-    Column {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.6f),
-        )
-        Spacer(Modifier.height(Spacing.xs))
-        Text(
-            text = "$value",
-            style = MaterialTheme.typography.titleLarge,
-            color = color,
         )
     }
 }
