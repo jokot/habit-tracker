@@ -42,4 +42,18 @@ interface HabitLogRepository {
     suspend fun markSynced(id: String, syncedAt: Instant)
 
     suspend fun mergePulled(row: HabitLog)
+
+    fun observeActiveLogsBetween(
+        userId: String,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): Flow<List<HabitLog>>
+
+    suspend fun countActiveLogsBetween(
+        userId: String,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): Int
+
+    suspend fun firstActiveLogAt(userId: String): Instant?
 }

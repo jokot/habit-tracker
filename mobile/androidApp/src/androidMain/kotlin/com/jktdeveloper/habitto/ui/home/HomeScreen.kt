@@ -18,14 +18,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -41,15 +40,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.streakCompleteColor
+import com.jktdeveloper.habitto.ui.auth.LogoutDialog
+import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
+import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
@@ -59,6 +59,8 @@ import com.habittracker.domain.model.WantActivity
 fun HomeScreen(
     viewModel: HomeViewModel,
     onSignIn: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenStreakHistory: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
@@ -107,29 +109,8 @@ fun HomeScreen(
                     } else {
                         TextButton(onClick = onSignIn) { Text("Sign in") }
                     }
-                    Box {
-                        var menuOpen by remember { mutableStateOf(false) }
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Sync now") },
-                                onClick = {
-                                    menuOpen = false
-                                    viewModel.triggerManualSync()
-                                },
-                            )
-                            if (uiState.isAuthenticated) {
-                                DropdownMenuItem(
-                                    text = { Text("Sign out") },
-                                    onClick = {
-                                        menuOpen = false
-                                        viewModel.beginSignOut()
-                                    },
-                                )
-                            }
-                        }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                     Spacer(Modifier.width(Spacing.sm))
                 },
@@ -148,56 +129,69 @@ fun HomeScreen(
             return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        val isRefreshing = (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.manualRefresh() },
+            modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            item {
-                Spacer(Modifier.height(Spacing.sm))
-                PointBalanceCard(
-                    earned = uiState.pointBalance.earned,
-                    spent = uiState.pointBalance.spent,
-                    balance = uiState.pointBalance.balance,
-                )
-            }
-
-            item {
-                SectionHeader(
-                    title = "Today's Habits",
-                    subtitle = if (uiState.habitsWithProgress.isEmpty()) null
-                    else "${uiState.habitsWithProgress.count { it.isGoalMet }} of ${uiState.habitsWithProgress.size} goals met",
-                )
-            }
-
-            if (uiState.habitsWithProgress.isEmpty()) {
-                item { EmptyState("No habits yet. Complete onboarding to add them.") }
-            } else {
-                items(uiState.habitsWithProgress, key = { it.habit.id }) { hwp ->
-                    HabitCard(
-                        habitWithProgress = hwp,
-                        pending = pendingMap[hwp.habit.id],
-                        onTap = { viewModel.tapHabit(hwp.habit) },
-                        onCancel = { viewModel.cancelPending(hwp.habit.id) },
-                    )
-                }
-            }
-
-            if (uiState.wantActivities.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
                 item {
-                    Spacer(Modifier.height(Spacing.md))
-                    SectionHeader(title = "Want Activities", subtitle = "Each tap = 1 session")
-                }
-                items(uiState.wantActivities, key = { it.id }) { activity ->
-                    WantActivityCard(
-                        activity = activity,
-                        pending = pendingWantMap[activity.id],
-                        onTap = { viewModel.tapWant(activity) },
-                        onCancel = { viewModel.cancelPendingWant(activity.id) },
+                    val streakRange by viewModel.streakStrip.collectAsState()
+                    val streakSummary by viewModel.streakSummary.collectAsState()
+                    Spacer(Modifier.height(Spacing.sm))
+                    DailyStatusCard(
+                        range = streakRange,
+                        currentStreak = streakSummary.currentStreak,
+                        earned = uiState.pointBalance.earnedToday,
+                        spent = uiState.pointBalance.spentToday,
+                        balance = uiState.pointBalance.balance,
+                        onViewAll = onOpenStreakHistory,
+                        onDayTap = { onOpenStreakHistory() },
                     )
                 }
-            }
 
-            item { Spacer(Modifier.height(Spacing.xxxl)) }
+                item {
+                    SectionHeader(
+                        title = "Today's Habits",
+                        subtitle = if (uiState.habitsWithProgress.isEmpty()) null
+                        else "${uiState.habitsWithProgress.count { it.isGoalMet }} of ${uiState.habitsWithProgress.size} goals met",
+                    )
+                }
+
+                if (uiState.habitsWithProgress.isEmpty()) {
+                    item { EmptyState("No habits yet. Complete onboarding to add them.") }
+                } else {
+                    items(uiState.habitsWithProgress, key = { it.habit.id }) { hwp ->
+                        HabitCard(
+                            habitWithProgress = hwp,
+                            pending = pendingMap[hwp.habit.id],
+                            onTap = { viewModel.tapHabit(hwp.habit) },
+                            onCancel = { viewModel.cancelPending(hwp.habit.id) },
+                        )
+                    }
+                }
+
+                if (uiState.wantActivities.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(Spacing.md))
+                        SectionHeader(title = "Want Activities", subtitle = "Each tap = 1 session")
+                    }
+                    items(uiState.wantActivities, key = { it.id }) { activity ->
+                        WantActivityCard(
+                            activity = activity,
+                            pending = pendingWantMap[activity.id],
+                            onTap = { viewModel.tapWant(activity) },
+                            onCancel = { viewModel.cancelPendingWant(activity.id) },
+                        )
+                    }
+                }
+
+                item { Spacer(Modifier.height(Spacing.xxxl)) }
+            }
         }
     }
 }
@@ -249,75 +243,6 @@ private fun EmptyState(message: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(Spacing.xl),
-        )
-    }
-}
-
-@Composable
-private fun PointBalanceCard(earned: Int, spent: Int, balance: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    ) {
-        Column(modifier = Modifier.padding(Spacing.xxl)) {
-            Text(
-                text = "Point Balance",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "$balance",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Spacer(Modifier.width(Spacing.sm))
-                Text(
-                    text = "pts",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = Spacing.md),
-                )
-            }
-            Spacer(Modifier.height(Spacing.lg))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xxl),
-            ) {
-                BalanceStat("Earned", earned)
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(32.dp)
-                        .padding(vertical = Spacing.xs),
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {}
-                }
-                BalanceStat("Spent", spent)
-            }
-        }
-    }
-}
-
-@Composable
-private fun BalanceStat(label: String, value: Int) {
-    val color = MaterialTheme.colorScheme.onPrimaryContainer
-    Column {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.6f),
-        )
-        Spacer(Modifier.height(Spacing.xs))
-        Text(
-            text = "$value",
-            style = MaterialTheme.typography.titleLarge,
-            color = color,
         )
     }
 }

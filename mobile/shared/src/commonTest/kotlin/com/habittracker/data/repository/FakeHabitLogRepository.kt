@@ -70,4 +70,29 @@ class FakeHabitLogRepository : HabitLogRepository {
     override suspend fun mergePulled(row: HabitLog) {
         _logs.value = _logs.value.filterNot { it.id == row.id } + row
     }
+
+    override fun observeActiveLogsBetween(
+        userId: String,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): Flow<List<HabitLog>> = _logs.map { list ->
+        list.filter {
+            it.isActive && it.userId == userId &&
+                it.loggedAt >= startInclusive && it.loggedAt < endExclusive
+        }
+    }
+
+    override suspend fun countActiveLogsBetween(
+        userId: String,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): Int = _logs.value.count {
+        it.isActive && it.userId == userId &&
+            it.loggedAt >= startInclusive && it.loggedAt < endExclusive
+    }
+
+    override suspend fun firstActiveLogAt(userId: String): Instant? =
+        _logs.value.filter { it.isActive && it.userId == userId }
+            .minByOrNull { it.loggedAt }
+            ?.loggedAt
 }

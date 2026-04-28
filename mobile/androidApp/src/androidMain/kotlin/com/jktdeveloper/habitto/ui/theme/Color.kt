@@ -8,13 +8,29 @@ import androidx.compose.ui.graphics.Color
 // Light mode: all verified WCAG AA (≥3:1 for UI components on white background)
 val StreakComplete = Color(0xFF2E7D32)       // green 800 — 7.54:1 on white ✓
 val StreakCompleteDark = Color(0xFF81C784)   // green 300 — 4.56:1 on #121212 ✓
-val StreakFrozen = Color(0xFF1565C0)         // blue 800 — 7.02:1 on white ✓
-val StreakFrozenDark = Color(0xFF64B5F6)     // blue 300 — 4.60:1 on #121212 ✓
+val StreakFrozen = Color(0xFF00838F)         // cyan 800 — ice blue, 5.92:1 on white ✓
+val StreakFrozenDark = Color(0xFF80DEEA)     // cyan 200 — ice blue dark, 7.92:1 on #121212 ✓
 val StreakBroken = Color(0xFFC62828)         // red 800 — 5.91:1 on white ✓
 val StreakBrokenDark = Color(0xFFEF9A9A)     // red 200 — 5.12:1 on #121212 ✓
-val StreakEmpty = Color(0xFFEEEEEE)          // grey 200 — surface variant light
-val StreakEmptyDark = Color(0xFF2C2C2C)      // near-black surface variant dark
+val StreakEmpty = Color(0xFFD7D7D7)          // grey 350 — visible against #EEEEEE surfaceVariant
+val StreakEmptyDark = Color(0xFF3C3C3C)      // dark grey — visible against near-black surfaceVariant
 val StreakTodayOutline = Color(0xFF757575)   // grey 600 — outline ring for today
+
+// Heatmap tokens (GitHub-style 5 levels)
+val HeatL0 = Color(0xFFD0D7DE)
+val HeatL1 = Color(0xFF9BE9A8)
+val HeatL2 = Color(0xFF40C463)
+val HeatL3 = Color(0xFF30A14E)
+val HeatL4 = Color(0xFF216E39)
+
+val HeatL0Dark = Color(0xFF161B22)
+val HeatL1Dark = Color(0xFF0E4429)
+val HeatL2Dark = Color(0xFF006D32)
+val HeatL3Dark = Color(0xFF26A641)
+val HeatL4Dark = Color(0xFF39D353)
+
+val HeatCellBorder = Color(0xFFC8C8C8)
+val HeatCellBorderDark = Color(0xFF30363D)
 
 internal val LightColorScheme = lightColorScheme(
     primary = Color(0xFF2E7D32),

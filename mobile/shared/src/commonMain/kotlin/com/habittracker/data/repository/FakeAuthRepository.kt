@@ -44,6 +44,8 @@ class FakeAuthRepository(
 
     override fun currentUserId(): String? = session?.userId
 
+    override fun currentEmail(): String? = session?.email
+
     override fun isLoggedIn(): Boolean = session != null
 
     override suspend fun awaitSessionRestored() {
