@@ -12,8 +12,8 @@ val StreakFrozen = Color(0xFF00838F)         // cyan 800 — ice blue, 5.92:1 on
 val StreakFrozenDark = Color(0xFF80DEEA)     // cyan 200 — ice blue dark, 7.92:1 on #121212 ✓
 val StreakBroken = Color(0xFFC62828)         // red 800 — 5.91:1 on white ✓
 val StreakBrokenDark = Color(0xFFEF9A9A)     // red 200 — 5.12:1 on #121212 ✓
-val StreakEmpty = Color(0xFFEEEEEE)          // grey 200 — surface variant light
-val StreakEmptyDark = Color(0xFF2C2C2C)      // near-black surface variant dark
+val StreakEmpty = Color(0xFFD7D7D7)          // grey 350 — visible against #EEEEEE surfaceVariant
+val StreakEmptyDark = Color(0xFF3C3C3C)      // dark grey — visible against near-black surfaceVariant
 val StreakTodayOutline = Color(0xFF757575)   // grey 600 — outline ring for today
 
 internal val LightColorScheme = lightColorScheme(

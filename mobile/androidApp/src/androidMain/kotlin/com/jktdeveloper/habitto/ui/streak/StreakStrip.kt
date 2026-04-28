@@ -102,7 +102,7 @@ fun DailyStatusCard(
             // 30-day grid
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 streakDayItems(range.days, onDayTap)
             }
@@ -198,11 +198,11 @@ private fun StreakDayCell(
     val showOutline = day.state == StreakDayState.TODAY_PENDING
     Box(
         modifier = Modifier
-            .size(18.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .size(32.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(color)
             .let { m ->
-                if (showOutline) m.border(1.5.dp, StreakTodayOutline, RoundedCornerShape(4.dp))
+                if (showOutline) m.border(1.5.dp, StreakTodayOutline, RoundedCornerShape(8.dp))
                 else m
             }
             .clickable(onClick = onTap),

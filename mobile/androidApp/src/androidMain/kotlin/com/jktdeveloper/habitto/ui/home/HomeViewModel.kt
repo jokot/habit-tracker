@@ -195,7 +195,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 .flatMapLatest { auth ->
                     val tz = TimeZone.currentSystemDefault()
                     val today = Clock.System.now().toLocalDateTime(tz).date
-                    val start = today.minus(29, DateTimeUnit.DAY)
+                    val start = today.minus(6, DateTimeUnit.DAY)
                     val range = com.habittracker.domain.model.DateRange(
                         start = start,
                         endExclusive = today.plus(1, DateTimeUnit.DAY),
