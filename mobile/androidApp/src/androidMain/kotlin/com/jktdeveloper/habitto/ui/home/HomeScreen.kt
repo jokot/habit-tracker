@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.streakCompleteColor
+import com.jktdeveloper.habitto.ui.auth.LogoutDialog
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
