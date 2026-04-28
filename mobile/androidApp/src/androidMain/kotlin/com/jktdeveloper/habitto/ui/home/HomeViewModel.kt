@@ -152,6 +152,22 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                                     PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
                                 } ?: 0
                             }
+                        val earnedToday = habitLogs
+                            .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
+                            .groupBy { it.habitId }
+                            .entries.sumOf { (habitId, dayLogs) ->
+                                val habit = habitsById[habitId] ?: return@sumOf 0
+                                dayLogs.sumOf {
+                                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                }.coerceAtMost(habit.dailyTarget)
+                            }
+                        val spentToday = wantLogs
+                            .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
+                            .sumOf { log ->
+                                wants.firstOrNull { it.id == log.activityId }?.let {
+                                    PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
+                                } ?: 0
+                            }
 
                         HomeUiState(
                             habitsWithProgress = habitsWithProgress,
@@ -159,8 +175,8 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                                 earned = earned,
                                 spent = spent,
                                 balance = maxOf(0, earned - spent),
-                                earnedToday = 0,  // overridden by use case once flow settles
-                                spentToday = 0,
+                                earnedToday = earnedToday,
+                                spentToday = spentToday,
                             ),
                             wantActivities = wants,
                             isAuthenticated = auth.isAuthenticated,

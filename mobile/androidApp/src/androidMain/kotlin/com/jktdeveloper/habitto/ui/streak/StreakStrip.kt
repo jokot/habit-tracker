@@ -65,7 +65,7 @@ fun DailyStatusCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.lg), // 12dp outer (was 16)
+                .padding(20.dp), // 20dp outer for breathing room
         ) {
             // Streak header
             Row(
@@ -75,7 +75,7 @@ fun DailyStatusCard(
                 Icon(
                     imageVector = Icons.Default.Whatshot,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = FlameOrange,
                     modifier = Modifier.size(24.dp),
                 )
                 Spacer(Modifier.width(Spacing.md))
@@ -169,6 +169,9 @@ private fun StatColumn(
         )
     }
 }
+
+/** Fire orange — used for streak flame icon. WCAG AA against surfaceVariant in light + dark. */
+private val FlameOrange = Color(0xFFFF6F00)
 
 @Composable
 private fun EarnedGreen(): Color {
