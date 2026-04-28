@@ -144,7 +144,9 @@ fun HomeScreen(
                     DailyStatusCard(
                         range = streakRange,
                         currentStreak = streakSummary.currentStreak,
-                        pointBalance = uiState.pointBalance.balance,
+                        earned = uiState.pointBalance.earned,
+                        spent = uiState.pointBalance.spent,
+                        balance = uiState.pointBalance.balance,
                         onViewAll = onOpenStreakHistory,
                         onDayTap = { onOpenStreakHistory() },
                     )

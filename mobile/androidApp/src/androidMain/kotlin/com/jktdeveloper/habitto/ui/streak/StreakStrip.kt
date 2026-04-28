@@ -20,16 +20,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDay
@@ -50,7 +51,9 @@ import com.jktdeveloper.habitto.ui.theme.StreakTodayOutline
 fun DailyStatusCard(
     range: StreakRangeResult,
     currentStreak: Int,
-    pointBalance: Int,
+    earned: Int,
+    spent: Int,
+    balance: Int,
     onViewAll: () -> Unit,
     onDayTap: (StreakDay) -> Unit,
     modifier: Modifier = Modifier,
@@ -65,7 +68,7 @@ fun DailyStatusCard(
                 .fillMaxWidth()
                 .padding(Spacing.xl),
         ) {
-            // Header row
+            // Streak header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -77,7 +80,6 @@ fun DailyStatusCard(
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(Spacing.md))
-
                 if (range.firstLogDate == null) {
                     Text(
                         text = "Log your first habit to start a streak.",
@@ -85,27 +87,16 @@ fun DailyStatusCard(
                         modifier = Modifier.weight(1f),
                     )
                 } else {
-                    val streakLabel = if (currentStreak == 1) "1 day streak" else "$currentStreak day streak"
+                    val label = if (currentStreak == 1) "1 day streak" else "$currentStreak day streak"
                     Text(
-                        text = streakLabel,
+                        text = label,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight(600),
-                        modifier = Modifier.weight(1f),
                     )
                 }
-
-                Spacer(Modifier.width(Spacing.lg))
-                VerticalDivider(modifier = Modifier.height(16.dp))
-                Spacer(Modifier.width(Spacing.lg))
-                Text(
-                    text = "$pointBalance pts",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight(600),
-                    color = MaterialTheme.colorScheme.primary,
-                )
             }
 
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.md))
 
             // 30-day grid
             LazyRow(
@@ -116,9 +107,38 @@ fun DailyStatusCard(
                 streakDayItems(range.days, onDayTap)
             }
 
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.lg))
 
-            // Footer row
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Spacer(Modifier.height(Spacing.lg))
+
+            // Points KPI row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                StatColumn(
+                    label = "Earned",
+                    value = "+$earned",
+                    valueColor = EarnedGreen(),
+                )
+                StatColumn(
+                    label = "Spent",
+                    value = if (spent > 0) "−$spent" else "0",
+                    valueColor = MaterialTheme.colorScheme.error,
+                )
+                StatColumn(
+                    label = "Balance",
+                    value = "$balance pts",
+                    valueColor = MaterialTheme.colorScheme.primary,
+                    emphasize = true,
+                )
+            }
+
+            Spacer(Modifier.height(Spacing.sm))
+
+            // Footer
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -127,6 +147,35 @@ fun DailyStatusCard(
             }
         }
     }
+}
+
+@Composable
+private fun StatColumn(
+    label: String,
+    value: String,
+    valueColor: Color,
+    emphasize: Boolean = false,
+) {
+    Column(horizontalAlignment = Alignment.Start) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = value,
+            style = if (emphasize) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight(if (emphasize) 700 else 600),
+            color = valueColor,
+        )
+    }
+}
+
+@Composable
+private fun EarnedGreen(): Color {
+    val isDark = isSystemInDarkTheme()
+    return if (isDark) StreakCompleteDark else StreakComplete
 }
 
 private fun LazyListScope.streakDayItems(
