@@ -144,15 +144,14 @@ fun SettingsScreen(
             // Account section
             item { SectionHeader("Account") }
             if (isAuthenticated) {
-                item {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                accountEmail ?: "Signed in",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        },
-                    )
+                if (accountEmail != null) {
+                    item {
+                        ListItem(
+                            headlineContent = {
+                                Text(accountEmail, style = MaterialTheme.typography.bodyLarge)
+                            },
+                        )
+                    }
                 }
                 item {
                     ListItem(
