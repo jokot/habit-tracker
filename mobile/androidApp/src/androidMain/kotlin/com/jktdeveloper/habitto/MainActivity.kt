@@ -18,7 +18,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as HabitTrackerApplication).container
-        container.notificationScheduler.ensureChannels()
         lifecycleScope.launch { container.notificationScheduler.reschedule() }
         setContent {
             HabitTrackerTheme {
