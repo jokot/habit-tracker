@@ -17,11 +17,15 @@ enum class StreakDayState {
 
     /** Today, no log yet. Not yet counted as miss. */
     TODAY_PENDING,
+
+    /** After today — not yet reachable. */
+    FUTURE,
 }
 
 data class StreakDay(
     val date: LocalDate,
     val state: StreakDayState,
+    val heatLevel: Int = 0,  // 0..4 — only meaningful for renderer; state still drives streak walk
 )
 
 data class StreakRangeResult(

@@ -16,6 +16,22 @@ val StreakEmpty = Color(0xFFD7D7D7)          // grey 350 — visible against #EE
 val StreakEmptyDark = Color(0xFF3C3C3C)      // dark grey — visible against near-black surfaceVariant
 val StreakTodayOutline = Color(0xFF757575)   // grey 600 — outline ring for today
 
+// Heatmap tokens (GitHub-style 5 levels)
+val HeatL0 = Color(0xFFD0D7DE)
+val HeatL1 = Color(0xFF9BE9A8)
+val HeatL2 = Color(0xFF40C463)
+val HeatL3 = Color(0xFF30A14E)
+val HeatL4 = Color(0xFF216E39)
+
+val HeatL0Dark = Color(0xFF161B22)
+val HeatL1Dark = Color(0xFF0E4429)
+val HeatL2Dark = Color(0xFF006D32)
+val HeatL3Dark = Color(0xFF26A641)
+val HeatL4Dark = Color(0xFF39D353)
+
+val HeatCellBorder = Color(0xFFC8C8C8)
+val HeatCellBorderDark = Color(0xFF30363D)
+
 internal val LightColorScheme = lightColorScheme(
     primary = Color(0xFF2E7D32),
     onPrimary = Color(0xFFFFFFFF),

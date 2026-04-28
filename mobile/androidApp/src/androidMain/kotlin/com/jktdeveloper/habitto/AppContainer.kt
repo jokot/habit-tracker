@@ -62,7 +62,7 @@ class AppContainer(context: Context) {
 
     val notificationPreferences = NotificationPreferences(appContext)
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
-    val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository)
+    val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository, habitRepository)
     val notificationScheduler = NotificationScheduler(appContext, notificationPreferences)
 
     private val syncPreferences = SyncPreferences(appContext)

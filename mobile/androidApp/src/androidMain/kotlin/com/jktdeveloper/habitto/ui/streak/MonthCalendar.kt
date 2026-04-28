@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
-import com.jktdeveloper.habitto.ui.theme.*
+import com.jktdeveloper.habitto.ui.theme.Spacing
 import kotlinx.datetime.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -55,7 +55,7 @@ fun MonthCalendar(
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     row.forEach { day ->
                         if (day == null) Box(modifier = Modifier.size(32.dp))
-                        else DayCell(day = day, isToday = day.date == today)
+                        else DayCell(day = day)
                     }
                     repeat(7 - row.size) { Box(modifier = Modifier.size(32.dp)) }
                 }
@@ -65,21 +65,26 @@ fun MonthCalendar(
 }
 
 @Composable
-private fun DayCell(day: StreakDay, isToday: Boolean) {
+private fun DayCell(day: StreakDay) {
     val isDark = isSystemInDarkTheme()
-    val (color, onColor) = when (day.state) {
-        StreakDayState.COMPLETE -> (if (isDark) StreakCompleteDark else StreakComplete) to Color.White
-        StreakDayState.FROZEN -> (if (isDark) StreakFrozenDark else StreakFrozen) to Color.White
-        StreakDayState.BROKEN -> (if (isDark) StreakBrokenDark else StreakBroken) to Color.White
-        StreakDayState.EMPTY -> (if (isDark) StreakEmptyDark else StreakEmpty) to MaterialTheme.colorScheme.onSurface
-        StreakDayState.TODAY_PENDING -> (if (isDark) StreakEmptyDark else StreakEmpty) to MaterialTheme.colorScheme.onSurface
+    val appearance = resolveCellAppearance(day, isDark)
+    // Determine text contrast — use white on saturated/dark fills, surface color on light fills
+    val onColor = when (day.state) {
+        StreakDayState.FROZEN, StreakDayState.BROKEN -> Color.White
+        else -> MaterialTheme.colorScheme.onSurface
     }
     Box(
         modifier = Modifier
             .size(32.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(color)
-            .let { if (isToday || day.state == StreakDayState.TODAY_PENDING) it.border(1.5.dp, StreakTodayOutline, RoundedCornerShape(6.dp)) else it },
+            .background(appearance.fill.copy(alpha = appearance.alpha))
+            .let { m ->
+                if (appearance.ringColor != null) {
+                    m.border(appearance.ringWidth, appearance.ringColor, RoundedCornerShape(6.dp))
+                } else {
+                    m.border(1.dp, appearance.border, RoundedCornerShape(6.dp))
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(

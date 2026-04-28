@@ -2,6 +2,8 @@ package com.jktdeveloper.habitto.ui.streak
 
 import android.app.Application
 import com.habittracker.data.repository.HabitLogRepository
+import com.habittracker.data.repository.HabitRepository
+import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.usecase.ComputeStreakUseCase
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +45,7 @@ class StreakHistoryViewModelTest {
 
     @Test fun `initial load seeds current month + summary`() = runTest(testDispatcher) {
         val logs = listOf(makeLog(today))
-        val uc = ComputeStreakUseCase(InMemoryRepo(logs), tz, FixedClock(today))
+        val uc = ComputeStreakUseCase(InMemoryRepo(logs), EmptyHabitRepo(), tz, FixedClock(today))
         val vm = StreakHistoryViewModel(uc, { userId }, tz, FixedClock(today))
         advanceUntilIdle()
         val months = vm.months.value
@@ -55,7 +57,7 @@ class StreakHistoryViewModelTest {
 
     @Test fun `loadOlderMonth prepends previous month`() = runTest(testDispatcher) {
         val logs = listOf(makeLog(LocalDate(2026, 3, 15)), makeLog(today))
-        val uc = ComputeStreakUseCase(InMemoryRepo(logs), tz, FixedClock(today))
+        val uc = ComputeStreakUseCase(InMemoryRepo(logs), EmptyHabitRepo(), tz, FixedClock(today))
         val vm = StreakHistoryViewModel(uc, { userId }, tz, FixedClock(today))
         advanceUntilIdle()
         vm.loadOlderMonth()
@@ -69,7 +71,7 @@ class StreakHistoryViewModelTest {
 
     @Test fun `loadOlderMonth stops at firstLogDate`() = runTest(testDispatcher) {
         val logs = listOf(makeLog(LocalDate(2026, 3, 15)), makeLog(today))
-        val uc = ComputeStreakUseCase(InMemoryRepo(logs), tz, FixedClock(today))
+        val uc = ComputeStreakUseCase(InMemoryRepo(logs), EmptyHabitRepo(), tz, FixedClock(today))
         val vm = StreakHistoryViewModel(uc, { userId }, tz, FixedClock(today))
         advanceUntilIdle()
         vm.loadOlderMonth()
@@ -93,6 +95,20 @@ class StreakHistoryViewModelTest {
 
 private class FixedClock(private val date: LocalDate) : Clock {
     override fun now(): Instant = LocalDateTime(date, LocalTime(12, 0)).toInstant(TimeZone.UTC)
+}
+
+/** Minimal HabitRepository that returns 0 habits — sufficient for streak-shape tests. */
+private class EmptyHabitRepo : HabitRepository {
+    override suspend fun getHabitsForUser(userId: String): List<Habit> = emptyList()
+    override fun observeHabitsForUser(userId: String) = error("unused")
+    override suspend fun saveHabit(habit: Habit) = error("unused")
+    override suspend fun deleteHabit(habitId: String, userId: String) = error("unused")
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
+    override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
+    override suspend fun mergePulled(row: Habit) = error("unused")
 }
 
 private class InMemoryRepo(private val logs: List<HabitLog>) : HabitLogRepository {

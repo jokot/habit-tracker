@@ -38,8 +38,10 @@ class ComputeStreakUseCaseTest {
     private fun makeUseCase(
         logs: List<HabitLog>,
         currentDay: LocalDate = today,
+        habitCount: Int = 1,
     ): ComputeStreakUseCase = ComputeStreakUseCase(
         habitLogRepository = fakeRepo(logs),
+        habitRepository = FixedCountHabitRepo(habitCount, userId),
         timeZone = tz,
         clock = FixedClock(instantAt(currentDay, hour = 12)),
     )
@@ -200,6 +202,7 @@ class ComputeStreakUseCaseTest {
             .map { log(it) }
         val uc = ComputeStreakUseCase(
             habitLogRepository = fakeRepo(logs),
+            habitRepository = FixedCountHabitRepo(1, userId),
             timeZone = tz,
             clock = FixedClock(instantAt(current)),
         )
@@ -215,6 +218,7 @@ class ComputeStreakUseCaseTest {
             .map { log(it) }
         val uc = ComputeStreakUseCase(
             habitLogRepository = fakeRepo(logs),
+            habitRepository = FixedCountHabitRepo(1, userId),
             timeZone = tz,
             clock = FixedClock(instantAt(current)),
         )
@@ -240,6 +244,54 @@ class ComputeStreakUseCaseTest {
         val summary = uc.computeSummaryNow(userId)
         assertEquals(3, summary.currentStreak)
         assertEquals(3, summary.longestStreak) // tied
+    }
+
+    @Test
+    fun `heatLevel 0 when no logs in range`() = runTest {
+        val uc = makeUseCase(logs = emptyList(), habitCount = 2)
+        val range = DateRange(today.minusDays(2), today.plusDays(1))
+        val result = uc.computeNow(userId, range)
+        // All past days with no logs should have heatLevel 0
+        result.days.dropLast(1).forEach { day ->
+            assertEquals(0, day.heatLevel, "Expected heatLevel 0 for ${day.date}")
+        }
+    }
+
+    @Test
+    fun `heatLevel scales with distinct habits logged`() = runTest {
+        // 4 habits total: log 1 (L1 = 0.25), 2 (L2 = 0.5), 3 (L3 = 0.75), 4 (L4 = 1.0)
+        val d1 = today.minusDays(4)
+        val d2 = today.minusDays(3)
+        val d3 = today.minusDays(2)
+        val d4 = today.minusDays(1)
+        val logs = listOf(
+            log(d1, "h1"),
+            log(d2, "h1"), log(d2, "h2"),
+            log(d3, "h1"), log(d3, "h2"), log(d3, "h3"),
+            log(d4, "h1"), log(d4, "h2"), log(d4, "h3"), log(d4, "h4"),
+        )
+        val uc = makeUseCase(logs = logs, habitCount = 4)
+        val range = DateRange(d1, today.plusDays(1))
+        val result = uc.computeNow(userId, range)
+        val byDate = result.days.associateBy { it.date }
+        assertEquals(1, byDate[d1]?.heatLevel) // 1/4 = 0.25 → L1
+        assertEquals(2, byDate[d2]?.heatLevel) // 2/4 = 0.5  → L2
+        assertEquals(3, byDate[d3]?.heatLevel) // 3/4 = 0.75 → L3
+        assertEquals(4, byDate[d4]?.heatLevel) // 4/4 = 1.0  → L4
+    }
+
+    @Test
+    fun `FUTURE state for days after today`() = runTest {
+        val uc = makeUseCase(logs = listOf(log(today)), habitCount = 1)
+        val range = DateRange(today, today.plusDays(3))
+        val result = uc.computeNow(userId, range)
+        val byDate = result.days.associateBy { it.date }
+        assertEquals(StreakDayState.COMPLETE, byDate[today]?.state)
+        assertEquals(StreakDayState.FUTURE, byDate[today.plusDays(1)]?.state)
+        assertEquals(StreakDayState.FUTURE, byDate[today.plusDays(2)]?.state)
+        // FUTURE cells have heatLevel 0
+        assertEquals(0, byDate[today.plusDays(1)]?.heatLevel)
+        assertEquals(0, byDate[today.plusDays(2)]?.heatLevel)
     }
 
     @AfterTest
@@ -300,6 +352,43 @@ private class InMemoryHabitLogRepo(
     override suspend fun getUnsyncedFor(userId: String) = error("unused")
     override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
     override suspend fun mergePulled(row: HabitLog) = error("unused")
+}
+
+/**
+ * HabitRepository stub that returns [count] dummy habits for [userId] and
+ * throws for everything else (nothing else is called by ComputeStreakUseCase).
+ */
+private class FixedCountHabitRepo(
+    private val count: Int,
+    private val ownerId: String,
+) : com.habittracker.data.repository.HabitRepository {
+    private val dummyInstant = kotlinx.datetime.Instant.fromEpochSeconds(0)
+    private fun dummyHabits() = List(count) { i ->
+        com.habittracker.domain.model.Habit(
+            id = "h${i + 1}",
+            userId = ownerId,
+            templateId = "t${i + 1}",
+            name = "Habit ${i + 1}",
+            unit = "times",
+            thresholdPerPoint = 1.0,
+            dailyTarget = 1,
+            createdAt = dummyInstant,
+            updatedAt = dummyInstant,
+        )
+    }
+
+    override suspend fun getHabitsForUser(userId: String): List<com.habittracker.domain.model.Habit> =
+        if (userId == ownerId) dummyHabits() else emptyList()
+
+    override fun observeHabitsForUser(userId: String) = error("unused")
+    override suspend fun saveHabit(habit: com.habittracker.domain.model.Habit) = error("unused")
+    override suspend fun deleteHabit(habitId: String, userId: String) = error("unused")
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: kotlinx.datetime.Instant) = error("unused")
+    override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
+    override suspend fun mergePulled(row: com.habittracker.domain.model.Habit) = error("unused")
 }
 
 private fun LocalDate.minusDays(d: Int): LocalDate =

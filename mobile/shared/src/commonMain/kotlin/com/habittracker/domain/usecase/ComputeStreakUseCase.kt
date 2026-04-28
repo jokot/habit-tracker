@@ -1,6 +1,7 @@
 package com.habittracker.domain.usecase
 
 import com.habittracker.data.repository.HabitLogRepository
+import com.habittracker.data.repository.HabitRepository
 import com.habittracker.domain.model.DateRange
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.StreakDay
@@ -22,6 +23,7 @@ import kotlinx.datetime.toLocalDateTime
 
 class ComputeStreakUseCase(
     private val habitLogRepository: HabitLogRepository,
+    private val habitRepository: HabitRepository,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
     private val clock: Clock = Clock.System,
 ) {
@@ -30,7 +32,7 @@ class ComputeStreakUseCase(
             userId = userId,
             startInclusive = range.start.atStartOfDayIn(timeZone),
             endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
-        ).map { logs -> buildRangeResult(range, logs, firstLogDateFor(userId)) }
+        ).map { logs -> buildRangeResult(userId, range, logs, firstLogDateFor(userId)) }
 
     fun observeCurrent(userId: String): Flow<StreakSummary> = flow {
         val first = habitLogRepository.firstActiveLogAt(userId)?.toLocalDate()
@@ -51,7 +53,7 @@ class ComputeStreakUseCase(
             startInclusive = range.start.atStartOfDayIn(timeZone),
             endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
         ).first()
-        return buildRangeResult(range, logs, firstLog)
+        return buildRangeResult(userId, range, logs, firstLog)
     }
 
     suspend fun computeSummaryNow(userId: String): StreakSummary {
@@ -71,15 +73,17 @@ class ComputeStreakUseCase(
     private suspend fun firstLogDateFor(userId: String): LocalDate? =
         habitLogRepository.firstActiveLogAt(userId)?.toLocalDate()
 
-    private fun buildRangeResult(
+    private suspend fun buildRangeResult(
+        userId: String,
         range: DateRange,
         logs: List<HabitLog>,
         firstLogDate: LocalDate?,
     ): StreakRangeResult {
         val today = todayLocal()
+        val habitCount = habitRepository.getHabitsForUser(userId).size
         // Set of dates with at least one log inside the range.
-        val daysWithLog: Set<LocalDate> = logs
-            .filter { it.loggedAt <= now() } // ignore future-dated
+        val pastLogs = logs.filter { it.loggedAt <= now() } // ignore future-dated
+        val daysWithLog: Set<LocalDate> = pastLogs
             .map { it.loggedAt.toLocalDate() }
             .toSet()
         // Walk from streak anchor (firstLogDate, or range.start if no anchor) up through today
@@ -93,7 +97,7 @@ class ComputeStreakUseCase(
         while (cursor <= walkEnd) {
             val state = when {
                 cursor < anchor -> StreakDayState.EMPTY
-                cursor > today -> StreakDayState.EMPTY // future days inside requested range render as EMPTY
+                cursor > today -> StreakDayState.FUTURE // future days inside requested range render as FUTURE
                 cursor in daysWithLog -> StreakDayState.COMPLETE
                 cursor == today -> StreakDayState.TODAY_PENDING
                 prev == StreakDayState.COMPLETE -> StreakDayState.FROZEN
@@ -109,11 +113,33 @@ class ComputeStreakUseCase(
         val days = mutableListOf<StreakDay>()
         var d = range.start
         while (d < range.endExclusive) {
-            days += StreakDay(d, perDay[d] ?: StreakDayState.EMPTY)
+            val state = perDay[d] ?: StreakDayState.EMPTY
+            val distinctCount = distinctOnDay(pastLogs, d)
+            val heat = if (state == StreakDayState.FUTURE || state == StreakDayState.EMPTY) 0
+                       else heatBucket(distinctCount, habitCount)
+            days += StreakDay(d, state, heat)
             d = d.plus(1, DateTimeUnit.DAY)
         }
         return StreakRangeResult(days = days, firstLogDate = firstLogDate)
     }
+
+    private fun heatBucket(distinct: Int, totalHabits: Int): Int {
+        if (totalHabits == 0) return 0
+        val ratio = distinct.toDouble() / totalHabits
+        return when {
+            ratio <= 0.0 -> 0
+            ratio <= 0.25 -> 1
+            ratio <= 0.5 -> 2
+            ratio <= 0.75 -> 3
+            else -> 4
+        }
+    }
+
+    private fun distinctOnDay(logs: List<HabitLog>, date: LocalDate): Int =
+        logs.filter { sameLocalDate(date, it.loggedAt) }.distinctBy { it.habitId }.size
+
+    private fun sameLocalDate(date: LocalDate, instant: Instant): Boolean =
+        instant.toLocalDate() == date
 
     private fun summarize(firstLog: LocalDate, today: LocalDate, logs: List<HabitLog>): StreakSummary {
         val daysWithLog = logs
@@ -150,6 +176,7 @@ class ComputeStreakUseCase(
                     // do nothing — yesterday's streak remains
                 }
                 StreakDayState.EMPTY -> Unit
+                StreakDayState.FUTURE -> Unit // never reached in summarize (cursor <= today)
             }
             prev = state
             cursor = cursor.plus(1, DateTimeUnit.DAY)

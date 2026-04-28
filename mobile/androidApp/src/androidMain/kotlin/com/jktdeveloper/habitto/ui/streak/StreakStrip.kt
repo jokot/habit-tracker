@@ -33,18 +33,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDay
-import com.habittracker.domain.model.StreakDayState
 import com.habittracker.domain.model.StreakRangeResult
 import com.jktdeveloper.habitto.ui.theme.Spacing
-import com.jktdeveloper.habitto.ui.theme.StreakBroken
-import com.jktdeveloper.habitto.ui.theme.StreakBrokenDark
 import com.jktdeveloper.habitto.ui.theme.StreakComplete
 import com.jktdeveloper.habitto.ui.theme.StreakCompleteDark
-import com.jktdeveloper.habitto.ui.theme.StreakEmpty
-import com.jktdeveloper.habitto.ui.theme.StreakEmptyDark
-import com.jktdeveloper.habitto.ui.theme.StreakFrozen
-import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
-import com.jktdeveloper.habitto.ui.theme.StreakTodayOutline
 
 @Composable
 fun DailyStatusCard(
@@ -188,22 +180,18 @@ private fun StreakDayCell(
     onTap: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    val color = when (day.state) {
-        StreakDayState.COMPLETE -> if (isDark) StreakCompleteDark else StreakComplete
-        StreakDayState.FROZEN -> if (isDark) StreakFrozenDark else StreakFrozen
-        StreakDayState.BROKEN -> if (isDark) StreakBrokenDark else StreakBroken
-        StreakDayState.EMPTY -> if (isDark) StreakEmptyDark else StreakEmpty
-        StreakDayState.TODAY_PENDING -> if (isDark) StreakEmptyDark else StreakEmpty
-    }
-    val showOutline = day.state == StreakDayState.TODAY_PENDING
+    val appearance = resolveCellAppearance(day, isDark)
     Box(
         modifier = Modifier
             .size(32.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(color)
+            .background(appearance.fill.copy(alpha = appearance.alpha))
             .let { m ->
-                if (showOutline) m.border(1.5.dp, StreakTodayOutline, RoundedCornerShape(8.dp))
-                else m
+                if (appearance.ringColor != null) {
+                    m.border(appearance.ringWidth, appearance.ringColor, RoundedCornerShape(8.dp))
+                } else {
+                    m.border(1.dp, appearance.border, RoundedCornerShape(8.dp))
+                }
             }
             .clickable(onClick = onTap),
     )
