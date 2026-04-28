@@ -6,6 +6,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jktdeveloper.habitto.HabitTrackerApplication
+import com.jktdeveloper.habitto.R
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -43,7 +44,7 @@ class DailyReminderWorker(
 
         fun fireDailyReminder(context: Context) {
             val builder = NotificationCompat.Builder(context, NotificationChannels.DAILY_REMINDER)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("Habitto")
                 .setContentText("Log your habits to keep your streak alive.")
                 .setAutoCancel(true)

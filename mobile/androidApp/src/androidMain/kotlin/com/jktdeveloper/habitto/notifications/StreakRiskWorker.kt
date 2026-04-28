@@ -6,6 +6,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jktdeveloper.habitto.HabitTrackerApplication
+import com.jktdeveloper.habitto.R
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -38,7 +39,7 @@ class StreakRiskWorker(
         if (summary.currentStreak <= 0) return@runCatching Result.success()
 
         val builder = NotificationCompat.Builder(applicationContext, NotificationChannels.STREAK_RISK)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Habitto")
             .setContentText("${summary.currentStreak}-day streak at risk. Log a habit before midnight.")
             .setAutoCancel(true)

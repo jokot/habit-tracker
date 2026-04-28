@@ -8,6 +8,7 @@ import androidx.work.WorkerParameters
 import com.habittracker.domain.model.DateRange
 import com.habittracker.domain.model.StreakDayState
 import com.jktdeveloper.habitto.HabitTrackerApplication
+import com.jktdeveloper.habitto.R
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -58,7 +59,7 @@ class DayBoundaryWorker(
 
     private fun fire(context: Context, id: Int, body: String) {
         val builder = NotificationCompat.Builder(context, NotificationChannels.STREAK_STATUS)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Habitto")
             .setContentText(body)
             .setAutoCancel(true)
