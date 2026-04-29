@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -148,7 +149,11 @@ fun DailyStatusCard(
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             text = currentStreak.toString(),
-                            style = NumeralStyle.copy(fontSize = 44.sp),
+                            style = NumeralStyle.copy(
+                                fontSize = 44.sp,
+                                lineHeight = 44.sp,
+                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            ),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.width(6.dp))

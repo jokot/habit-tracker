@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -216,11 +217,11 @@ private fun OnboardingBottomBar(
     onLeftAction: () -> Unit,
     onRightAction: () -> Unit,
 ) {
-    Surface(
-        color = Color.Transparent,
-        tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
+    Column {
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
