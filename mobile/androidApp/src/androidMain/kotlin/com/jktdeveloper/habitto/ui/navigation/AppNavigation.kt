@@ -187,6 +187,22 @@ fun AppNavigation(container: AppContainer) {
                     onBack = { navController.popBackStack() },
                 )
             }
+
+            composable(Screen.You.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.you.YouHubViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.you.YouHubScreen(
+                    viewModel = vm,
+                    onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                    onSignIn = { navController.navigate(Screen.Auth.route) },
+                    onSignOutComplete = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
+                    },
+                )
+            }
         }
     }
 }
