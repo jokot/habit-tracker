@@ -67,18 +67,17 @@ These features WILL ship later, but Home should not advertise or surface them in
 
 This is design hygiene only — engineering will leave hooks in code that surface these later. The DESIGN should not show them on Home until the features ship.
 
-### 6. Document the deferred features
+### 6. Group artboards by readiness
 
-In the canvas, clearly label which artboards represent **shipped + redesign** vs **future-feature designs not yet wired**:
-- Identity list / detail / add → future feature (Phase 5b)
-- Habit form CRUD / Habit detail → future feature (Phase 5c)
-- Want list / detail / CRUD → future feature (Phase 5c) — see §7 below
-- Freezes screen → future feature (Phase 5c)
-- Want timer → future feature (Phase 5c)
-- Exchange rate → future feature (Phase 7)
-- Widgets → future feature (Phase 6)
+In the canvas, label every section as one of two groups:
+- **`[redesign of existing surface]`** — the screen exists in the live app today; the design replaces what's there
+- **`[future surface]`** — the screen describes a feature that hasn't shipped yet
 
-The Home / Onboarding / Auth / Streak history / Settings redesigns are the IMMEDIATE-IMPLEMENTATION set. Mark them.
+Existing surfaces being redesigned: Onboarding, Auth, Today (Home), Streak history, Settings.
+
+Future surfaces: Identity list / Identity detail / Add identity flow, Habit detail, Habit form / Habit CRUD, Want list / Want detail / Want form / Want CRUD, Freezes screen, Want timer, Exchange rate, Widgets, You hub.
+
+Group sections so all redesigns sit together and all future surfaces sit together — see §9 for the full ordering.
 
 ---
 
@@ -131,16 +130,16 @@ Today screen supports pull-to-refresh which triggers a manual sync. Currently no
 2. **3-item bottom nav** applied consistently to every screen that shows nav chrome.
 3. **Want list / Want detail / Want form** mockups (light + dark, all states from §13 of the original brief).
 4. **Updated IA diagram** reflecting 3-item nav + Wants reachable via Today taps and You hub.
-5. **Phase tags** on every canvas section: `[redesign · ship now]` vs `[future · phase 5b]` vs `[future · phase 5c]` vs `[future · phase 6]` vs `[future · phase 7]`.
+5. **Readiness tags** on every canvas section: `[redesign of existing surface]` vs `[future surface]`.
 6. **Home (revised)** — without freeze chip, without exchange-rate banner, without per-habit streak chip. Just the streak number + 7-day heatmap + KPI row + identity strip + habits + wants + bottom nav.
 7. **Today refresh states** — pulling / released / syncing / success / error variants of Today, light + dark.
 8. **Microcopy delta** for any labels that changed (drop "Wants" tab label, add "Manage wants" inside You hub, etc.).
 9. **Sort the canvas sections** in this order:
    - **Design system** first (tokens, primitives, component library)
-   - **Ship-now redesigns** next, in user-flow order: Onboarding → Auth → Today → Streak history → You hub → Settings
-   - **Phase-tagged future features** after, grouped by phase: 5b (Identity list/detail/add, Habit form CRUD, Habit detail) → 5c (Want list/detail/form, Habit/Want CRUD lists, Freezes, Want timer, per-habit streak surfaces) → 6 (Widgets) → 7 (Exchange rate)
+   - **Existing-surface redesigns** next, in user-flow order: Onboarding → Auth → Today → Streak history → You hub → Settings
+   - **Future surfaces** after, in conceptually related groupings: Identity (list, detail, add) → Habit (detail, CRUD) → Want (list, detail, CRUD) → Freezes → Want timer → Exchange rate → Widgets
    - **Notifications + IA diagram** last as reference appendices
-   - Within each section, light variants before dark; primary state before edge states (empty / loading / error / pending)
+   - Within each section: light variants before dark; primary state before edge states (empty / loading / error / pending)
 
 ---
 
