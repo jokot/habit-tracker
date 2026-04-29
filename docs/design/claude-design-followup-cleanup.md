@@ -135,6 +135,12 @@ Today screen supports pull-to-refresh which triggers a manual sync. Currently no
 6. **Home (revised)** — without freeze chip, without exchange-rate banner, without per-habit streak chip. Just the streak number + 7-day heatmap + KPI row + identity strip + habits + wants + bottom nav.
 7. **Today refresh states** — pulling / released / syncing / success / error variants of Today, light + dark.
 8. **Microcopy delta** for any labels that changed (drop "Wants" tab label, add "Manage wants" inside You hub, etc.).
+9. **Sort the canvas sections** in this order:
+   - **Design system** first (tokens, primitives, component library)
+   - **Ship-now redesigns** next, in user-flow order: Onboarding → Auth → Today → Streak history → You hub → Settings
+   - **Phase-tagged future features** after, grouped by phase: 5b (Identity list/detail/add, Habit form CRUD, Habit detail) → 5c (Want list/detail/form, Habit/Want CRUD lists, Freezes, Want timer, per-habit streak surfaces) → 6 (Widgets) → 7 (Exchange rate)
+   - **Notifications + IA diagram** last as reference appendices
+   - Within each section, light variants before dark; primary state before edge states (empty / loading / error / pending)
 
 ---
 
