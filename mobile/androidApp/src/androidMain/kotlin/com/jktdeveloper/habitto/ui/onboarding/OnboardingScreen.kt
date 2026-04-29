@@ -296,6 +296,9 @@ private fun IdentityGridCell(
     val hue = IdentityHue.forIdentityId(identity.name.lowercase())
     val selectedBg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.92f)
     val selectedBorder = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.50f)
+    // Selected bg is always light regardless of theme — use a dark fg for legibility
+    val selectedTitleFg = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.18f)
+    val selectedSubtitleFg = Color.hsl(hue = hue, saturation = 0.40f, lightness = 0.30f)
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
@@ -338,13 +341,13 @@ private fun IdentityGridCell(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (selected) selectedTitleFg else MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = identity.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) selectedSubtitleFg else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

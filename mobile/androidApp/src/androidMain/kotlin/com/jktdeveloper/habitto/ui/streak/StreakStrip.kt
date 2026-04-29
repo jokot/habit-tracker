@@ -35,6 +35,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.StreakDay
@@ -121,19 +123,23 @@ fun DailyStatusCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column {
-            // ── Streak header ─────────────────────────────────────────────────
-            Row(
+            // ── Streak header (ConstraintLayout per canvas) ───────────────────
+            ConstraintLayout(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 44dp icon container
+                val (iconRef, streakRef, daysRef, supportRef) = createRefs()
+
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(containerBg),
+                        .background(containerBg)
+                        .constrainAs(iconRef) {
+                            start.linkTo(parent.start)
+                            top.linkTo(parent.top)
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -144,33 +150,42 @@ fun DailyStatusCard(
                     )
                 }
 
-                // Right: numeral hero + supporting line
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = currentStreak.toString(),
-                            style = NumeralStyle.copy(
-                                fontSize = 44.sp,
-                                lineHeight = 44.sp,
-                                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = if (currentStreak == 1) "day" else "days",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = supportingText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = currentStreak.toString(),
+                    style = NumeralStyle.copy(
+                        fontSize = 44.sp,
+                        lineHeight = 44.sp,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.constrainAs(streakRef) {
+                        start.linkTo(iconRef.end, margin = 12.dp)
+                        top.linkTo(iconRef.top)
+                        bottom.linkTo(iconRef.bottom)
+                    },
+                )
+
+                Text(
+                    text = if (currentStreak == 1) "day" else "days",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.constrainAs(daysRef) {
+                        start.linkTo(streakRef.end, margin = 6.dp)
+                        baseline.linkTo(streakRef.baseline)
+                    },
+                )
+
+                Text(
+                    text = supportingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.constrainAs(supportRef) {
+                        start.linkTo(streakRef.start)
+                        top.linkTo(streakRef.bottom, margin = 2.dp)
+                        end.linkTo(parent.end)
+                        width = Dimension.fillToConstraints
+                    },
+                )
             }
 
             // ── 7-day heatmap row with weekday labels ─────────────────────────

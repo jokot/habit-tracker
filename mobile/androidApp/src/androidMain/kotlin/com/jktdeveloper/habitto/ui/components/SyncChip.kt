@@ -1,5 +1,11 @@
 package com.jktdeveloper.habitto.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
@@ -10,16 +16,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,7 +68,7 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
             label = "Syncing"
             showSpinner = true
             clickable = false
-            stateIcon = Icons.Outlined.CloudDone // unused when showSpinner=true
+            stateIcon = Icons.Filled.Sync
         }
         is SyncState.Error -> {
             container = if (isDark) SyncErrorBgDark else SyncErrorBg
@@ -91,20 +99,27 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
             modifier = Modifier.padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (showSpinner) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 1.5.dp,
-                    color = onContainer,
+            val iconModifier = if (showSpinner) {
+                val transition = rememberInfiniteTransition(label = "sync-rotate")
+                val angle by transition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 1400, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart,
+                    ),
+                    label = "sync-angle",
                 )
+                Modifier.size(14.dp).rotate(angle)
             } else {
-                Icon(
-                    imageVector = stateIcon,
-                    contentDescription = null,
-                    tint = onContainer,
-                    modifier = Modifier.size(14.dp),
-                )
+                Modifier.size(14.dp)
             }
+            Icon(
+                imageVector = stateIcon,
+                contentDescription = null,
+                tint = onContainer,
+                modifier = iconModifier,
+            )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
