@@ -141,7 +141,6 @@ fun HomeScreen(
                         earned = uiState.pointBalance.earnedToday,
                         spent = uiState.pointBalance.spentToday,
                         balance = uiState.pointBalance.balance,
-                        onViewAll = onOpenStreakHistory,
                         onDayTap = { onOpenStreakHistory() },
                     )
                 }
