@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,10 +61,10 @@ fun StreakHistoryScreen(
                 },
                 windowInsets = WindowInsets(0.dp),
                 modifier = Modifier
-                    .statusBarsPadding()
                     .padding(horizontal = if (showBack) 0.dp else Spacing.sm),
             )
         },
+        contentWindowInsets = WindowInsets(0.dp),
     ) { padding ->
         LazyColumn(
             modifier = Modifier
