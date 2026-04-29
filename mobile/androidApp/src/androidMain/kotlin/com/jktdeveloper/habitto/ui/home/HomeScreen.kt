@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -167,7 +168,10 @@ fun HomeScreen(
             onRefresh = { viewModel.manualRefresh() },
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = Spacing.xxxl),
+            ) {
 
                 // ── DailyStatusCard ───────────────────────────────────────────
                 item {
@@ -278,8 +282,7 @@ fun HomeScreen(
                     }
                 }
 
-                // ── Bottom spacer ─────────────────────────────────────────────
-                item { Spacer(Modifier.height(Spacing.xxxl)) }
+                // Bottom padding handled by LazyColumn contentPadding
             }
         }
     }
@@ -320,7 +323,7 @@ private fun HabitCard(
             ) {
                 // Glyph
                 HabitGlyph(
-                    icon = habitIcon(null),
+                    icon = habitIcon(habitWithProgress.habit.name),
                     hue = hue,
                     size = 44.dp,
                 )
@@ -468,7 +471,7 @@ private fun WantActivityCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = wantIcon(activity.id),
+                        imageVector = wantIcon(activity.name),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp),
@@ -653,26 +656,41 @@ private fun EmptyState(message: String) {
 
 // ── Icon mapping helpers ──────────────────────────────────────────────────────
 
-private fun wantIcon(id: String): ImageVector = when (id) {
-    "twitter" -> Icons.Default.ChatBubble
-    "insta", "instagram" -> Icons.Default.PhotoCamera
-    "tiktok" -> Icons.Default.PlayCircle
-    "yt", "youtube" -> Icons.Default.SmartDisplay
-    "reddit" -> Icons.Default.Forum
-    "gaming" -> Icons.Default.SportsEsports
-    "snack", "snacks" -> Icons.Default.Restaurant
-    "smoke", "smoking" -> Icons.Default.SmokingRooms
+private fun wantIcon(name: String): ImageVector = when {
+    name.contains("twitter", ignoreCase = true) || name.contains("/x", ignoreCase = true) -> Icons.Default.ChatBubble
+    name.contains("instagram", ignoreCase = true) -> Icons.Default.PhotoCamera
+    name.contains("tiktok", ignoreCase = true) || name.contains("scroll", ignoreCase = true) || name.contains("reel", ignoreCase = true) || name.contains("short", ignoreCase = true) -> Icons.Default.PlayCircle
+    name.contains("youtube", ignoreCase = true) -> Icons.Default.SmartDisplay
+    name.contains("netflix", ignoreCase = true) || name.contains("stream", ignoreCase = true) -> Icons.Default.SmartDisplay
+    name.contains("reddit", ignoreCase = true) -> Icons.Default.Forum
+    name.contains("game", ignoreCase = true) || name.contains("valorant", ignoreCase = true) || name.contains("pc gaming", ignoreCase = true) -> Icons.Default.SportsEsports
+    name.contains("snack", ignoreCase = true) || name.contains("food", ignoreCase = true) || name.contains("junk", ignoreCase = true) || name.contains("donut", ignoreCase = true) || name.contains("dessert", ignoreCase = true) -> Icons.Default.Restaurant
+    name.contains("smoke", ignoreCase = true) || name.contains("smoking", ignoreCase = true) -> Icons.Default.SmokingRooms
+    name.contains("shop", ignoreCase = true) || name.contains("purchase", ignoreCase = true) -> Icons.Default.Restaurant
+    name.contains("drink", ignoreCase = true) || name.contains("sugary", ignoreCase = true) -> Icons.Default.Restaurant
     else -> Icons.Default.MoreHoriz
 }
 
-private fun habitIcon(name: String?): ImageVector = when (name) {
-    "water_drop" -> Icons.Default.WaterDrop
-    "bedtime" -> Icons.Default.Bedtime
-    "directions_run" -> Icons.AutoMirrored.Filled.DirectionsRun
-    "menu_book" -> Icons.AutoMirrored.Filled.MenuBook
-    "self_improvement" -> Icons.Default.SelfImprovement
-    "school" -> Icons.Default.School
-    else -> Icons.Default.CheckCircle
+private fun habitIcon(name: String?): ImageVector {
+    if (name == null) return Icons.Default.CheckCircle
+    return when {
+        name.contains("read", ignoreCase = true) -> Icons.AutoMirrored.Filled.MenuBook
+        name.contains("water", ignoreCase = true) || name.contains("drink", ignoreCase = true) -> Icons.Default.WaterDrop
+        name.contains("sleep", ignoreCase = true) || name.contains("bedtime", ignoreCase = true) -> Icons.Default.Bedtime
+        name.contains("run", ignoreCase = true) || name.contains("walk", ignoreCase = true)
+            || name.contains("cycl", ignoreCase = true) || name.contains("push", ignoreCase = true)
+            || name.contains("squat", ignoreCase = true) || name.contains("plank", ignoreCase = true)
+            || name.contains("stretch", ignoreCase = true) -> Icons.AutoMirrored.Filled.DirectionsRun
+        name.contains("meditat", ignoreCase = true) || name.contains("pray", ignoreCase = true)
+            || name.contains("journal", ignoreCase = true) -> Icons.Default.SelfImprovement
+        name.contains("school", ignoreCase = true) || name.contains("course", ignoreCase = true)
+            || name.contains("flash", ignoreCase = true) || name.contains("language", ignoreCase = true)
+            || name.contains("learn", ignoreCase = true) -> Icons.Default.School
+        name.contains("video", ignoreCase = true) || name.contains("watch", ignoreCase = true) -> Icons.Default.SmartDisplay
+        name.contains("write", ignoreCase = true) || name.contains("blog", ignoreCase = true) || name.contains("draft", ignoreCase = true) -> Icons.Default.Forum
+        name.contains("code", ignoreCase = true) || name.contains("test", ignoreCase = true) || name.contains("refactor", ignoreCase = true) -> Icons.Default.Forum
+        else -> Icons.Default.CheckCircle
+    }
 }
 
 // ── Point helpers ─────────────────────────────────────────────────────────────

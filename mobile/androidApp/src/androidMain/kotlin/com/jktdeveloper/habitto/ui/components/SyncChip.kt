@@ -8,13 +8,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.habittracker.data.sync.SyncState
 import com.jktdeveloper.habitto.ui.theme.Spacing
@@ -45,6 +50,7 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
     val label: String
     val showSpinner: Boolean
     val clickable: Boolean
+    val stateIcon: ImageVector
 
     when (state) {
         is SyncState.Running -> {
@@ -53,6 +59,7 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
             label = "Syncing"
             showSpinner = true
             clickable = false
+            stateIcon = Icons.Outlined.CloudDone // unused when showSpinner=true
         }
         is SyncState.Error -> {
             container = if (isDark) SyncErrorBgDark else SyncErrorBg
@@ -60,6 +67,7 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
             label = "Sync failed"
             showSpinner = false
             clickable = true
+            stateIcon = Icons.Outlined.CloudOff
         }
         else -> {
             container = if (isDark) SyncSyncedBgDark else SyncSyncedBg
@@ -67,6 +75,7 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
             label = "Synced"
             showSpinner = false
             clickable = false
+            stateIcon = Icons.Outlined.CloudDone
         }
     }
 
@@ -87,8 +96,15 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
                     strokeWidth = 1.5.dp,
                     color = onContainer,
                 )
-                Spacer(Modifier.width(Spacing.xs))
+            } else {
+                Icon(
+                    imageVector = stateIcon,
+                    contentDescription = null,
+                    tint = onContainer,
+                    modifier = Modifier.size(14.dp),
+                )
             }
+            Spacer(Modifier.width(Spacing.xs))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,

@@ -58,7 +58,10 @@ fun StreakHistoryScreen(
                         }
                     }
                 },
-                modifier = Modifier.padding(horizontal = if (showBack) 0.dp else Spacing.sm),
+                windowInsets = WindowInsets(0.dp),
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = if (showBack) 0.dp else Spacing.sm),
             )
         },
     ) { padding ->
@@ -66,6 +69,7 @@ fun StreakHistoryScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
+            contentPadding = PaddingValues(bottom = Spacing.xxl),
         ) {
             item {
                 SummaryCard(summary)
@@ -82,7 +86,6 @@ fun StreakHistoryScreen(
                     onDayClick = { day -> selectedDay = day },
                 )
             }
-            item { Spacer(Modifier.height(Spacing.xxl)) }
         }
     }
 

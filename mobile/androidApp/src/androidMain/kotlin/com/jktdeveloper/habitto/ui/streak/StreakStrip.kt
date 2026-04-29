@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -124,7 +125,7 @@ fun DailyStatusCard(
                 modifier = Modifier
                     .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 44dp icon container
                 Box(
@@ -203,6 +204,7 @@ fun DailyStatusCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
                     .padding(top = 14.dp, bottom = 16.dp),
             ) {
                 KpiCell(
@@ -245,14 +247,14 @@ private fun KpiCell(
     showLeftBorder: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val outlineColor = MaterialTheme.colorScheme.outline
     Row(modifier = modifier) {
         if (showLeftBorder) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(1.dp)
-                    .background(outlineVariant),
+                    .background(outlineColor),
             )
         }
         Box(

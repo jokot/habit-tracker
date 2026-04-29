@@ -31,10 +31,17 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.SmartDisplay
+import androidx.compose.material.icons.filled.SmokingRooms
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.Button
@@ -119,7 +126,7 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 12.dp),
             ) {
                 StepProgressBar(step = index, total = 4)
                 Spacer(Modifier.height(16.dp))
@@ -219,7 +226,7 @@ private fun OnboardingBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 20.dp),
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -242,14 +249,12 @@ private fun OnboardingBottomBar(
                     text = primaryLabel,
                     style = MaterialTheme.typography.labelLarge,
                 )
-                if (step != OnboardingStep.SYNC) {
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }
@@ -290,14 +295,14 @@ private fun IdentityGridCell(
     onSelect: () -> Unit,
 ) {
     val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val selectedBg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.92f)
+    val selectedBorder = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.50f)
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surface,
+        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             width = if (selected) 2.dp else 1.dp,
-            color = if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outlineVariant,
+            color = if (selected) selectedBorder else MaterialTheme.colorScheme.outlineVariant,
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -310,14 +315,14 @@ private fun IdentityGridCell(
                     modifier = Modifier
                         .size(22.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(selectedBorder)
                         .align(Alignment.TopEnd),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(14.dp),
                     )
                 }
@@ -334,15 +339,13 @@ private fun IdentityGridCell(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = identity.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -480,22 +483,11 @@ private fun WantActivityRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Icon tile — WantActivity has no icon field; use emoji keyed on id suffix
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.12f)
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = wantEmoji(activity.id),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+            HabitGlyph(
+                icon = wantIcon(activity.name),
+                hue = 8f,
+                size = 40.dp,
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = activity.name,
@@ -658,22 +650,17 @@ private fun habitIcon(name: String): ImageVector = when {
     else -> Icons.Default.CheckCircle
 }
 
-/** Emoji icons for want activities, keyed on the last segment of the UUID. */
-private fun wantEmoji(id: String): String = when {
-    id.endsWith("001") -> "📱" // Scroll reels/TikTok
-    id.endsWith("002") -> "🐦" // Twitter/X
-    id.endsWith("003") -> "📸" // Instagram
-    id.endsWith("004") -> "📺" // YouTube long-form
-    id.endsWith("005") -> "▶️"  // YouTube shorts
-    id.endsWith("006") -> "🎬" // Netflix/streaming
-    id.endsWith("007") -> "🎮" // Casual mobile game
-    id.endsWith("008") -> "🎯" // Valorant Deathmatch
-    id.endsWith("009") -> "🏆" // Valorant Ranked
-    id.endsWith("010") -> "🖥️" // PC gaming
-    id.endsWith("011") -> "🛒" // Online shopping
-    id.endsWith("012") -> "💳" // Purchase session
-    id.endsWith("013") -> "🍔" // Junk food
-    id.endsWith("014") -> "🥤" // Sugary drinks
-    id.endsWith("015") -> "🍩" // Donut/dessert
-    else -> "?"
+private fun wantIcon(name: String): ImageVector = when {
+    name.contains("twitter", ignoreCase = true) || name.contains("/x", ignoreCase = true) -> Icons.Default.ChatBubble
+    name.contains("instagram", ignoreCase = true) -> Icons.Default.PhotoCamera
+    name.contains("tiktok", ignoreCase = true) || name.contains("scroll", ignoreCase = true) || name.contains("reel", ignoreCase = true) || name.contains("short", ignoreCase = true) -> Icons.Default.PlayCircle
+    name.contains("youtube", ignoreCase = true) -> Icons.Default.SmartDisplay
+    name.contains("netflix", ignoreCase = true) || name.contains("stream", ignoreCase = true) -> Icons.Default.SmartDisplay
+    name.contains("reddit", ignoreCase = true) -> Icons.Default.Forum
+    name.contains("game", ignoreCase = true) || name.contains("valorant", ignoreCase = true) || name.contains("pc gaming", ignoreCase = true) -> Icons.Default.SportsEsports
+    name.contains("snack", ignoreCase = true) || name.contains("food", ignoreCase = true) || name.contains("junk", ignoreCase = true) || name.contains("donut", ignoreCase = true) || name.contains("dessert", ignoreCase = true) -> Icons.Default.Restaurant
+    name.contains("smoke", ignoreCase = true) || name.contains("smoking", ignoreCase = true) -> Icons.Default.SmokingRooms
+    name.contains("shop", ignoreCase = true) || name.contains("purchase", ignoreCase = true) -> Icons.Default.Restaurant
+    name.contains("drink", ignoreCase = true) || name.contains("sugary", ignoreCase = true) -> Icons.Default.Restaurant
+    else -> Icons.Default.MoreHoriz
 }
