@@ -34,9 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakRangeResult
+import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.Spacing
-import com.jktdeveloper.habitto.ui.theme.StreakComplete
-import com.jktdeveloper.habitto.ui.theme.StreakCompleteDark
 
 @Composable
 fun DailyStatusCard(
@@ -156,14 +155,8 @@ private fun StatColumn(
     }
 }
 
-/** Fire orange — used for streak flame icon. WCAG AA against surfaceVariant in light + dark. */
-private val FlameOrange = Color(0xFFFF6F00)
-
 @Composable
-private fun EarnedGreen(): Color {
-    val isDark = isSystemInDarkTheme()
-    return if (isDark) StreakCompleteDark else StreakComplete
-}
+private fun EarnedGreen(): Color = MaterialTheme.colorScheme.primary
 
 private fun LazyListScope.streakDayItems(
     days: List<StreakDay>,

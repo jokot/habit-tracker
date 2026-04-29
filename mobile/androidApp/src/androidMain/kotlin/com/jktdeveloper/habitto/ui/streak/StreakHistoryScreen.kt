@@ -22,6 +22,7 @@ import kotlinx.datetime.toLocalDateTime
 fun StreakHistoryScreen(
     viewModel: StreakHistoryViewModel,
     onBack: () -> Unit,
+    showBack: Boolean = true,
 ) {
     val summary by viewModel.summary.collectAsState()
     val months by viewModel.months.collectAsState()
@@ -32,8 +33,10 @@ fun StreakHistoryScreen(
             CenterAlignedTopAppBar(
                 title = { Text("Streak History") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (showBack) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
             )

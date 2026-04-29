@@ -2,7 +2,9 @@ package com.jktdeveloper.habitto.ui.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.jktdeveloper.habitto.AppContainer
 import com.jktdeveloper.habitto.ui.auth.AuthScreen
@@ -32,6 +35,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Settings : Screen("settings")
     object StreakHistory : Screen("streak-history")
+    object You : Screen("you")
 }
 
 @Composable
@@ -76,58 +80,127 @@ fun AppNavigation(container: AppContainer) {
         return
     }
 
-    NavHost(navController = navController, startDestination = start) {
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val showBottomNav = currentRoute in BOTTOM_NAV_ROUTES
 
-        composable(Screen.Auth.route) {
-            val vm = viewModel { AuthViewModel(container) }
-            AuthScreen(
-                viewModel = vm,
-                launcher = container.googleSignInLauncher,
-                onSuccess = {
-                    // After sign-in, go to Home and wipe any Onboarding/Auth from the stack.
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(navController.graph.id) { inclusive = true }
-                    }
-                },
-                onBack = { navController.popBackStack() },
-            )
-        }
+    Scaffold(
+        bottomBar = {
+            if (showBottomNav) BottomNav(currentRoute = currentRoute, navController = navController)
+        },
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = start,
+            modifier = Modifier.padding(padding),
+        ) {
 
-        composable(Screen.Onboarding.route) {
-            val vm = viewModel { OnboardingViewModel(container) }
-            OnboardingScreen(
-                viewModel = vm,
-                onFinished = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Onboarding.route) { inclusive = true }
-                    }
-                },
-                onSignIn = { navController.navigate(Screen.Auth.route) },
-            )
-        }
-
-        composable(Screen.Home.route) {
-            val vm = viewModel { HomeViewModel(container) }
-            HomeScreen(
-                viewModel = vm,
-                onSignIn = { navController.navigate(Screen.Auth.route) },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) },
-                onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
-            )
-        }
-
-        composable(Screen.Settings.route) {
-            val vm = androidx.lifecycle.viewmodel.compose.viewModel {
-                com.jktdeveloper.habitto.ui.settings.SettingsViewModel(
-                    notificationPrefs = container.notificationPreferences,
-                    scheduler = container.notificationScheduler,
-                    signOutAction = { container.signOutFromSettings() },
-                    unsyncedCountProvider = {
-                        val userId = container.currentUserId()
-                        val habits = container.habitLogRepository.getUnsyncedFor(userId).size
-                        val wants = container.wantLogRepository.getUnsyncedFor(userId).size
-                        habits + wants
+            composable(Screen.Auth.route) {
+                val vm = viewModel { AuthViewModel(container) }
+                AuthScreen(
+                    viewModel = vm,
+                    launcher = container.googleSignInLauncher,
+                    onSuccess = {
+                        // After sign-in, go to Home and wipe any Onboarding/Auth from the stack.
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
                     },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Screen.Onboarding.route) {
+                val vm = viewModel { OnboardingViewModel(container) }
+                OnboardingScreen(
+                    viewModel = vm,
+                    onFinished = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    },
+                    onSignIn = { navController.navigate(Screen.Auth.route) },
+                )
+            }
+
+            composable(Screen.Home.route) {
+                val vm = viewModel { HomeViewModel(container) }
+                HomeScreen(
+                    viewModel = vm,
+                    onSignIn = { navController.navigate(Screen.Auth.route) },
+                    onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
+                )
+            }
+
+            composable(Screen.Settings.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.settings.SettingsViewModel(
+                        notificationPrefs = container.notificationPreferences,
+                        scheduler = container.notificationScheduler,
+                        signOutAction = { container.signOutFromSettings() },
+                        unsyncedCountProvider = {
+                            val userId = container.currentUserId()
+                            val habits = container.habitLogRepository.getUnsyncedFor(userId).size
+                            val wants = container.wantLogRepository.getUnsyncedFor(userId).size
+                            habits + wants
+                        },
+                        onSignOutComplete = {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        },
+                    )
+                }
+                val showDialog by vm.showLogoutDialog.collectAsState()
+                val unsyncedCount by vm.logoutUnsyncedCount.collectAsState()
+                val isSigningOut by vm.isSigningOut.collectAsState()
+                if (showDialog) {
+                    com.jktdeveloper.habitto.ui.auth.LogoutDialog(
+                        unsyncedCount = unsyncedCount,
+                        onConfirm = { force -> vm.confirmSignOut(force) },
+                        onDismiss = vm::dismissLogoutDialog,
+                        isProcessing = isSigningOut,
+                    )
+                }
+                val authState by container.authState.collectAsState()
+                val email = remember(authState) { container.currentAccountEmail() }
+                com.jktdeveloper.habitto.ui.settings.SettingsScreen(
+                    viewModel = vm,
+                    isAuthenticated = authState.isAuthenticated,
+                    accountEmail = email,
+                    onSignOut = { vm.beginSignOut() },
+                    onSignIn = { navController.navigate(Screen.Auth.route) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Screen.StreakHistory.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.streak.StreakHistoryViewModel(
+                        useCase = container.computeStreakUseCase,
+                        userIdProvider = { container.currentUserId() },
+                    )
+                }
+                // showBack only when we have a previous entry that isn't the same route.
+                // Tab-tap nav uses single-top + saveState, so it shouldn't push duplicate entries.
+                // "View all" from Home pushes onto current backstack — previousBackStackEntry exists.
+                val showBack = navController.previousBackStackEntry != null &&
+                    navController.previousBackStackEntry?.destination?.route != Screen.StreakHistory.route
+                com.jktdeveloper.habitto.ui.streak.StreakHistoryScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    showBack = showBack,
+                )
+            }
+
+            composable(Screen.You.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.you.YouHubViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.you.YouHubScreen(
+                    viewModel = vm,
+                    onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                    onSignIn = { navController.navigate(Screen.Auth.route) },
                     onSignOutComplete = {
                         navController.navigate(Screen.Home.route) {
                             popUpTo(navController.graph.id) { inclusive = true }
@@ -135,40 +208,6 @@ fun AppNavigation(container: AppContainer) {
                     },
                 )
             }
-            val showDialog by vm.showLogoutDialog.collectAsState()
-            val unsyncedCount by vm.logoutUnsyncedCount.collectAsState()
-            val isSigningOut by vm.isSigningOut.collectAsState()
-            if (showDialog) {
-                com.jktdeveloper.habitto.ui.auth.LogoutDialog(
-                    unsyncedCount = unsyncedCount,
-                    onConfirm = { force -> vm.confirmSignOut(force) },
-                    onDismiss = vm::dismissLogoutDialog,
-                    isProcessing = isSigningOut,
-                )
-            }
-            val authState by container.authState.collectAsState()
-            val email = remember(authState) { container.currentAccountEmail() }
-            com.jktdeveloper.habitto.ui.settings.SettingsScreen(
-                viewModel = vm,
-                isAuthenticated = authState.isAuthenticated,
-                accountEmail = email,
-                onSignOut = { vm.beginSignOut() },
-                onSignIn = { navController.navigate(Screen.Auth.route) },
-                onBack = { navController.popBackStack() },
-            )
-        }
-
-        composable(Screen.StreakHistory.route) {
-            val vm = androidx.lifecycle.viewmodel.compose.viewModel {
-                com.jktdeveloper.habitto.ui.streak.StreakHistoryViewModel(
-                    useCase = container.computeStreakUseCase,
-                    userIdProvider = { container.currentUserId() },
-                )
-            }
-            com.jktdeveloper.habitto.ui.streak.StreakHistoryScreen(
-                viewModel = vm,
-                onBack = { navController.popBackStack() },
-            )
         }
     }
 }
