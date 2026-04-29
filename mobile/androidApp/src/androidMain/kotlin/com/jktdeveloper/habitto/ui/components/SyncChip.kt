@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,8 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.habittracker.data.sync.SyncState
-import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.SyncErrorBg
 import com.jktdeveloper.habitto.ui.theme.SyncErrorBgDark
 import com.jktdeveloper.habitto.ui.theme.SyncErrorFg
@@ -83,16 +84,16 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
         shape = CircleShape,
         color = container,
         modifier = Modifier
-            .padding(horizontal = Spacing.xs)
+            .height(28.dp)
             .let { if (clickable) it.clickable(onClick = onRetry) else it },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            modifier = Modifier.padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showSpinner) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(14.dp),
                     strokeWidth = 1.5.dp,
                     color = onContainer,
                 )
@@ -104,10 +105,11 @@ fun SyncChip(state: SyncState, onRetry: () -> Unit) {
                     modifier = Modifier.size(14.dp),
                 )
             }
-            Spacer(Modifier.width(Spacing.xs))
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                fontSize = 12.sp,
+                lineHeight = 12.sp,
                 color = onContainer,
             )
         }

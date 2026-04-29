@@ -3,8 +3,13 @@ package com.jktdeveloper.habitto.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
@@ -19,9 +24,9 @@ private data class NavItem(
 )
 
 private val NAV_ITEMS = listOf(
-    NavItem(Screen.Home.route, "Today", Icons.Outlined.Today),
-    NavItem(Screen.StreakHistory.route, "Streak", Icons.Outlined.LocalFireDepartment),
-    NavItem(Screen.You.route, "You", Icons.Outlined.AccountCircle),
+    NavItem(Screen.Home.route, "Today", Icons.Rounded.Today),
+    NavItem(Screen.StreakHistory.route, "Streak", Icons.Rounded.LocalFireDepartment),
+    NavItem(Screen.You.route, "You", Icons.Outlined.Person),
 )
 
 @Composable
@@ -29,7 +34,9 @@ fun BottomNav(
     currentRoute: String?,
     navController: NavController,
 ) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
         NAV_ITEMS.forEach { item ->
             NavigationBarItem(
                 selected = currentRoute == item.route,

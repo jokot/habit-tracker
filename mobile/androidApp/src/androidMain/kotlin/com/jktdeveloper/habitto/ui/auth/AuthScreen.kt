@@ -1,7 +1,7 @@
 package com.jktdeveloper.habitto.ui.auth
 
 import android.content.Intent
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,19 +56,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jktdeveloper.habitto.R
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameSoft
 import com.jktdeveloper.habitto.ui.theme.NumeralStyle
@@ -451,124 +448,13 @@ private fun AuthInput(
     )
 }
 
-/**
- * 4-color Google "G" logo drawn via Canvas.
- * No `Icons.Outlined.Google` exists in material-icons-extended 1.7.6 — inline Canvas used instead.
- */
 @Composable
 private fun GoogleLogo(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val cy = h / 2f
-        val r = minOf(w, h) / 2f
-
-        // Clip to circle
-        val circlePath = Path().apply { addOval(Rect(center = Offset(cx, cy), radius = r)) }
-        clipPath(circlePath) {
-            // Background white
-            drawRect(Color.White, size = Size(w, h))
-
-            // Blue segment (right, ~270° arc) — simplified as a filled circle then overlaid wedges
-            // We'll draw the 4 colored path segments approximated from the SVG viewBox (18x18):
-            val scale = r / 9f  // SVG uses 0-18 space; center at 9,9
-
-            // Blue path: right portion
-            drawPath(
-                path = Path().apply {
-                    moveTo(cx + 8.64f * scale, cy)
-                    arcTo(
-                        rect = Rect(
-                            left = cx - r,
-                            top = cy - r,
-                            right = cx + r,
-                            bottom = cy + r,
-                        ),
-                        startAngleDegrees = -15f,
-                        sweepAngleDegrees = 95f,
-                        forceMoveTo = false,
-                    )
-                    lineTo(cx, cy)
-                    close()
-                },
-                color = Color(0xFF4285F4),
-            )
-
-            // Green path: bottom portion
-            drawPath(
-                path = Path().apply {
-                    moveTo(cx, cy + r)
-                    arcTo(
-                        rect = Rect(
-                            left = cx - r,
-                            top = cy - r,
-                            right = cx + r,
-                            bottom = cy + r,
-                        ),
-                        startAngleDegrees = 80f,
-                        sweepAngleDegrees = 100f,
-                        forceMoveTo = false,
-                    )
-                    lineTo(cx, cy)
-                    close()
-                },
-                color = Color(0xFF34A853),
-            )
-
-            // Yellow path: left-bottom portion
-            drawPath(
-                path = Path().apply {
-                    moveTo(cx - r, cy)
-                    arcTo(
-                        rect = Rect(
-                            left = cx - r,
-                            top = cy - r,
-                            right = cx + r,
-                            bottom = cy + r,
-                        ),
-                        startAngleDegrees = 160f,
-                        sweepAngleDegrees = 100f,
-                        forceMoveTo = false,
-                    )
-                    lineTo(cx, cy)
-                    close()
-                },
-                color = Color(0xFFFBBC05),
-            )
-
-            // Red path: top portion
-            drawPath(
-                path = Path().apply {
-                    moveTo(cx, cy - r)
-                    arcTo(
-                        rect = Rect(
-                            left = cx - r,
-                            top = cy - r,
-                            right = cx + r,
-                            bottom = cy + r,
-                        ),
-                        startAngleDegrees = 250f,
-                        sweepAngleDegrees = 110f,
-                        forceMoveTo = false,
-                    )
-                    lineTo(cx, cy)
-                    close()
-                },
-                color = Color(0xFFEA4335),
-            )
-
-            // White inner circle to create the "G" cutout
-            drawCircle(Color.White, radius = r * 0.55f, center = Offset(cx, cy))
-
-            // Blue rectangle for the horizontal bar of the G
-            drawRect(
-                color = Color(0xFF4285F4),
-                topLeft = Offset(cx, cy - r * 0.18f),
-                size = Size(r * 0.95f, r * 0.36f),
-            )
-        }
-    }
+    Image(
+        painter = painterResource(R.drawable.ic_google_g),
+        contentDescription = null,
+        modifier = modifier,
+    )
 }
 
 @Composable

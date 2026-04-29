@@ -20,6 +20,8 @@ Drop any 4-item variant (e.g. "Home · Streak · Wants · You"). Wants are manag
 
 Update every artboard with bottom nav chrome to reflect 3-item version.
 
+**App bar treatment for top-level destinations (Streak, You):** title left-aligned, no back arrow. These are reachable only via bottom-nav tab tap (no push from another screen), so a back affordance is misleading. System back button still dismisses the app.
+
 ### 2. Multi-identity is the only identity model
 
 The many-to-many habit↔identity model (a user holds multiple identities; each habit can serve one or more) is the canonical version. Single-identity variants are superseded — remove them entirely. Canvas must show one identity model.

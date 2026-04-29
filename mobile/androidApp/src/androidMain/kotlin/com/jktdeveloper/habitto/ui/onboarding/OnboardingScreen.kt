@@ -217,14 +217,14 @@ private fun OnboardingBottomBar(
     onRightAction: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

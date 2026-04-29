@@ -148,10 +148,7 @@ fun DailyStatusCard(
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             text = currentStreak.toString(),
-                            style = NumeralStyle.copy(
-                                fontSize = 44.sp,
-                                lineHeight = 44.sp,
-                            ),
+                            style = NumeralStyle.copy(fontSize = 44.sp),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.width(6.dp))

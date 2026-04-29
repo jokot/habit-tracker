@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,8 +32,6 @@ import java.util.Locale
 @Composable
 fun StreakHistoryScreen(
     viewModel: StreakHistoryViewModel,
-    onBack: () -> Unit,
-    showBack: Boolean = true,
 ) {
     val summary by viewModel.summary.collectAsState()
     val months by viewModel.months.collectAsState()
@@ -52,16 +49,11 @@ fun StreakHistoryScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = {
-                    if (showBack) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                ),
                 windowInsets = WindowInsets(0.dp),
-                modifier = Modifier
-                    .padding(horizontal = if (showBack) 0.dp else Spacing.sm),
+                modifier = Modifier.padding(horizontal = Spacing.sm),
             )
         },
         contentWindowInsets = WindowInsets(0.dp),
