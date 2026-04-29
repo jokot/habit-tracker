@@ -2,7 +2,6 @@ package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,18 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.theme.Spacing
-import com.jktdeveloper.habitto.ui.theme.SyncErrorBg
-import com.jktdeveloper.habitto.ui.theme.SyncErrorBgDark
-import com.jktdeveloper.habitto.ui.theme.SyncErrorFg
-import com.jktdeveloper.habitto.ui.theme.SyncErrorFgDark
-import com.jktdeveloper.habitto.ui.theme.SyncRunningBg
-import com.jktdeveloper.habitto.ui.theme.SyncRunningBgDark
-import com.jktdeveloper.habitto.ui.theme.SyncRunningFg
-import com.jktdeveloper.habitto.ui.theme.SyncRunningFgDark
-import com.jktdeveloper.habitto.ui.theme.SyncSyncedBg
-import com.jktdeveloper.habitto.ui.theme.SyncSyncedBgDark
-import com.jktdeveloper.habitto.ui.theme.SyncSyncedFg
-import com.jktdeveloper.habitto.ui.theme.SyncSyncedFgDark
+import com.jktdeveloper.habitto.ui.components.SyncChip
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.habittracker.data.sync.SyncReason
@@ -112,7 +100,7 @@ fun HomeScreen(
                 },
                 actions = {
                     if (uiState.isAuthenticated) {
-                        SyncStatusChip(syncState, onRetry = viewModel::triggerManualSync)
+                        SyncChip(syncState, onRetry = viewModel::triggerManualSync)
                     } else {
                         TextButton(onClick = onSignIn) { Text("Sign in") }
                     }
@@ -433,65 +421,4 @@ private fun perTapCost(activity: WantActivity): String {
     val perTap = if (activity.costPerUnit >= 1.0) activity.costPerUnit.toInt()
     else 1 // ceil(1 × cost) with min-1 — matches PointCalculator.pointsSpent
     return "-$perTap pt"
-}
-
-@Composable
-private fun SyncStatusChip(state: SyncState, onRetry: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
-    val container: androidx.compose.ui.graphics.Color
-    val onContainer: androidx.compose.ui.graphics.Color
-    val label: String
-    val showSpinner: Boolean
-    val clickable: Boolean
-
-    when (state) {
-        is SyncState.Running -> {
-            container = if (isDark) SyncRunningBgDark else SyncRunningBg
-            onContainer = if (isDark) SyncRunningFgDark else SyncRunningFg
-            label = "Syncing"
-            showSpinner = true
-            clickable = false
-        }
-        is SyncState.Error -> {
-            container = if (isDark) SyncErrorBgDark else SyncErrorBg
-            onContainer = if (isDark) SyncErrorFgDark else SyncErrorFg
-            label = "Sync failed"
-            showSpinner = false
-            clickable = true
-        }
-        else -> {
-            container = if (isDark) SyncSyncedBgDark else SyncSyncedBg
-            onContainer = if (isDark) SyncSyncedFgDark else SyncSyncedFg
-            label = "Synced"
-            showSpinner = false
-            clickable = false
-        }
-    }
-
-    Surface(
-        shape = CircleShape,
-        color = container,
-        modifier = Modifier
-            .padding(horizontal = Spacing.xs)
-            .let { if (clickable) it.clickable(onClick = onRetry) else it },
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (showSpinner) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(12.dp),
-                    strokeWidth = 1.5.dp,
-                    color = onContainer,
-                )
-                Spacer(Modifier.width(Spacing.xs))
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = onContainer,
-            )
-        }
-    }
 }
