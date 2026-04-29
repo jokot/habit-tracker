@@ -1,12 +1,12 @@
-# Habitto — Design Cleanup & Lock-in
+# Habitto — Design Cleanup & Gap Fills
 
-Round-4 follow-up. Decisions are now locked. Clean up duplicate / superseded artboards in the canvas, fill the gaps below, and produce a single source of truth that I hand to engineering.
+Update the existing design canvas in place: remove duplicate / superseded artboards, apply the choices below across every screen consistently, and fill the missing screens. Produce a single canonical version of each screen — no duplicates, no contradictions.
 
-This brief stands alone. Tone, design system, and component primitives from prior rounds carry over.
+Tone, design system, and component primitives stay as already defined in `tokens.css` and `shared.jsx`.
 
 ---
 
-## Locked decisions
+## Decisions to apply
 
 ### 1. Bottom navigation — 3 items only
 
@@ -20,28 +20,29 @@ Drop any 4-item variant (e.g. "Home · Streak · Wants · You"). Wants are manag
 
 Update every artboard with bottom nav chrome to reflect 3-item version.
 
-### 2. Multi-identity is the model — single-identity surfaces are deprecated
+### 2. Multi-identity is the only identity model
 
-Round 3's many-to-many habit↔identity model is canonical. Keep:
-- `IdentityList` (Round 3)
-- `IdentityDetail` (Round 3)
-- `AddIdentityFlow` (Round 3)
-- `HabitFormMulti` (Round 3 — multi-select identity field)
-- `NotificationsV2` (Round 3 — per-identity copy)
-- `ExchangeRateV2` (Round 3 — per-identity, geometric mean to global)
-- Round 3 multi-identity onboarding step
-- Round 3 Home with multi-identity chip strip
-- Round 3 You hub identity card (stacked avatars)
+The many-to-many habit↔identity model (a user holds multiple identities; each habit can serve one or more) is the canonical version. Single-identity variants are superseded — remove them entirely. Canvas must show one identity model.
 
-Drop:
-- Round 2 `IdentityScreen` (single-identity)
-- Round 2 `IdentityChangeDialog` (single-identity)
-- Original Round 2 onboarding identity step (single-select)
-- Original Round 2 Home identity chip (single-identity)
-- Original Round 2 You hub identity card (single-identity, before update)
-- Round 2 Notifications + Exchange-rate variants (superseded by V2)
+Keep these multi-identity surfaces:
+- `IdentityList`
+- `IdentityDetail`
+- `AddIdentityFlow`
+- `HabitFormMulti` (multi-select identity field)
+- Per-identity notifications copy
+- Per-identity exchange-rate breakdown (geometric mean to global)
+- Multi-identity onboarding step
+- Home with multi-identity chip strip
+- You hub identity card (stacked avatars)
 
-Goal: zero contradiction in canvas. Reader sees one identity model, not two.
+Remove from the canvas:
+- Any single-identity `IdentityScreen` / `IdentityChangeDialog`
+- Any single-select onboarding identity step
+- Any single-identity Home chip
+- Any older You hub identity card variant
+- Any single-identity notifications + exchange-rate variants
+
+If duplicate component names exist (e.g. `Notifications` and `NotificationsV2`), collapse to one canonical name and delete the older.
 
 ### 3. Type system stays — Inter + Instrument Serif
 
@@ -124,9 +125,9 @@ Today screen supports pull-to-refresh which triggers a manual sync. Currently no
 
 ---
 
-## Deliverables for this round
+## Deliverables
 
-1. **Cleaned canvas.html** with all Round 2 superseded artboards removed. Single canonical version of every screen.
+1. **Cleaned canvas.html** with all superseded artboards removed. Single canonical version of every screen.
 2. **3-item bottom nav** applied consistently to every screen that shows nav chrome.
 3. **Want list / Want detail / Want form** mockups (light + dark, all states from §13 of the original brief).
 4. **Updated IA diagram** reflecting 3-item nav + Wants reachable via Today taps and You hub.
@@ -139,8 +140,8 @@ Today screen supports pull-to-refresh which triggers a manual sync. Currently no
 
 ## Don't change
 
-- Token system (colors, type, spacing, radius, motion) — frozen.
+- Token system (colors, type, spacing, radius, motion).
 - Switch / Card / ListItem / HeatCell / SyncChip primitives — keep as-is.
-- Notification visual examples — keep V2 only.
-- Onboarding flow shape (4 steps, multi-identity step replaces single).
-- Streak rules (frozen / broken / heat ramp / today-pending / future).
+- Notification visual examples — single canonical version, per-identity copy.
+- Onboarding flow shape (4 steps, multi-identity step).
+- Streak rules (frozen-day / broken-day / heat ramp / today-pending / future-day).
