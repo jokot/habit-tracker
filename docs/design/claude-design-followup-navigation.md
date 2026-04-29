@@ -1,8 +1,6 @@
 # Habitto — Design Follow-up: Identity, CRUD entry points, Exchange rate, Navigation
 
-Round-2 design brief. The first pass produced screens for onboarding, home, settings, streak history, habit/want CRUD, freezes, want-timer, widgets, and exchange-rate concept. Five gaps remain. Resolve them in this round.
-
-This brief stands alone — no need to re-read the original. The product mechanics and tone you already designed for still apply.
+Update the existing design canvas to fix the five gaps below. The product mechanics and tone you already designed for still apply — keep tone and design system unchanged, edit screens in place.
 
 ---
 
@@ -67,9 +65,7 @@ Some features benefit from being surfaced outside their dedicated screen:
 
 ---
 
-## Deliverables for this round
-
-Return:
+## Deliverables
 
 1. **Information architecture diagram** — top-level destinations + how secondary screens nest under them
 2. **Navigation pattern recommendation** with reasoning (bottom nav / drawer / hub / hybrid)
@@ -80,6 +76,6 @@ Return:
 7. **Cross-feature surface decisions** — annotations on Home (and other screens) showing where freeze inventory, exchange-rate signal, per-habit streak appear
 8. **Microcopy** — labels for new nav items + identity surface
 
-Tone and design system from Round 1 carry over. Don't re-derive tokens; reuse.
+Reuse existing tokens and primitives — don't re-derive.
 
 If any choice trades off against another (e.g. bottom nav vs hub-and-spoke), state the tradeoff explicitly and pick a stance.

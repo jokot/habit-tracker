@@ -1,8 +1,8 @@
 # Habitto — Design Follow-up: Multi-Identity Model
 
-Round-3 clarification. Earlier design rounds described identity as singular ("current identity", "change identity"). That was wrong. **A user can hold multiple identities at once.** Update the design accordingly.
+The earlier design treated identity as singular ("current identity", "change identity"). That was wrong. **A user can hold multiple identities at once.** Update the design in place — replace single-identity surfaces with multi-identity equivalents. Don't keep both.
 
-This brief stands alone. Tone, design system, and navigation pattern from earlier rounds carry over.
+Tone, design system, and navigation pattern stay as already defined.
 
 ---
 
@@ -36,7 +36,7 @@ Each identity is its own commitment. They aren't ranked or primary/secondary by 
 - After identity selection → habits step shows habits grouped or filtered by chosen identities. If a habit is recommended by multiple chosen identities, surface that (e.g. "Recommended by: Healthy person, Reader").
 
 ### Identity surfacing on Home
-- The previous round had "current identity" surfaced near the top. Replace with multi-identity surface:
+- Replace any single "current identity" chip with a multi-identity surface:
   - A row/strip of identity chips/cards (avatar/icon + name)
   - Or an aggregate: "I am: a Healthy person, a Reader, a Disciplined sleeper"
   - Tap a single identity → drill into its detail view
@@ -91,9 +91,9 @@ For each, list your stance:
 
 ---
 
-## Deliverables for this round
+## Deliverables
 
-1. **Updated information-architecture diagram** showing Identity screen + Identity detail nested correctly under whatever navigation pattern you committed to in Round 2
+1. **Updated information-architecture diagram** showing Identity screen + Identity detail nested correctly under the existing navigation pattern
 2. **Onboarding identity step (revised)** — multi-select with hint
 3. **Home identity surface (revised)** — multi-identity treatment
 4. **Identity screen** — list of all active identities + Add CTA
