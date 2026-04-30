@@ -53,7 +53,8 @@ class AppContainer(context: Context) {
         key = BuildConfig.SUPABASE_ANON_KEY,
     )
 
-    private val db = HabitTrackerDatabase(DatabaseDriverFactory(context).createDriver())
+    private val driverFactory = DatabaseDriverFactory(context)
+    private val db = HabitTrackerDatabase(driverFactory.createDriver())
     private val localUserIdStore = LocalUserIdStore(context)
 
     val authRepository = SupabaseAuthRepository(supabase)
@@ -176,5 +177,13 @@ class AppContainer(context: Context) {
         // Reset pull watermarks so the next sign-in pulls everything from
         // the cloud instead of skipping rows older than the cached watermark.
         watermarks.reset()
+    }
+
+    init {
+        // If the DB was wiped due to a schema version bump (dev-only migration path),
+        // reset sync watermarks so the next pull fetches everything from the server.
+        if (driverFactory.lastCreateWasWipe) {
+            watermarks.reset()
+        }
     }
 }
