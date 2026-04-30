@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jktdeveloper.habitto.AppContainer
 import com.habittracker.data.local.SeedData
-import com.habittracker.domain.model.HabitTemplate
 import com.habittracker.domain.model.Identity
+import com.habittracker.domain.model.TemplateWithIdentities
 import com.habittracker.domain.model.WantActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +20,8 @@ enum class OnboardingStep { IDENTITY, HABITS, WANTS, SYNC }
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.IDENTITY,
     val identities: List<Identity> = SeedData.identities,
-    val selectedIdentityId: String? = null,
-    val habitTemplates: List<HabitTemplate> = emptyList(),
+    val selectedIdentityIds: Set<String> = emptySet(),
+    val habitTemplates: List<TemplateWithIdentities> = emptyList(),
     val selectedTemplateIds: Set<String> = emptySet(),
     val wantActivities: List<WantActivity> = SeedData.wantActivities,
     val selectedActivityIds: Set<String> = emptySet(),
@@ -37,17 +37,21 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
     private val _finished = MutableSharedFlow<Unit>()
     val finished: SharedFlow<Unit> = _finished.asSharedFlow()
 
-    fun selectIdentity(identityId: String) {
-        val templates = container.getHabitTemplatesForIdentityUseCase.execute(identityId)
+    fun toggleIdentity(identityId: String) {
+        val current = _uiState.value.selectedIdentityIds.toMutableSet()
+        if (current.contains(identityId)) current.remove(identityId) else current.add(identityId)
+        val newTemplates = container.getHabitTemplatesForIdentitiesUseCase.execute(current)
+        val newTemplateIds = newTemplates.map { it.template.id }.toSet()
+        val keptSelections = _uiState.value.selectedTemplateIds.intersect(newTemplateIds)
         _uiState.value = _uiState.value.copy(
-            selectedIdentityId = identityId,
-            habitTemplates = templates,
-            selectedTemplateIds = emptySet(),
+            selectedIdentityIds = current,
+            habitTemplates = newTemplates,
+            selectedTemplateIds = keptSelections,
         )
     }
 
     fun continueFromIdentity() {
-        if (_uiState.value.selectedIdentityId == null) return
+        if (_uiState.value.selectedIdentityIds.isEmpty()) return
         _uiState.value = _uiState.value.copy(step = OnboardingStep.HABITS)
     }
 
@@ -59,6 +63,12 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
 
     fun continueFromHabits() {
         _uiState.value = _uiState.value.copy(step = OnboardingStep.WANTS)
+    }
+
+    fun toggleWantActivity(activityId: String) {
+        val current = _uiState.value.selectedActivityIds.toMutableSet()
+        if (current.contains(activityId)) current.remove(activityId) else current.add(activityId)
+        _uiState.value = _uiState.value.copy(selectedActivityIds = current)
     }
 
     fun continueFromWants() {
@@ -76,26 +86,36 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
         _uiState.value = _uiState.value.copy(step = prev)
     }
 
-    fun toggleWantActivity(activityId: String) {
-        val current = _uiState.value.selectedActivityIds.toMutableSet()
-        if (current.contains(activityId)) current.remove(activityId) else current.add(activityId)
-        _uiState.value = _uiState.value.copy(selectedActivityIds = current)
-    }
-
     fun finish() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val userId = container.currentUserId()
             val state = _uiState.value
-            val selectedTemplates = state.habitTemplates.filter { it.id in state.selectedTemplateIds }
+            val selectedTemplates = state.habitTemplates
+                .filter { it.template.id in state.selectedTemplateIds }
+                .map { it.template }
             val selectedActivities = state.wantActivities.filter { it.id in state.selectedActivityIds }
 
-            container.setupUserHabitsUseCase.execute(userId, selectedTemplates)
+            container.setupUserIdentitiesUseCase
+                .execute(userId, state.selectedIdentityIds)
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
                     return@launch
                 }
-            container.setupUserWantActivitiesUseCase.execute(userId, selectedActivities)
+            val templateIdToHabitId = container.setupUserHabitsUseCase
+                .execute(userId, selectedTemplates)
+                .getOrElse { e ->
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                    return@launch
+                }
+            container.linkOnboardingHabitsToIdentitiesUseCase
+                .execute(userId, templateIdToHabitId, state.selectedIdentityIds)
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                    return@launch
+                }
+            container.setupUserWantActivitiesUseCase
+                .execute(userId, selectedActivities)
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
                     return@launch
