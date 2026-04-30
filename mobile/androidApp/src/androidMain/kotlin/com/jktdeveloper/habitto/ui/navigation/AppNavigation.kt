@@ -229,8 +229,15 @@ fun AppNavigation(container: AppContainer) {
                         type = androidx.navigation.NavType.StringType
                     },
                 ),
-            ) {
-                androidx.compose.material3.Text("IdentityDetail placeholder")
+            ) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString(Screen.IdentityDetail.ARG_ID) ?: return@composable
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.identity.IdentityDetailViewModel(container, id)
+                }
+                com.jktdeveloper.habitto.ui.identity.IdentityDetailScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
             }
         }
     }
