@@ -143,6 +143,10 @@ class AppContainer(context: Context) {
             db.habitTrackerDatabaseQueries.migrateHabitLogsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateWantLogsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateWantActivitiesUserId(authUserId, localId)
+            db.habitTrackerDatabaseQueries.migrateUserIdentitiesUserId(authUserId, localId)
+            // LocalHabitIdentity rows reference habitIds (not userIds) — migrate-by-userId
+            // is unnecessary because the underlying habit rows still have the same id after
+            // their userId flips above.
         }
     }
 

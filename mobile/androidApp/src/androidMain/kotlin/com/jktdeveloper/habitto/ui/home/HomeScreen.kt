@@ -165,12 +165,9 @@ fun HomeScreen(
             return@Scaffold
         }
 
-        val isRefreshing = (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = { viewModel.manualRefresh() },
-            modifier = Modifier.fillMaxSize().padding(padding),
-        ) {
+        val isRefreshing = uiState.isAuthenticated &&
+            (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
+        val content: @Composable () -> Unit = {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
@@ -293,6 +290,15 @@ fun HomeScreen(
 
                 // Bottom padding handled by LazyColumn contentPadding
             }
+        }
+        if (uiState.isAuthenticated) {
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.manualRefresh() },
+                modifier = Modifier.fillMaxSize().padding(padding),
+            ) { content() }
+        } else {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) { content() }
         }
     }
 }

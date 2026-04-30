@@ -173,6 +173,9 @@ UPDATE WantLog SET userId = ? WHERE userId = ?;
 migrateWantActivitiesUserId:
 UPDATE LocalWantActivity SET userId = ? WHERE userId = ?;
 
+migrateUserIdentitiesUserId:
+UPDATE LocalUserIdentity SET userId = ? WHERE userId = ?;
+
 -- Logout wipe
 clearHabitsForUser:
 DELETE FROM LocalHabit WHERE userId = ?;
