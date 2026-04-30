@@ -64,13 +64,25 @@ class StreakHistoryViewModel(
     }
 
     init {
+        refresh()
+    }
+
+    /** Reload summary + currently visible months. Call on screen resume to pick up new logs. */
+    fun refresh() {
         viewModelScope.launch {
             val userId = userIdProvider()
             val s = useCase.computeSummaryNow(userId)
             _summary.value = s
             _firstLogDate.value = s.firstLogDate
             val today = clock.now().toLocalDateTime(timeZone).date
-            loadMonth(today.year, today.monthNumber)
+            // Reload all months currently in view (including the current month).
+            val visible = _months.value
+            if (visible.isEmpty()) {
+                loadMonth(today.year, today.monthNumber)
+            } else {
+                _months.value = emptyList() // force reload via loadMonth
+                visible.forEach { loadMonth(it.year, it.month) }
+            }
         }
     }
 

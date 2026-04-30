@@ -39,6 +39,17 @@ fun StreakHistoryScreen(
 
     var selectedDay by remember { mutableStateOf<StreakDay?>(null) }
 
+    // Refresh on every entry (including bottom-nav re-tap and resume) so logs made
+    // since last visit show up on the heatmap and summary.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
