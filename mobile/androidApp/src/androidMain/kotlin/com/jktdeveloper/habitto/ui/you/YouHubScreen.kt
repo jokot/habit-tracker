@@ -31,6 +31,7 @@ fun YouHubScreen(
     onOpenSettings: () -> Unit,
     onSignIn: () -> Unit,
     onSignOutComplete: () -> Unit,
+    onOpenIdentities: () -> Unit,
 ) {
     val authState by viewModel.authState.collectAsState()
     val isSigningOut by viewModel.isSigningOut.collectAsState()
@@ -59,7 +60,7 @@ fun YouHubScreen(
             item {
                 val identities by viewModel.userIdentities.collectAsState()
                 if (identities.isNotEmpty()) {
-                    IdentityHubCard(identities = identities)
+                    IdentityHubCard(identities = identities, onClick = onOpenIdentities)
                 }
             }
             item { SectionHeader("Account") }

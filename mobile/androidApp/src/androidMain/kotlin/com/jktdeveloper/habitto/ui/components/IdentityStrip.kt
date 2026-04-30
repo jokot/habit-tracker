@@ -18,6 +18,8 @@ import com.habittracker.domain.model.Identity
 @Composable
 fun IdentityStrip(
     identities: List<Identity>,
+    onChipClick: (Identity) -> Unit,
+    onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (identities.isEmpty()) return
@@ -40,7 +42,7 @@ fun IdentityStrip(
                 .align(Alignment.CenterVertically),
             letterSpacing = 0.3.sp,
         )
-        visible.forEach { IdentityChip(it) }
-        if (extra > 0) IdentityMorePill(extra)
+        visible.forEach { identity -> IdentityChip(identity, onClick = { onChipClick(identity) }) }
+        if (extra > 0) IdentityMorePill(extra, onClick = onMoreClick)
     }
 }

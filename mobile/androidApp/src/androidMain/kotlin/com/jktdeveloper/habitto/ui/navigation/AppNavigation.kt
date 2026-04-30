@@ -134,6 +134,8 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
+                    onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
+                    onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
                 )
             }
 
@@ -205,6 +207,7 @@ fun AppNavigation(container: AppContainer) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
                     },
+                    onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
                 )
             }
 

@@ -2,6 +2,7 @@ package com.jktdeveloper.habitto.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,14 +30,15 @@ import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.Identity
 
 @Composable
-fun IdentityHubCard(identities: List<Identity>) {
+fun IdentityHubCard(identities: List<Identity>, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
