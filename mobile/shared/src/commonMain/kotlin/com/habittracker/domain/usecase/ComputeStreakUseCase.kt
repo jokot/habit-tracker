@@ -3,6 +3,7 @@ package com.habittracker.domain.usecase
 import com.habittracker.data.repository.HabitLogRepository
 import com.habittracker.data.repository.HabitRepository
 import com.habittracker.domain.model.DateRange
+import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
@@ -42,7 +43,8 @@ class ComputeStreakUseCase(
         }
         habitLogRepository.observeAllActiveLogsForUser(userId).collect { logs ->
             val today = todayLocal()
-            emit(summarize(first, today, logs))
+            val habits = habitRepository.getHabitsForUser(userId)
+            emit(summarize(first, today, logs, habits))
         }
     }
 
@@ -65,7 +67,8 @@ class ComputeStreakUseCase(
             startInclusive = first.atStartOfDayIn(timeZone),
             endExclusive = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone),
         ).first()
-        return summarize(first, today, logs)
+        val habits = habitRepository.getHabitsForUser(userId)
+        return summarize(first, today, logs, habits)
     }
 
     // ----- internals -----
@@ -80,12 +83,15 @@ class ComputeStreakUseCase(
         firstLogDate: LocalDate?,
     ): StreakRangeResult {
         val today = todayLocal()
-        val habitCount = habitRepository.getHabitsForUser(userId).size
-        // Set of dates with at least one log inside the range.
+        val habits = habitRepository.getHabitsForUser(userId)
+        val habitCount = habits.size
         val pastLogs = logs.filter { it.loggedAt <= now() } // ignore future-dated
-        val daysWithLog: Set<LocalDate> = pastLogs
-            .map { it.loggedAt.toLocalDate() }
-            .toSet()
+        // Strict streak (option A): a day counts as COMPLETE only when ALL habits met
+        // their dailyTarget that day. Partial-log days do NOT continue the streak.
+        val completeDays: Set<LocalDate> = if (habitCount == 0) emptySet() else
+            pastLogs.map { it.loggedAt.toLocalDate() }.toSet()
+                .filter { allHabitsMetTargetOnDay(pastLogs, habits, it) }
+                .toSet()
         // Walk from streak anchor (firstLogDate, or range.start if no anchor) up through today
         // to know the carrying state when range.start is reached. We then emit only days inside the range.
         val anchor = firstLogDate ?: range.start
@@ -98,7 +104,7 @@ class ComputeStreakUseCase(
             val state = when {
                 cursor < anchor -> StreakDayState.EMPTY
                 cursor > today -> StreakDayState.FUTURE // future days inside requested range render as FUTURE
-                cursor in daysWithLog -> StreakDayState.COMPLETE
+                cursor in completeDays -> StreakDayState.COMPLETE
                 cursor == today -> StreakDayState.TODAY_PENDING
                 prev == StreakDayState.COMPLETE -> StreakDayState.FROZEN
                 prev == StreakDayState.FROZEN -> StreakDayState.BROKEN
@@ -115,12 +121,32 @@ class ComputeStreakUseCase(
         while (d < range.endExclusive) {
             val state = perDay[d] ?: StreakDayState.EMPTY
             val distinctCount = distinctOnDay(pastLogs, d)
-            val heat = if (state == StreakDayState.FUTURE || state == StreakDayState.EMPTY) 0
+            // Heatmap is a separate "activity" signal — colored by distinct habits
+            // logged on the day, regardless of whether the day qualifies as strict-COMPLETE.
+            // distinctCount=0 naturally yields heatLevel=0, so days with zero logs are still cold.
+            val heat = if (state == StreakDayState.FUTURE) 0
                        else heatBucket(distinctCount, habitCount)
             days += StreakDay(d, state, heat)
             d = d.plus(1, DateTimeUnit.DAY)
         }
         return StreakRangeResult(days = days, firstLogDate = firstLogDate)
+    }
+
+    /** Strict streak rule: every habit must have earned ≥ its dailyTarget points on [date]. */
+    private fun allHabitsMetTargetOnDay(
+        logs: List<HabitLog>,
+        habits: List<Habit>,
+        date: LocalDate,
+    ): Boolean {
+        if (habits.isEmpty()) return false
+        val byHabit = logs
+            .filter { sameLocalDate(date, it.loggedAt) }
+            .groupBy { it.habitId }
+        return habits.all { habit ->
+            val dayLogs = byHabit[habit.id].orEmpty()
+            val pts = dayLogs.sumOf { PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint) }
+            pts >= habit.dailyTarget
+        }
     }
 
     private fun heatBucket(distinct: Int, totalHabits: Int): Int {
@@ -141,11 +167,18 @@ class ComputeStreakUseCase(
     private fun sameLocalDate(date: LocalDate, instant: Instant): Boolean =
         instant.toLocalDate() == date
 
-    private fun summarize(firstLog: LocalDate, today: LocalDate, logs: List<HabitLog>): StreakSummary {
-        val daysWithLog = logs
-            .filter { it.loggedAt <= now() }
-            .map { it.loggedAt.toLocalDate() }
-            .toSet()
+    private fun summarize(
+        firstLog: LocalDate,
+        today: LocalDate,
+        logs: List<HabitLog>,
+        habits: List<Habit>,
+    ): StreakSummary {
+        val pastLogs = logs.filter { it.loggedAt <= now() }
+        // Strict streak: only days where ALL habits met dailyTarget count as COMPLETE.
+        val completeDays: Set<LocalDate> = if (habits.isEmpty()) emptySet() else
+            pastLogs.map { it.loggedAt.toLocalDate() }.toSet()
+                .filter { allHabitsMetTargetOnDay(pastLogs, habits, it) }
+                .toSet()
         var longest = 0
         var run = 0
         var totalComplete = 0
@@ -153,7 +186,7 @@ class ComputeStreakUseCase(
         var cursor = firstLog
         while (cursor <= today) {
             val state = when {
-                cursor in daysWithLog -> StreakDayState.COMPLETE
+                cursor in completeDays -> StreakDayState.COMPLETE
                 cursor == today -> StreakDayState.TODAY_PENDING
                 prev == StreakDayState.COMPLETE -> StreakDayState.FROZEN
                 prev == StreakDayState.FROZEN -> StreakDayState.BROKEN
