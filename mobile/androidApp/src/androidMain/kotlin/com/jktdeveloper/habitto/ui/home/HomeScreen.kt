@@ -73,6 +73,7 @@ import com.habittracker.domain.model.WantActivity
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.IdentityStrip
 import com.jktdeveloper.habitto.ui.components.SyncChip
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.jktdeveloper.habitto.ui.theme.InterFontFamily
@@ -164,16 +165,19 @@ fun HomeScreen(
             return@Scaffold
         }
 
-        val isRefreshing = (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = { viewModel.manualRefresh() },
-            modifier = Modifier.fillMaxSize().padding(padding),
-        ) {
+        val isRefreshing = uiState.isAuthenticated &&
+            (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
+        val content: @Composable () -> Unit = {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
             ) {
+
+                // ── Identity strip ────────────────────────────────────────────
+                item {
+                    val identities by viewModel.userIdentities.collectAsState()
+                    IdentityStrip(identities = identities)
+                }
 
                 // ── DailyStatusCard ───────────────────────────────────────────
                 item {
@@ -286,6 +290,15 @@ fun HomeScreen(
 
                 // Bottom padding handled by LazyColumn contentPadding
             }
+        }
+        if (uiState.isAuthenticated) {
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.manualRefresh() },
+                modifier = Modifier.fillMaxSize().padding(padding),
+            ) { content() }
+        } else {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) { content() }
         }
     }
 }

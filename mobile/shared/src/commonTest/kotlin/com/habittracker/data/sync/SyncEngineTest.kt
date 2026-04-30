@@ -4,6 +4,7 @@ import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.WatermarkReader
 import com.habittracker.data.repository.FakeHabitLogRepository
 import com.habittracker.data.repository.FakeHabitRepository
+import com.habittracker.data.repository.FakeIdentityRepository
 import com.habittracker.data.repository.FakeWantActivityRepository
 import com.habittracker.data.repository.FakeWantLogRepository
 import com.habittracker.domain.model.Habit
@@ -22,12 +23,13 @@ class SyncEngineTest {
     private val habitLogRepo = FakeHabitLogRepository()
     private val wantActivityRepo = FakeWantActivityRepository()
     private val wantLogRepo = FakeWantLogRepository()
+    private val identityRepo = FakeIdentityRepository()
     private val supabase = FakeSupabaseSyncClient()
     private val watermarks = InMemoryWatermarks()
     private val auth = FakeAuthIdentity("user-1", authenticated = true)
 
     private val engine = SyncEngine(
-        habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo,
+        habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo, identityRepo,
         supabase, watermarks, auth,
     )
 
@@ -104,7 +106,7 @@ class SyncEngineTest {
     fun `unauthenticated sync returns zero without touching network`() = runTest {
         val offlineAuth = FakeAuthIdentity("user-1", authenticated = false)
         val offlineEngine = SyncEngine(
-            habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo,
+            habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo, identityRepo,
             supabase, watermarks, offlineAuth,
         )
         habitRepo.saveHabit(makeHabit("h1"))
@@ -128,6 +130,25 @@ class SyncEngineTest {
         supabase.habits.add(makeHabit("h2", updatedAt = tPlus(20)))
         engine.sync(SyncReason.MANUAL).getOrThrow()
         assertEquals(tPlus(20).toEpochMilliseconds(), watermarks.get(SyncTable.HABITS))
+    }
+
+    @Test
+    fun `push syncs unsynced user and habit identities`() = runTest {
+        val habit = makeHabit(id = "h1")
+        habitRepo.saveHabit(habit)
+        // FakeIdentityRepository.getUnsyncedHabitIdentitiesFor filters by habits seeded into it
+        identityRepo.seedHabit(habit)
+        identityRepo.setUserIdentities("user-1", setOf("reader"))
+        identityRepo.linkHabitToIdentities("h1", setOf("reader"))
+
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+
+        assertEquals(1, supabase.userIdentities.size)
+        assertEquals("user-1", supabase.userIdentities.first().userId)
+        assertEquals("reader", supabase.userIdentities.first().identityId)
+        assertEquals(1, supabase.habitIdentities.size)
+        assertEquals("h1", supabase.habitIdentities.first().habitId)
+        assertEquals("reader", supabase.habitIdentities.first().identityId)
     }
 }
 

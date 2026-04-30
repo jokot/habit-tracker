@@ -21,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.jktdeveloper.habitto.ui.components.IdentityHubCard
 import com.jktdeveloper.habitto.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +56,12 @@ fun YouHubScreen(
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
+            item {
+                val identities by viewModel.userIdentities.collectAsState()
+                if (identities.isNotEmpty()) {
+                    IdentityHubCard(identities = identities)
+                }
+            }
             item { SectionHeader("Account") }
             if (authState.isAuthenticated) {
                 if (email != null) {

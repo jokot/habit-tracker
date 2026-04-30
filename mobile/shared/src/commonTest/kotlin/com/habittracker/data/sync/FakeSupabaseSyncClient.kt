@@ -1,5 +1,7 @@
 package com.habittracker.data.sync
 
+import com.habittracker.data.repository.HabitIdentityRow
+import com.habittracker.data.repository.UserIdentityRow
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.WantActivity
@@ -69,5 +71,31 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
         return wantLogs.filter {
             it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: 0L) > sinceMs
         }
+    }
+
+    val userIdentities = mutableListOf<UserIdentityRow>()
+    val habitIdentities = mutableListOf<HabitIdentityRow>()
+
+    override suspend fun upsertUserIdentity(row: UserIdentityRow) {
+        failIfNeeded()
+        userIdentities.removeAll { it.userId == row.userId && it.identityId == row.identityId }
+        userIdentities.add(row)
+    }
+
+    override suspend fun upsertHabitIdentity(row: HabitIdentityRow) {
+        failIfNeeded()
+        habitIdentities.removeAll { it.habitId == row.habitId && it.identityId == row.identityId }
+        habitIdentities.add(row)
+    }
+
+    override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> {
+        failIfNeeded()
+        return userIdentities.filter { it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds()) > sinceMs }
+    }
+
+    override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
+        failIfNeeded()
+        @Suppress("UNUSED_PARAMETER") val _u = userId
+        return habitIdentities.filter { (it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds()) > sinceMs }
     }
 }

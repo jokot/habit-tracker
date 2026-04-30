@@ -5,6 +5,8 @@ enum class SyncTable(val key: String) {
     HABIT_LOGS("habit_logs"),
     WANT_ACTIVITIES("want_activities"),
     WANT_LOGS("want_logs"),
+    USER_IDENTITIES("user_identities"),
+    HABIT_IDENTITIES("habit_identities"),
 }
 
 /** Watermark read/write surface used by SyncEngine. Allows in-memory test impls. */

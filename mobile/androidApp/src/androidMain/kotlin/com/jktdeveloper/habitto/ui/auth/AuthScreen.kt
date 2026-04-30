@@ -282,6 +282,27 @@ fun AuthScreen(
                                 )
                             }
                         }
+
+                        // Live confirm-password mismatch hint
+                        if (uiState.confirmPassword.isNotEmpty() &&
+                            uiState.password != uiState.confirmPassword) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Text(
+                                    text = "Passwords don't match.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                     }
 
                     // Server-side error row

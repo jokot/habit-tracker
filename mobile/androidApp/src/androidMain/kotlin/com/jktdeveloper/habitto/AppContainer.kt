@@ -21,8 +21,11 @@ import com.habittracker.data.sync.SyncEngine
 import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.ComputeStreakUseCase
-import com.habittracker.domain.usecase.GetHabitTemplatesForIdentityUseCase
+import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
+import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
+import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
+import com.habittracker.domain.usecase.SetupUserIdentitiesUseCase
 import com.habittracker.domain.usecase.IsOnboardedUseCase
 import com.habittracker.domain.usecase.LogHabitUseCase
 import com.habittracker.domain.usecase.LogWantUseCase
@@ -50,7 +53,8 @@ class AppContainer(context: Context) {
         key = BuildConfig.SUPABASE_ANON_KEY,
     )
 
-    private val db = HabitTrackerDatabase(DatabaseDriverFactory(context).createDriver())
+    private val driverFactory = DatabaseDriverFactory(context)
+    private val db = HabitTrackerDatabase(driverFactory.createDriver())
     private val localUserIdStore = LocalUserIdStore(context)
 
     val authRepository = SupabaseAuthRepository(supabase)
@@ -79,6 +83,7 @@ class AppContainer(context: Context) {
         habitLogRepository,
         wantActivityRepository,
         wantLogRepository,
+        identityRepository,
         supabaseSyncClient,
         watermarks,
         syncIdentity,
@@ -97,7 +102,10 @@ class AppContainer(context: Context) {
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
     val isOnboardedUseCase = IsOnboardedUseCase(habitRepository)
-    val getHabitTemplatesForIdentityUseCase = GetHabitTemplatesForIdentityUseCase()
+    val getUserIdentitiesUseCase = GetUserIdentitiesUseCase(identityRepository)
+    val setupUserIdentitiesUseCase = SetupUserIdentitiesUseCase(identityRepository)
+    val getHabitTemplatesForIdentitiesUseCase = GetHabitTemplatesForIdentitiesUseCase()
+    val linkOnboardingHabitsToIdentitiesUseCase = LinkOnboardingHabitsToIdentitiesUseCase(identityRepository)
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
     val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
 
@@ -127,14 +135,44 @@ class AppContainer(context: Context) {
         // currentUserId(). Home shows exactly what the user selected.
     }
 
+    /**
+     * Reconciles the local guest dataset with the authenticated user's server dataset.
+     *
+     * - **New user** (server empty): migrate local guest rows up to the auth userId so the next
+     *   sync push sends them. First-time sign-up flow.
+     * - **Existing user** (server has habits): discard the local guest dataset; the next sync
+     *   pull will populate from the server. Without this branch, the guest's locally-created
+     *   rows would be pushed under the existing user's id, producing duplicates.
+     */
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
         val localId = userIdentityProvider.localUserId()
         if (localId == authUserId) return
+        val serverHasData = runCatching {
+            supabaseSyncClient.fetchHabitsSince(authUserId, 0L).isNotEmpty()
+        }.getOrDefault(false)
+        if (serverHasData) {
+            // Existing user — drop local guest data, server is the source of truth.
+            db.habitTrackerDatabaseQueries.transaction {
+                db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(localId)
+                db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(localId)
+                db.habitTrackerDatabaseQueries.clearHabitsForUser(localId)
+                db.habitTrackerDatabaseQueries.clearHabitLogsForUser(localId)
+                db.habitTrackerDatabaseQueries.clearWantLogsForUser(localId)
+                db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(localId)
+            }
+            watermarks.reset()
+            return
+        }
+        // New user — migrate local guest rows up.
         db.habitTrackerDatabaseQueries.transaction {
             db.habitTrackerDatabaseQueries.migrateHabitsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateHabitLogsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateWantLogsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateWantActivitiesUserId(authUserId, localId)
+            db.habitTrackerDatabaseQueries.migrateUserIdentitiesUserId(authUserId, localId)
+            // LocalHabitIdentity rows reference habitIds (not userIds) — migrate-by-userId
+            // is unnecessary because the underlying habit rows still have the same id after
+            // their userId flips above.
         }
     }
 
@@ -157,6 +195,10 @@ class AppContainer(context: Context) {
 
     suspend fun clearAuthenticatedUserData(authUserId: String) {
         db.habitTrackerDatabaseQueries.transaction {
+            // Identity tables first — habit_identities subquery references LocalHabit.userId,
+            // so it must run before LocalHabit rows are deleted.
+            db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(authUserId)
+            db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearHabitsForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearHabitLogsForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearWantLogsForUser(authUserId)
@@ -165,5 +207,13 @@ class AppContainer(context: Context) {
         // Reset pull watermarks so the next sign-in pulls everything from
         // the cloud instead of skipping rows older than the cached watermark.
         watermarks.reset()
+    }
+
+    init {
+        // If the DB was wiped due to a schema version bump (dev-only migration path),
+        // reset sync watermarks so the next pull fetches everything from the server.
+        if (driverFactory.lastCreateWasWipe) {
+            watermarks.reset()
+        }
     }
 }

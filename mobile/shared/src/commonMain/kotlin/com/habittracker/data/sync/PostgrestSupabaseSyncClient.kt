@@ -1,5 +1,7 @@
 package com.habittracker.data.sync
 
+import com.habittracker.data.repository.HabitIdentityRow
+import com.habittracker.data.repository.UserIdentityRow
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
@@ -79,6 +81,40 @@ class PostgrestSupabaseSyncClient(
             }
             .decodeList<WantLogDto>()
             .map { it.toDomain() }
+
+    override suspend fun upsertUserIdentity(row: UserIdentityRow) {
+        supabase.postgrest.from("user_identities").upsert(row.toDto())
+    }
+
+    override suspend fun upsertHabitIdentity(row: HabitIdentityRow) {
+        supabase.postgrest.from("habit_identities").upsert(row.toDto())
+    }
+
+    override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> =
+        supabase.postgrest.from("user_identities")
+            .select {
+                filter {
+                    eq("user_id", userId)
+                    gt("added_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                }
+                order("added_at", Order.ASCENDING)
+            }
+            .decodeList<UserIdentityDto>()
+            .map { it.toDomain() }
+
+    override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
+        // RLS scopes to habits owned by current user; client-side userId arg is for parity
+        @Suppress("UNUSED_PARAMETER") val _u = userId
+        return supabase.postgrest.from("habit_identities")
+            .select {
+                filter {
+                    gt("added_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                }
+                order("added_at", Order.ASCENDING)
+            }
+            .decodeList<HabitIdentityDto>()
+            .map { it.toDomain() }
+    }
 }
 
 // ---- DTOs ---------------------------------------------------------------
@@ -222,4 +258,44 @@ private fun WantLogDto.toDomain() = WantLog(
     loggedAt = Instant.parse(loggedAt),
     deletedAt = deletedAt?.let { Instant.parse(it) },
     syncedAt = syncedAt?.let { Instant.parse(it) },
+)
+
+@Serializable
+private data class UserIdentityDto(
+    @SerialName("user_id") val userId: String,
+    @SerialName("identity_id") val identityId: String,
+    @SerialName("added_at") val addedAt: String,
+)
+
+private fun UserIdentityRow.toDto() = UserIdentityDto(
+    userId = userId,
+    identityId = identityId,
+    addedAt = addedAt.toString(),
+)
+
+private fun UserIdentityDto.toDomain() = UserIdentityRow(
+    userId = userId,
+    identityId = identityId,
+    addedAt = Instant.parse(addedAt),
+    syncedAt = Instant.parse(addedAt),
+)
+
+@Serializable
+private data class HabitIdentityDto(
+    @SerialName("habit_id") val habitId: String,
+    @SerialName("identity_id") val identityId: String,
+    @SerialName("added_at") val addedAt: String,
+)
+
+private fun HabitIdentityRow.toDto() = HabitIdentityDto(
+    habitId = habitId,
+    identityId = identityId,
+    addedAt = addedAt.toString(),
+)
+
+private fun HabitIdentityDto.toDomain() = HabitIdentityRow(
+    habitId = habitId,
+    identityId = identityId,
+    addedAt = Instant.parse(addedAt),
+    syncedAt = Instant.parse(addedAt),
 )
