@@ -132,21 +132,19 @@ class ComputeStreakUseCase(
         return StreakRangeResult(days = days, firstLogDate = firstLogDate)
     }
 
-    /** Strict streak rule: every habit must have earned ≥ its dailyTarget points on [date]. */
+    /** Strict streak rule: every habit must have at least one log on [date].
+     *  (Quantity / dailyTarget irrelevant — just presence per habit.) */
     private fun allHabitsMetTargetOnDay(
         logs: List<HabitLog>,
         habits: List<Habit>,
         date: LocalDate,
     ): Boolean {
         if (habits.isEmpty()) return false
-        val byHabit = logs
+        val loggedHabitIds = logs
             .filter { sameLocalDate(date, it.loggedAt) }
-            .groupBy { it.habitId }
-        return habits.all { habit ->
-            val dayLogs = byHabit[habit.id].orEmpty()
-            val pts = dayLogs.sumOf { PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint) }
-            pts >= habit.dailyTarget
-        }
+            .map { it.habitId }
+            .toSet()
+        return habits.all { it.id in loggedHabitIds }
     }
 
     private fun heatBucket(distinct: Int, totalHabits: Int): Int {
