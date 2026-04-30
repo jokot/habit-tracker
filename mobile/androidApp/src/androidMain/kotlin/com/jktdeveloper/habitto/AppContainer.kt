@@ -22,6 +22,7 @@ import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.ComputeStreakUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
+import com.habittracker.domain.usecase.GetDayPointsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
 import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
@@ -97,6 +98,7 @@ class AppContainer(context: Context) {
     val userIdentityProvider = UserIdentityProvider(authRepository, localUserIdStore)
 
     val getPointBalanceUseCase = GetPointBalanceUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
+    val getDayPointsUseCase = GetDayPointsUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
     val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
     val logWantUseCase = LogWantUseCase(wantLogRepository, wantActivityRepository, getPointBalanceUseCase)
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)

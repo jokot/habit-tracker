@@ -178,6 +178,7 @@ fun AppNavigation(container: AppContainer) {
                 val vm = androidx.lifecycle.viewmodel.compose.viewModel {
                     com.jktdeveloper.habitto.ui.streak.StreakHistoryViewModel(
                         useCase = container.computeStreakUseCase,
+                        getDayPointsUseCase = container.getDayPointsUseCase,
                         userIdProvider = { container.currentUserId() },
                     )
                 }

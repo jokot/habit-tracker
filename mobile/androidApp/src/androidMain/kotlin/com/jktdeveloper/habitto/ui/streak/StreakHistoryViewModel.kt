@@ -3,9 +3,11 @@ package com.jktdeveloper.habitto.ui.streak
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.domain.model.DateRange
+import com.habittracker.domain.model.DayPoints
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakSummary
 import com.habittracker.domain.usecase.ComputeStreakUseCase
+import com.habittracker.domain.usecase.GetDayPointsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +33,7 @@ data class MonthData(
 
 class StreakHistoryViewModel(
     private val useCase: ComputeStreakUseCase,
+    private val getDayPointsUseCase: GetDayPointsUseCase,
     private val userIdProvider: () -> String,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
     private val clock: Clock = Clock.System,
@@ -44,6 +47,21 @@ class StreakHistoryViewModel(
 
     private val _firstLogDate = MutableStateFlow<LocalDate?>(null)
     val firstLogDate: StateFlow<LocalDate?> = _firstLogDate.asStateFlow()
+
+    private val _selectedDayPoints = MutableStateFlow<DayPoints?>(null)
+    val selectedDayPoints: StateFlow<DayPoints?> = _selectedDayPoints.asStateFlow()
+
+    fun onDaySelected(day: LocalDate?) {
+        if (day == null) {
+            _selectedDayPoints.value = null
+            return
+        }
+        viewModelScope.launch {
+            getDayPointsUseCase.execute(userIdProvider(), day)
+                .onSuccess { _selectedDayPoints.value = it }
+                .onFailure { _selectedDayPoints.value = DayPoints(earned = 0, spent = 0) }
+        }
+    }
 
     init {
         viewModelScope.launch {
