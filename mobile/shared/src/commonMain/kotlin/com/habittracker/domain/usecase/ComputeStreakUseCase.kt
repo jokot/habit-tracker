@@ -11,7 +11,6 @@ import com.habittracker.domain.model.StreakRangeResult
 import com.habittracker.domain.model.StreakSummary
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -35,18 +34,21 @@ class ComputeStreakUseCase(
             endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
         ).map { logs -> buildRangeResult(userId, range, logs, firstLogDateFor(userId)) }
 
-    fun observeCurrent(userId: String): Flow<StreakSummary> = flow {
-        val first = habitLogRepository.firstActiveLogAt(userId)?.toLocalDate()
-        if (first == null) {
-            emit(StreakSummary(0, 0, 0, null))
-            return@flow
+    fun observeCurrent(userId: String): Flow<StreakSummary> =
+        habitLogRepository.observeAllActiveLogsForUser(userId).map { logs ->
+            // Re-derive firstLog from the live log stream rather than a snapshot at flow
+            // creation. Previous impl exited early when the user had 0 logs, so the first
+            // habit log never triggered a re-emit and the streak counter stayed at 0 even
+            // after the heatmap turned green.
+            val first = logs.minByOrNull { it.loggedAt }?.loggedAt?.toLocalDate()
+            if (first == null) {
+                StreakSummary(0, 0, 0, null)
+            } else {
+                val today = todayLocal()
+                val habits = habitRepository.getHabitsForUser(userId)
+                summarize(first, today, logs, habits)
+            }
         }
-        habitLogRepository.observeAllActiveLogsForUser(userId).collect { logs ->
-            val today = todayLocal()
-            val habits = habitRepository.getHabitsForUser(userId)
-            emit(summarize(first, today, logs, habits))
-        }
-    }
 
     suspend fun computeNow(userId: String, range: DateRange): StreakRangeResult {
         val firstLog = firstLogDateFor(userId)
