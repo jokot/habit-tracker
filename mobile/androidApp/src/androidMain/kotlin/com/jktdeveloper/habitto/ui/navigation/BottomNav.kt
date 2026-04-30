@@ -17,10 +17,11 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.jktdeveloper.habitto.ui.theme.BottomNavBg
+import com.jktdeveloper.habitto.ui.theme.BottomNavBgDark
 
 private data class NavItem(
     val route: String,
@@ -39,7 +40,7 @@ fun BottomNav(
     currentRoute: String?,
     navController: NavController,
 ) {
-    val barBg = if (isSystemInDarkTheme()) Color(0xFF181816) else Color.White
+    val barBg = if (isSystemInDarkTheme()) BottomNavBgDark else BottomNavBg
     Column {
         HorizontalDivider(
             thickness = 1.dp,
