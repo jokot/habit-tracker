@@ -135,9 +135,35 @@ class AppContainer(context: Context) {
         // currentUserId(). Home shows exactly what the user selected.
     }
 
+    /**
+     * Reconciles the local guest dataset with the authenticated user's server dataset.
+     *
+     * - **New user** (server empty): migrate local guest rows up to the auth userId so the next
+     *   sync push sends them. First-time sign-up flow.
+     * - **Existing user** (server has habits): discard the local guest dataset; the next sync
+     *   pull will populate from the server. Without this branch, the guest's locally-created
+     *   rows would be pushed under the existing user's id, producing duplicates.
+     */
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
         val localId = userIdentityProvider.localUserId()
         if (localId == authUserId) return
+        val serverHasData = runCatching {
+            supabaseSyncClient.fetchHabitsSince(authUserId, 0L).isNotEmpty()
+        }.getOrDefault(false)
+        if (serverHasData) {
+            // Existing user — drop local guest data, server is the source of truth.
+            db.habitTrackerDatabaseQueries.transaction {
+                db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(localId)
+                db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(localId)
+                db.habitTrackerDatabaseQueries.clearHabitsForUser(localId)
+                db.habitTrackerDatabaseQueries.clearHabitLogsForUser(localId)
+                db.habitTrackerDatabaseQueries.clearWantLogsForUser(localId)
+                db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(localId)
+            }
+            watermarks.reset()
+            return
+        }
+        // New user — migrate local guest rows up.
         db.habitTrackerDatabaseQueries.transaction {
             db.habitTrackerDatabaseQueries.migrateHabitsUserId(authUserId, localId)
             db.habitTrackerDatabaseQueries.migrateHabitLogsUserId(authUserId, localId)

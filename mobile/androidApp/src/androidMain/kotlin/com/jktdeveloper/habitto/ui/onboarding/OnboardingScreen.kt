@@ -115,7 +115,12 @@ fun OnboardingScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.finished.collect { onFinished() }
+        viewModel.finished.collect { event ->
+            when (event) {
+                OnboardingFinishEvent.Home -> onFinished()
+                OnboardingFinishEvent.SignIn -> onSignIn()
+            }
+        }
     }
 
     val currentStep = uiState.step
@@ -210,7 +215,7 @@ fun OnboardingScreen(
                 modifier = Modifier.padding(innerPadding),
             )
             OnboardingStep.SYNC -> SyncStepBody(
-                onSignIn = onSignIn,
+                onFinishAndSignIn = viewModel::finishAndSignIn,
                 modifier = Modifier.padding(innerPadding),
             )
         }
@@ -537,7 +542,7 @@ private fun WantActivityRow(
 
 @Composable
 private fun SyncStepBody(
-    onSignIn: () -> Unit,
+    onFinishAndSignIn: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -557,7 +562,7 @@ private fun SyncStepBody(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Button(
-                    onClick = onSignIn,
+                    onClick = onFinishAndSignIn,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
@@ -568,7 +573,7 @@ private fun SyncStepBody(
                     )
                 }
                 OutlinedButton(
-                    onClick = onSignIn,
+                    onClick = onFinishAndSignIn,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),

@@ -17,6 +17,11 @@ import kotlinx.coroutines.launch
 
 enum class OnboardingStep { IDENTITY, HABITS, WANTS, SYNC }
 
+sealed interface OnboardingFinishEvent {
+    object Home : OnboardingFinishEvent
+    object SignIn : OnboardingFinishEvent
+}
+
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.IDENTITY,
     val identities: List<Identity> = SeedData.identities,
@@ -34,8 +39,8 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-    private val _finished = MutableSharedFlow<Unit>()
-    val finished: SharedFlow<Unit> = _finished.asSharedFlow()
+    private val _finished = MutableSharedFlow<OnboardingFinishEvent>()
+    val finished: SharedFlow<OnboardingFinishEvent> = _finished.asSharedFlow()
 
     fun toggleIdentity(identityId: String) {
         val current = _uiState.value.selectedIdentityIds.toMutableSet()
@@ -86,7 +91,11 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
         _uiState.value = _uiState.value.copy(step = prev)
     }
 
-    fun finish() {
+    fun finish() = persistAndEmit(OnboardingFinishEvent.Home)
+
+    fun finishAndSignIn() = persistAndEmit(OnboardingFinishEvent.SignIn)
+
+    private fun persistAndEmit(target: OnboardingFinishEvent) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val userId = container.currentUserId()
@@ -120,7 +129,7 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
                     return@launch
                 }
-            _finished.emit(Unit)
+            _finished.emit(target)
         }
     }
 }
