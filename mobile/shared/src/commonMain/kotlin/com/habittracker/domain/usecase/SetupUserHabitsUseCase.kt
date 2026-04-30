@@ -9,13 +9,15 @@ import kotlin.uuid.Uuid
 
 class SetupUserHabitsUseCase(private val habitRepository: HabitRepository) {
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun execute(userId: String, templates: List<HabitTemplate>): Result<Unit> =
+    suspend fun execute(userId: String, templates: List<HabitTemplate>): Result<Map<String, String>> =
         runCatching {
             val now = Clock.System.now()
+            val mapping = mutableMapOf<String, String>()
             templates.forEach { template ->
+                val habitId = Uuid.random().toString()
                 habitRepository.saveHabit(
                     Habit(
-                        id = Uuid.random().toString(),
+                        id = habitId,
                         userId = userId,
                         templateId = template.id,
                         name = template.name,
@@ -26,6 +28,8 @@ class SetupUserHabitsUseCase(private val habitRepository: HabitRepository) {
                         updatedAt = now,
                     )
                 )
+                mapping[template.id] = habitId
             }
+            mapping.toMap()
         }
 }
