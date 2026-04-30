@@ -39,6 +39,17 @@ fun StreakHistoryScreen(
 
     var selectedDay by remember { mutableStateOf<StreakDay?>(null) }
 
+    // Refresh on every entry (including bottom-nav re-tap and resume) so logs made
+    // since last visit show up on the heatmap and summary.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -84,13 +95,15 @@ fun StreakHistoryScreen(
 
     // Day-detail bottom sheet
     val day = selectedDay
+    val dayPoints by viewModel.selectedDayPoints.collectAsState()
+    LaunchedEffect(day) { viewModel.onDaySelected(day?.date) }
     if (day != null) {
         ModalBottomSheet(
             onDismissRequest = { selectedDay = null },
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = null,
         ) {
-            DayDetailSheet(day = day)
+            DayDetailSheet(day = day, dayPoints = dayPoints)
         }
     }
 }
@@ -178,7 +191,7 @@ private fun StatCell(
 }
 
 @Composable
-private fun DayDetailSheet(day: StreakDay) {
+private fun DayDetailSheet(day: StreakDay, dayPoints: com.habittracker.domain.model.DayPoints?) {
     val isActive = day.state == StreakDayState.COMPLETE || day.state == StreakDayState.TODAY_PENDING
     val isFrozen = day.state == StreakDayState.FROZEN
     val isBroken = day.state == StreakDayState.BROKEN
@@ -199,8 +212,10 @@ private fun DayDetailSheet(day: StreakDay) {
         StreakDayState.FUTURE -> "Future"
     }
 
-    // Net points approximation from heatLevel (each level = ~3 points)
-    val netPoints = day.heatLevel * 3
+    // Real per-day net points (loaded async after tap)
+    val netPoints = dayPoints?.net ?: 0
+    val earned = dayPoints?.earned ?: 0
+    val spent = dayPoints?.spent ?: 0
 
     Column(
         modifier = Modifier
@@ -254,9 +269,9 @@ private fun DayDetailSheet(day: StreakDay) {
                     }
                 }
             }
-            if (netPoints > 0) {
+            if (netPoints != 0) {
                 Text(
-                    text = "+$netPoints",
+                    text = if (netPoints > 0) "+$netPoints" else netPoints.toString(),
                     style = NumeralStyle.copy(fontSize = 32.sp),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -276,10 +291,10 @@ private fun DayDetailSheet(day: StreakDay) {
             modifier = Modifier.padding(bottom = Spacing.md),
         )
 
-        // State detail row — use heat level as a proxy count
+        // State detail row — earned + spent breakdown
         if (isActive) {
             Text(
-                text = "Day logged — heat level ${day.heatLevel}/4",
+                text = "Earned +$earned · Spent −$spent",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )

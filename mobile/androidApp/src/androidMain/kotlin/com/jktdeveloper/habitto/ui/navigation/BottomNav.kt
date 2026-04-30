@@ -54,10 +54,16 @@ fun BottomNav(
                 selected = currentRoute == item.route,
                 onClick = {
                     if (currentRoute != item.route) {
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        // Try pop first — if the destination is already in the backstack
+                        // (e.g. user pushed StreakHistory via "View all"), popping is
+                        // lossless. Fall back to navigate for first-time tab switches.
+                        val popped = navController.popBackStack(item.route, inclusive = false)
+                        if (!popped) {
+                            navController.navigate(item.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     }
                 },

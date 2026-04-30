@@ -46,7 +46,8 @@ class StreakHistoryViewModelTest {
     @Test fun `initial load seeds current month + summary`() = runTest(testDispatcher) {
         val logs = listOf(makeLog(today))
         val uc = ComputeStreakUseCase(InMemoryRepo(logs), EmptyHabitRepo(), tz, FixedClock(today))
-        val vm = StreakHistoryViewModel(uc, { userId }, tz, FixedClock(today))
+        val dayPoints = makeDayPointsUseCase(logs)
+        val vm = StreakHistoryViewModel(uc, dayPoints, { userId }, tz, FixedClock(today))
         advanceUntilIdle()
         val months = vm.months.value
         assertEquals(1, months.size)
@@ -58,7 +59,8 @@ class StreakHistoryViewModelTest {
     @Test fun `loadOlderMonth prepends previous month`() = runTest(testDispatcher) {
         val logs = listOf(makeLog(LocalDate(2026, 3, 15)), makeLog(today))
         val uc = ComputeStreakUseCase(InMemoryRepo(logs), EmptyHabitRepo(), tz, FixedClock(today))
-        val vm = StreakHistoryViewModel(uc, { userId }, tz, FixedClock(today))
+        val dayPoints = makeDayPointsUseCase(logs)
+        val vm = StreakHistoryViewModel(uc, dayPoints, { userId }, tz, FixedClock(today))
         advanceUntilIdle()
         vm.loadOlderMonth()
         advanceUntilIdle()
@@ -72,7 +74,8 @@ class StreakHistoryViewModelTest {
     @Test fun `loadOlderMonth stops at firstLogDate`() = runTest(testDispatcher) {
         val logs = listOf(makeLog(LocalDate(2026, 3, 15)), makeLog(today))
         val uc = ComputeStreakUseCase(InMemoryRepo(logs), EmptyHabitRepo(), tz, FixedClock(today))
-        val vm = StreakHistoryViewModel(uc, { userId }, tz, FixedClock(today))
+        val dayPoints = makeDayPointsUseCase(logs)
+        val vm = StreakHistoryViewModel(uc, dayPoints, { userId }, tz, FixedClock(today))
         advanceUntilIdle()
         vm.loadOlderMonth()
         advanceUntilIdle()
@@ -81,6 +84,15 @@ class StreakHistoryViewModelTest {
         advanceUntilIdle()
         assertEquals(sizeAfterMarch, vm.months.value.size)
     }
+
+    private fun makeDayPointsUseCase(logs: List<HabitLog>) =
+        com.habittracker.domain.usecase.GetDayPointsUseCase(
+            habitLogRepo = AllLogsHabitLogRepo(logs),
+            wantLogRepo = EmptyWantLogRepo(),
+            habitRepo = EmptyHabitRepo(),
+            wantActivityRepo = EmptyWantActivityRepo(),
+            timeZone = tz,
+        )
 
     private fun makeLog(date: LocalDate, habitId: String = "h1"): HabitLog = HabitLog(
         id = "log-$date-$habitId",
@@ -97,9 +109,17 @@ private class FixedClock(private val date: LocalDate) : Clock {
     override fun now(): Instant = LocalDateTime(date, LocalTime(12, 0)).toInstant(TimeZone.UTC)
 }
 
-/** Minimal HabitRepository that returns 0 habits — sufficient for streak-shape tests. */
+/** Minimal HabitRepository that returns ONE habit (id=h1, dailyTarget=1, threshold=1.0)
+ *  so a single log of quantity 1 meets the daily target — strict streak fires. */
 private class EmptyHabitRepo : HabitRepository {
-    override suspend fun getHabitsForUser(userId: String): List<Habit> = emptyList()
+    private val instant = Instant.fromEpochSeconds(0)
+    override suspend fun getHabitsForUser(userId: String): List<Habit> = listOf(
+        Habit(
+            id = "h1", userId = userId, templateId = "t1", name = "H1", unit = "x",
+            thresholdPerPoint = 1.0, dailyTarget = 1,
+            createdAt = instant, updatedAt = instant,
+        ),
+    )
     override fun observeHabitsForUser(userId: String) = error("unused")
     override suspend fun saveHabit(habit: Habit) = error("unused")
     override suspend fun deleteHabit(habitId: String, userId: String) = error("unused")
@@ -109,6 +129,49 @@ private class EmptyHabitRepo : HabitRepository {
     override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
     override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
     override suspend fun mergePulled(row: Habit) = error("unused")
+}
+
+/** HabitLogRepository fake that ALSO returns logs for getAllActiveLogsForUser
+ *  (used by GetDayPointsUseCase). Different from InMemoryRepo which throws. */
+private class AllLogsHabitLogRepo(private val logs: List<HabitLog>) : HabitLogRepository {
+    override fun observeActiveLogsBetween(userId: String, startInclusive: Instant, endExclusive: Instant): Flow<List<HabitLog>> = flowOf(emptyList())
+    override suspend fun countActiveLogsBetween(userId: String, startInclusive: Instant, endExclusive: Instant): Int = 0
+    override suspend fun firstActiveLogAt(userId: String): Instant? = null
+    override suspend fun insertLog(id: String, userId: String, habitId: String, quantity: Double, loggedAt: Instant) = error("unused")
+    override suspend fun softDelete(logId: String, userId: String) = error("unused")
+    override fun observeActiveLogsForHabitOnDay(userId: String, habitId: String, dayStart: Instant, dayEnd: Instant) = error("unused")
+    override suspend fun getActiveLogsForHabitOnDay(userId: String, habitId: String, dayStart: Instant, dayEnd: Instant) = error("unused")
+    override fun observeAllActiveLogsForUser(userId: String): Flow<List<HabitLog>> = flowOf(logs.filter { it.userId == userId && it.deletedAt == null })
+    override suspend fun getAllActiveLogsForUser(userId: String): List<HabitLog> = logs.filter { it.userId == userId && it.deletedAt == null }
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
+    override suspend fun mergePulled(row: HabitLog) = error("unused")
+}
+
+private class EmptyWantLogRepo : com.habittracker.data.repository.WantLogRepository {
+    override suspend fun insertLog(id: String, userId: String, activityId: String, quantity: Double, deviceMode: com.habittracker.domain.model.DeviceMode, loggedAt: Instant) = error("unused")
+    override suspend fun softDelete(logId: String, userId: String) = error("unused")
+    override fun observeAllActiveLogsForUser(userId: String): Flow<List<com.habittracker.domain.model.WantLog>> = flowOf(emptyList())
+    override suspend fun getAllActiveLogsForUser(userId: String): List<com.habittracker.domain.model.WantLog> = emptyList()
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
+    override suspend fun mergePulled(row: com.habittracker.domain.model.WantLog) = error("unused")
+}
+
+private class EmptyWantActivityRepo : com.habittracker.data.repository.WantActivityRepository {
+    override fun observeWantActivities(userId: String): Flow<List<com.habittracker.domain.model.WantActivity>> = flowOf(emptyList())
+    override suspend fun getWantActivities(userId: String): List<com.habittracker.domain.model.WantActivity> = emptyList()
+    override suspend fun saveWantActivity(activity: com.habittracker.domain.model.WantActivity, userId: String) = error("unused")
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
+    override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
+    override suspend fun mergePulled(row: com.habittracker.domain.model.WantActivity) = error("unused")
 }
 
 private class InMemoryRepo(private val logs: List<HabitLog>) : HabitLogRepository {
