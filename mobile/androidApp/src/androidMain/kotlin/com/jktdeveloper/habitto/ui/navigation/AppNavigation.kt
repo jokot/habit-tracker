@@ -212,7 +212,14 @@ fun AppNavigation(container: AppContainer) {
             }
 
             composable(Screen.IdentityList.route) {
-                androidx.compose.material3.Text("IdentityList placeholder")
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.identity.IdentityListViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.identity.IdentityListScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
+                )
             }
 
             composable(
