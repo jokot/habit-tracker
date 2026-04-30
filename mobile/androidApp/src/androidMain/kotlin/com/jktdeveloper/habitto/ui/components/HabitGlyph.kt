@@ -4,6 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FamilyRestroom
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -45,6 +57,22 @@ fun HabitGlyph(
             modifier = Modifier.size(size * 0.5f),
         )
     }
+}
+
+/** Map identity name → Material icon. Identity seed stores emoji in `icon` field;
+ *  this resolver picks an appropriate vector icon for in-app rendering. */
+fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
+    "reader" -> Icons.AutoMirrored.Filled.MenuBook
+    "builder", "maker" -> Icons.Default.Build
+    "athlete" -> Icons.AutoMirrored.Filled.DirectionsRun
+    "writer" -> Icons.Default.Edit
+    "learner" -> Icons.Default.School
+    "minimalist" -> Icons.Default.Spa
+    "devotee", "calm" -> Icons.Default.SelfImprovement
+    "health-conscious", "healthy" -> Icons.Default.FitnessCenter
+    "sleeper" -> Icons.Default.Bedtime
+    "parent" -> Icons.Default.FamilyRestroom
+    else -> Icons.Default.Person
 }
 
 /** Identity-hue mapping. Matches IDENTITY_HUE in shared.jsx. */

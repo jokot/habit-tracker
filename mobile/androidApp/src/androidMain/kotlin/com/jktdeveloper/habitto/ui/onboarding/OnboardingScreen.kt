@@ -71,6 +71,7 @@ import com.habittracker.domain.model.TemplateWithIdentities
 import com.habittracker.domain.model.WantActivity
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.identityIcon
 import com.jktdeveloper.habitto.ui.components.StepProgressBar
 
 // ── Step copy ────────────────────────────────────────────────────────────────
@@ -638,20 +639,6 @@ private fun CheckSquare(
 }
 
 // ── Icon helpers ──────────────────────────────────────────────────────────────
-
-private fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
-    "reader" -> Icons.AutoMirrored.Filled.MenuBook
-    "builder", "maker" -> Icons.Default.Forum
-    "athlete" -> Icons.AutoMirrored.Filled.DirectionsRun
-    "writer" -> Icons.Default.Forum
-    "learner" -> Icons.Default.School
-    "minimalist" -> Icons.Default.SelfImprovement
-    "devotee", "calm" -> Icons.Default.SelfImprovement
-    "health-conscious", "healthy" -> Icons.Default.WaterDrop
-    "sleeper" -> Icons.Default.Bedtime
-    "parent" -> Icons.Default.Forum
-    else -> Icons.Default.CheckCircle
-}
 
 private fun habitIcon(name: String): ImageVector = when {
     name.contains("read", ignoreCase = true) -> Icons.AutoMirrored.Filled.MenuBook

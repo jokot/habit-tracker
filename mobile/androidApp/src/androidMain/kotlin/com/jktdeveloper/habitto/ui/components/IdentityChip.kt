@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,8 +29,8 @@ fun IdentityChip(identity: Identity) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             HabitGlyph(
-                icon = Icons.Default.Person,
-                hue = IdentityHue.forIdentityId(identity.id),
+                icon = identityIcon(identity.name),
+                hue = IdentityHue.forIdentityId(identity.name.lowercase()),
                 size = 22.dp,
             )
             Text(

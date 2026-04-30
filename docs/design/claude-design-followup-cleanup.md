@@ -24,6 +24,11 @@ Update every artboard with bottom nav chrome to reflect 3-item version.
 
 **Hue-tinted selection states (identity card, etc.):** when a selected card uses an identity-hue background (light tint), the foreground text and subtitle must use a DARK hue-tinted color (low lightness, e.g. `hsl(hue, 55%, 18%)` for title and `hsl(hue, 40%, 30%)` for subtitle), NOT `onSurface` / `onSurfaceVariant`. The bg is the same light tint regardless of light/dark mode, so theme-driven `onSurface` (light text in dark mode) becomes invisible against the light selected bg. Lock contrast to the bg, not to the theme.
 
+**Habit cards support multiple identities.** A habit can serve more than one identity (many-to-many habit↔identity, per §2). Surfaces that render habits must reflect this:
+- **Onboarding step 2 (habit picker):** when the user picked multiple identities at step 1, show one merged habit list (union, deduped). For habits recommended by 2+ picked identities, render a small inline label below the habit subtitle: `"Recommended by: Reader · Healthy"`. Single-identity habits show no badge.
+- **Today (Home) habit cards:** each card may be associated with 1+ identities. Surface the association — likely as small hue-tinted dots/chips inline with the habit name (one dot per linked identity, using the identity hue). Tap behavior matches the identity strip chips above the cards.
+- Layout constraint: identity info is secondary metadata. Don't crowd the habit card. Small, peripheral, never the focal point.
+
 ### 2. Multi-identity is the only identity model
 
 The many-to-many habit↔identity model (a user holds multiple identities; each habit can serve one or more) is the canonical version. Single-identity variants are superseded — remove them entirely. Canvas must show one identity model.

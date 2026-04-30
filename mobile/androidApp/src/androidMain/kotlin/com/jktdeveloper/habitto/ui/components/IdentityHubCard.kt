@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -79,8 +78,8 @@ private fun IdentityAvatarStack(identities: List<Identity>) {
         visible.forEachIndexed { i, identity ->
             Box(modifier = Modifier.offset(x = (16 * i).dp)) {
                 HabitGlyph(
-                    icon = Icons.Filled.Person,
-                    hue = IdentityHue.forIdentityId(identity.id),
+                    icon = identityIcon(identity.name),
+                    hue = IdentityHue.forIdentityId(identity.name.lowercase()),
                     size = 32.dp,
                 )
             }
