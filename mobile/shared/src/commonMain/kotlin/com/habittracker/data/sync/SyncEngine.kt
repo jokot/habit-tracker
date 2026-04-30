@@ -4,6 +4,7 @@ import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.WatermarkReader
 import com.habittracker.data.repository.HabitLogRepository
 import com.habittracker.data.repository.HabitRepository
+import com.habittracker.data.repository.IdentityRepository
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantLogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,7 @@ class SyncEngine(
     private val habitLogRepo: HabitLogRepository,
     private val wantActivityRepo: WantActivityRepository,
     private val wantLogRepo: WantLogRepository,
+    private val identityRepo: IdentityRepository,
     private val supabase: SupabaseSyncClient,
     private val watermarks: WatermarkReader,
     private val identity: SyncIdentity,
@@ -94,6 +96,18 @@ class SyncEngine(
             wantLogRepo.markSynced(row.id, now)
             count++
         }
+        identityRepo.getUnsyncedUserIdentitiesFor(userId).forEach { row ->
+            val stamped = row.copy(syncedAt = now)
+            supabase.upsertUserIdentity(stamped)
+            identityRepo.markUserIdentitySynced(row.userId, row.identityId, now)
+            count++
+        }
+        identityRepo.getUnsyncedHabitIdentitiesFor(userId).forEach { row ->
+            val stamped = row.copy(syncedAt = now)
+            supabase.upsertHabitIdentity(stamped)
+            identityRepo.markHabitIdentitySynced(row.habitId, row.identityId, now)
+            count++
+        }
         return count
     }
 
@@ -101,7 +115,9 @@ class SyncEngine(
         pullHabits(userId) +
             pullWantActivities(userId) +
             pullHabitLogs(userId) +
-            pullWantLogs(userId)
+            pullWantLogs(userId) +
+            pullUserIdentities(userId) +
+            pullHabitIdentities(userId)
 
     private suspend fun pullHabits(userId: String): Int {
         val last = watermarks.get(SyncTable.HABITS)
@@ -152,6 +168,26 @@ class SyncEngine(
         remote.forEach { row -> wantLogRepo.mergePulled(row) }
         val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
         watermarks.set(SyncTable.WANT_LOGS, maxTs)
+        return remote.size
+    }
+
+    private suspend fun pullUserIdentities(userId: String): Int {
+        val last = watermarks.get(SyncTable.USER_IDENTITIES)
+        val remote = supabase.fetchUserIdentitiesSince(userId, last)
+        if (remote.isEmpty()) return 0
+        remote.forEach { row -> identityRepo.mergePulledUserIdentity(row) }
+        val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
+        watermarks.set(SyncTable.USER_IDENTITIES, maxTs)
+        return remote.size
+    }
+
+    private suspend fun pullHabitIdentities(userId: String): Int {
+        val last = watermarks.get(SyncTable.HABIT_IDENTITIES)
+        val remote = supabase.fetchHabitIdentitiesSince(userId, last)
+        if (remote.isEmpty()) return 0
+        remote.forEach { row -> identityRepo.mergePulledHabitIdentity(row) }
+        val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
+        watermarks.set(SyncTable.HABIT_IDENTITIES, maxTs)
         return remote.size
     }
 }

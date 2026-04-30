@@ -79,6 +79,7 @@ class AppContainer(context: Context) {
         habitLogRepository,
         wantActivityRepository,
         wantLogRepository,
+        identityRepository,
         supabaseSyncClient,
         watermarks,
         syncIdentity,
