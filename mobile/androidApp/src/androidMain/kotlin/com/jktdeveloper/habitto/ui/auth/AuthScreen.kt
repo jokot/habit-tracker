@@ -1,28 +1,35 @@
 package com.jktdeveloper.habitto.ui.auth
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
+import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,8 +37,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -43,17 +50,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.jktdeveloper.habitto.R
+import com.jktdeveloper.habitto.ui.theme.FlameOrange
+import com.jktdeveloper.habitto.ui.theme.FlameSoft
+import com.jktdeveloper.habitto.ui.theme.NumeralStyle
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.habittracker.data.remote.GoogleSignInLauncher
 import kotlinx.coroutines.launch
@@ -69,16 +84,17 @@ fun AuthScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // When ConfirmationEmailSent fires, show the check variant instead of navigating back
+    var checkEmail by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 AuthEvent.Success -> onSuccess()
                 is AuthEvent.ConfirmationEmailSent -> {
-                    snackbarHostState.showSnackbar(
-                        "Check your email (${event.email}) to confirm your account.",
-                    )
-                    onBack()
+                    checkEmail = event.email
                 }
             }
         }
@@ -89,115 +105,147 @@ fun AuthScreen(
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Cancel") }
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                 ),
+                windowInsets = WindowInsets(0.dp),
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets(0.dp),
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = Spacing.xxl)
+                .verticalScroll(rememberScrollState())
                 .imePadding(),
         ) {
-            Spacer(Modifier.height(Spacing.xxxl))
+            Spacer(Modifier.height(Spacing.xxl))
 
-            AuthHero(isSignUp = uiState.isSignUp)
+            // --- Hero block ---
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = FlameSoft,
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.LocalFireDepartment,
+                    contentDescription = null,
+                    tint = FlameOrange,
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .size(32.dp),
+                )
+            }
 
-            Spacer(Modifier.height(Spacing.xxxl))
+            Spacer(Modifier.height(16.dp))
 
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        launcher.requestIdToken()
-                            .onSuccess { token -> viewModel.signInWithGoogle(token) }
-                            .onFailure { e ->
-                                snackbarHostState.showSnackbar(
-                                    e.message ?: "Google sign-in failed",
+            Text(
+                text = when {
+                    checkEmail != null -> "Check your email"
+                    uiState.isSignUp -> "Create account"
+                    else -> "Welcome back"
+                },
+                style = NumeralStyle.copy(fontSize = 44.sp, lineHeight = 44.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = when {
+                    checkEmail != null ->
+                        "We sent a sign-in link to $checkEmail. Tap it to continue."
+                    else ->
+                        "Sync your habits and streak across devices."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(Spacing.xxl))
+
+            // --- Body block ---
+            if (checkEmail != null) {
+                // Check variant: email card
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.MarkEmailRead,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(28.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Link sent",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                            Text(
+                                text = "Expires in 15 minutes.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+                }
+            } else {
+                // signin / signup inputs
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    AuthInput(
+                        value = uiState.email,
+                        onValueChange = viewModel::onEmailChange,
+                        label = "Email",
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next,
+                        ),
+                    )
+
+                    AuthInput(
+                        value = uiState.password,
+                        onValueChange = viewModel::onPasswordChange,
+                        label = "Password",
+                        visualTransformation = if (uiState.isPasswordVisible) VisualTransformation.None
+                        else PasswordVisualTransformation(),
+                        trailingIcon = if (uiState.password.isNotEmpty()) {
+                            {
+                                VisibilityToggle(
+                                    visible = uiState.isPasswordVisible,
+                                    onClick = viewModel::togglePasswordVisibility,
                                 )
                             }
-                    }
-                },
-                enabled = !uiState.isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Text(
-                    "Continue with Google",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = if (uiState.isSignUp) ImeAction.Next else ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { viewModel.submit() }),
+                    )
 
-            Spacer(Modifier.height(Spacing.lg))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HorizontalDivider(modifier = Modifier.weight(1f))
-                Text(
-                    text = "  or  ",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                HorizontalDivider(modifier = Modifier.weight(1f))
-            }
-
-            Spacer(Modifier.height(Spacing.lg))
-
-            OutlinedTextField(
-                value = uiState.email,
-                onValueChange = viewModel::onEmailChange,
-                label = { Text("Email") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(Spacing.md))
-
-            OutlinedTextField(
-                value = uiState.password,
-                onValueChange = viewModel::onPasswordChange,
-                label = { Text("Password") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                visualTransformation = if (uiState.isPasswordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                trailingIcon = if (uiState.password.isNotEmpty()) {
-                    {
-                        VisibilityToggle(
-                            visible = uiState.isPasswordVisible,
-                            onClick = viewModel::togglePasswordVisibility,
-                        )
-                    }
-                } else null,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = if (uiState.isSignUp) ImeAction.Next else ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { viewModel.submit() }),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Box(modifier = Modifier.animateContentSize()) {
-                if (uiState.isSignUp) {
-                    Column {
-                        Spacer(Modifier.height(Spacing.md))
-                        OutlinedTextField(
+                    if (uiState.isSignUp) {
+                        AuthInput(
                             value = uiState.confirmPassword,
                             onValueChange = viewModel::onConfirmPasswordChange,
-                            label = { Text("Confirm password") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
+                            label = "Confirm password",
                             visualTransformation = if (uiState.isConfirmPasswordVisible) VisualTransformation.None
                             else PasswordVisualTransformation(),
                             trailingIcon = if (uiState.confirmPassword.isNotEmpty()) {
@@ -213,30 +261,79 @@ fun AuthScreen(
                                 imeAction = ImeAction.Done,
                             ),
                             keyboardActions = KeyboardActions(onDone = { viewModel.submit() }),
-                            modifier = Modifier.fillMaxWidth(),
                         )
+
+                        // 8-char min validation hint
+                        if (uiState.password.isNotEmpty() && uiState.password.length < 8) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Text(
+                                    text = "Password must be at least 8 characters.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+
+                    // Server-side error row
+                    uiState.error?.let { errorMsg ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                text = errorMsg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
 
-            Box(modifier = Modifier.animateContentSize()) {
-                uiState.error?.let { errorMsg ->
-                    Spacer(Modifier.height(Spacing.md))
-                    ErrorBanner(errorMsg)
-                }
-            }
+            // --- Bottom action block (32dp top padding) ---
+            Spacer(Modifier.height(32.dp))
 
-            Spacer(Modifier.height(Spacing.xxl))
-
+            // Primary filled button
             Button(
-                onClick = viewModel::submit,
+                onClick = {
+                    if (checkEmail != null) {
+                        // Open mail app
+                        val intent = Intent(Intent.ACTION_MAIN).apply {
+                            addCategory(Intent.CATEGORY_APP_EMAIL)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        runCatching { context.startActivity(intent) }.onFailure {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("No email app found.")
+                            }
+                        }
+                    } else {
+                        viewModel.submit()
+                    }
+                },
                 enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(48.dp),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                if (uiState.isLoading) {
+                if (uiState.isLoading && checkEmail == null) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
@@ -244,102 +341,120 @@ fun AuthScreen(
                     )
                 } else {
                     Text(
-                        if (uiState.isSignUp) "Sign Up" else "Sign In",
+                        text = when {
+                            checkEmail != null -> "Open mail app"
+                            uiState.isSignUp -> "Create account"
+                            else -> "Sign in"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
             }
 
-            Spacer(Modifier.height(Spacing.md))
+            if (checkEmail == null) {
+                // "or" divider
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "  or  ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
 
-            ToggleSignUpRow(
-                isSignUp = uiState.isSignUp,
-                enabled = !uiState.isLoading,
-                onToggle = viewModel::toggleSignUp,
-            )
+                // Continue with Google
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            launcher.requestIdToken()
+                                .onSuccess { token -> viewModel.signInWithGoogle(token) }
+                                .onFailure { e ->
+                                    snackbarHostState.showSnackbar(
+                                        e.message ?: "Google sign-in failed",
+                                    )
+                                }
+                        }
+                    },
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    GoogleLogo(modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Continue with Google",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
 
-            Spacer(Modifier.weight(1f))
+                // Toggle sign-in / sign-up
+                TextButton(
+                    onClick = viewModel::toggleSignUp,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                ) {
+                    Text(
+                        text = if (uiState.isSignUp) "I have an account" else "Create account",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
 
-            LocalPrivacyFooter()
-
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.xxl))
         }
     }
 }
 
+/** OutlinedTextField with primary-colored border (resting + focused) and 8dp corner radius. */
 @Composable
-private fun AuthHero(isSignUp: Boolean) {
-    Column(horizontalAlignment = Alignment.Start) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-        ) {
-            Text(
-                text = "Optional",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
-            )
-        }
-        Spacer(Modifier.height(Spacing.lg))
-        Text(
-            text = if (isSignUp) "Create an account" else "Welcome back",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            text = "Sign in to sync habits across your devices. Your local data stays either way.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(max = 420.dp),
-        )
-    }
+private fun AuthInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        shape = RoundedCornerShape(8.dp),
+        visualTransformation = visualTransformation,
+        trailingIcon = trailingIcon,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp),
+    )
 }
 
 @Composable
-private fun ErrorBanner(message: String) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(MaterialTheme.colorScheme.error, CircleShape),
-            )
-            Spacer(Modifier.size(Spacing.md))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToggleSignUpRow(isSignUp: Boolean, enabled: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = if (isSignUp) "Already have an account?" else "New here?",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        TextButton(onClick = onToggle, enabled = enabled) {
-            Text(if (isSignUp) "Sign In" else "Create an account")
-        }
-    }
+private fun GoogleLogo(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.ic_google_g),
+        contentDescription = null,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -349,22 +464,6 @@ private fun VisibilityToggle(visible: Boolean, onClick: () -> Unit) {
             imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
             contentDescription = if (visible) "Hide password" else "Show password",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun LocalPrivacyFooter() {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = "Your habits and logs live on this device. Signing in only enables cloud sync.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(Spacing.md),
         )
     }
 }

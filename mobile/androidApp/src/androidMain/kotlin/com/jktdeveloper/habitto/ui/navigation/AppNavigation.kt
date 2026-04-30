@@ -181,15 +181,8 @@ fun AppNavigation(container: AppContainer) {
                         userIdProvider = { container.currentUserId() },
                     )
                 }
-                // showBack only when we have a previous entry that isn't the same route.
-                // Tab-tap nav uses single-top + saveState, so it shouldn't push duplicate entries.
-                // "View all" from Home pushes onto current backstack — previousBackStackEntry exists.
-                val showBack = navController.previousBackStackEntry != null &&
-                    navController.previousBackStackEntry?.destination?.route != Screen.StreakHistory.route
                 com.jktdeveloper.habitto.ui.streak.StreakHistoryScreen(
                     viewModel = vm,
-                    onBack = { navController.popBackStack() },
-                    showBack = showBack,
                 )
             }
 

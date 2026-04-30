@@ -61,6 +61,10 @@ val Surface2Light = Color(0xFFECE7DF)
 val Surface1Dark = Color(0xFF221F1A)
 val Surface2Dark = Color(0xFF2C2823)
 
+// ─── Bottom nav bar bg (distinct from app background) ───
+val BottomNavBg = Color(0xFFFFFFFF)
+val BottomNavBgDark = Color(0xFF181816)
+
 // ─── Material 3 — Light ───
 internal val LightColorScheme = lightColorScheme(
     primary = Color(0xFF2E7D32),

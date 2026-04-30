@@ -2,6 +2,7 @@ package com.jktdeveloper.habitto.ui.streak
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
@@ -20,44 +22,117 @@ import kotlinx.datetime.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+private val WEEKDAY_LABELS = listOf("M", "T", "W", "T", "F", "S", "S")
+private val CELL_GAP = 4.dp
+
 @Composable
 fun MonthCalendar(
     month: MonthData,
     today: LocalDate,
     modifier: Modifier = Modifier,
+    onDayClick: ((StreakDay) -> Unit)? = null,
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(horizontal = Spacing.xl)) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.xl),
+    ) {
+        // Month label
         Text(
             text = "${java.time.Month.of(month.month).getDisplayName(TextStyle.FULL, Locale.getDefault())} ${month.year}",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = Spacing.xl, bottom = Spacing.md),
+            modifier = Modifier.padding(bottom = 12.dp),
         )
 
-        if (month.isLoading) {
-            Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@Column
-        }
-        if (month.error != null) {
-            Text("Couldn't load — ${month.error}", color = MaterialTheme.colorScheme.error)
-            return@Column
-        }
+        // Surface card wrapper
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            tonalElevation = 0.dp,
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                if (month.isLoading) {
+                    Text(
+                        text = "Loading…",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    return@Column
+                }
+                if (month.error != null) {
+                    Text(
+                        text = "Couldn't load — ${month.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    return@Column
+                }
 
-        // 7-column grid: pad start with empty placeholders so the 1st aligns under the right weekday.
-        val firstDay = LocalDate(month.year, month.month, 1)
-        val firstDow = firstDay.dayOfWeek
-        // We want columns laid out Mon..Sun (kotlinx-datetime DayOfWeek.MONDAY = ordinal 0).
-        val padStart = firstDow.ordinal
-        val cells: List<StreakDay?> = List(padStart) { null } + month.days
-        val rows = cells.chunked(7)
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            rows.forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    row.forEach { day ->
-                        if (day == null) Box(modifier = Modifier.size(32.dp))
-                        else DayCell(day = day)
+                // Weekday header row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(CELL_GAP),
+                ) {
+                    WEEKDAY_LABELS.forEach { label ->
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
-                    repeat(7 - row.size) { Box(modifier = Modifier.size(32.dp)) }
+                }
+
+                // Day grid — 7 columns, padded start
+                val firstDay = LocalDate(month.year, month.month, 1)
+                val padStart = firstDay.dayOfWeek.ordinal // Mon=0
+                val cells: List<StreakDay?> = List(padStart) { null } + month.days
+                val rows = cells.chunked(7)
+
+                Column(verticalArrangement = Arrangement.spacedBy(CELL_GAP)) {
+                    rows.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CELL_GAP),
+                        ) {
+                            row.forEach { day ->
+                                if (day == null) {
+                                    // Leading/trailing empty pad — keeps aspect ratio
+                                    Spacer(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f),
+                                    )
+                                } else {
+                                    DayCell(
+                                        day = day,
+                                        isToday = day.date == today,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f),
+                                        onClick = { onDayClick?.invoke(day) },
+                                    )
+                                }
+                            }
+                            // Fill remainder of last row
+                            val remaining = 7 - row.size
+                            if (remaining > 0) {
+                                repeat(remaining) {
+                                    Spacer(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -65,32 +140,30 @@ fun MonthCalendar(
 }
 
 @Composable
-private fun DayCell(day: StreakDay) {
+private fun DayCell(
+    day: StreakDay,
+    isToday: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+) {
     val isDark = isSystemInDarkTheme()
     val appearance = resolveCellAppearance(day, isDark)
-    // Determine text contrast — use white on saturated/dark fills, surface color on light fills
-    val onColor = when (day.state) {
-        StreakDayState.FROZEN, StreakDayState.BROKEN -> Color.White
-        else -> MaterialTheme.colorScheme.onSurface
-    }
+    val onSurface = MaterialTheme.colorScheme.onSurface
+
     Box(
-        modifier = Modifier
-            .size(32.dp)
+        modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(appearance.fill.copy(alpha = appearance.alpha))
             .let { m ->
-                if (appearance.ringColor != null) {
-                    m.border(appearance.ringWidth, appearance.ringColor, RoundedCornerShape(6.dp))
-                } else {
-                    m.border(1.dp, appearance.border, RoundedCornerShape(6.dp))
+                when {
+                    isToday -> m.border(2.dp, onSurface, RoundedCornerShape(6.dp))
+                    appearance.ringColor != null -> m.border(appearance.ringWidth, appearance.ringColor, RoundedCornerShape(6.dp))
+                    else -> m.border(1.dp, appearance.border, RoundedCornerShape(6.dp))
                 }
-            },
+            }
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = day.date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.labelSmall,
-            color = onColor,
-        )
+        // Intentionally no text label per design (cells are colour-only heat map)
     }
 }

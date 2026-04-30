@@ -20,6 +20,10 @@ Drop any 4-item variant (e.g. "Home · Streak · Wants · You"). Wants are manag
 
 Update every artboard with bottom nav chrome to reflect 3-item version.
 
+**App bar treatment for top-level destinations (Streak, You):** title left-aligned, no back arrow. These are reachable only via bottom-nav tab tap (no push from another screen), so a back affordance is misleading. System back button still dismisses the app.
+
+**Hue-tinted selection states (identity card, etc.):** when a selected card uses an identity-hue background (light tint), the foreground text and subtitle must use a DARK hue-tinted color (low lightness, e.g. `hsl(hue, 55%, 18%)` for title and `hsl(hue, 40%, 30%)` for subtitle), NOT `onSurface` / `onSurfaceVariant`. The bg is the same light tint regardless of light/dark mode, so theme-driven `onSurface` (light text in dark mode) becomes invisible against the light selected bg. Lock contrast to the bg, not to the theme.
+
 ### 2. Multi-identity is the only identity model
 
 The many-to-many habit↔identity model (a user holds multiple identities; each habit can serve one or more) is the canonical version. Single-identity variants are superseded — remove them entirely. Canvas must show one identity model.

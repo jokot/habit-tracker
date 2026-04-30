@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class OnboardingStep { IDENTITY, HABITS, WANTS }
+enum class OnboardingStep { IDENTITY, HABITS, WANTS, SYNC }
 
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.IDENTITY,
@@ -59,6 +59,21 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
 
     fun continueFromHabits() {
         _uiState.value = _uiState.value.copy(step = OnboardingStep.WANTS)
+    }
+
+    fun continueFromWants() {
+        _uiState.value = _uiState.value.copy(step = OnboardingStep.SYNC)
+    }
+
+    fun back() {
+        val current = _uiState.value.step
+        val prev = when (current) {
+            OnboardingStep.IDENTITY -> return
+            OnboardingStep.HABITS -> OnboardingStep.IDENTITY
+            OnboardingStep.WANTS -> OnboardingStep.HABITS
+            OnboardingStep.SYNC -> OnboardingStep.WANTS
+        }
+        _uiState.value = _uiState.value.copy(step = prev)
     }
 
     fun toggleWantActivity(activityId: String) {

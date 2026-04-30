@@ -2,26 +2,37 @@ package com.jktdeveloper.habitto.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.BuildConfig
-import com.jktdeveloper.habitto.notifications.NotificationPrefs
 import com.jktdeveloper.habitto.notifications.PermissionUtils
-import com.jktdeveloper.habitto.ui.theme.Spacing
+import com.jktdeveloper.habitto.ui.theme.SyncRunningBg
+import com.jktdeveloper.habitto.ui.theme.SyncRunningBgDark
+import com.jktdeveloper.habitto.ui.theme.SyncRunningFg
+import com.jktdeveloper.habitto.ui.theme.SyncRunningFgDark
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -52,182 +63,253 @@ fun SettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // ── Top bar ──────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        // ── Permission banner ─────────────────────────────────────────────────
+        if (!permissionGranted) {
+            PermissionBanner(
+                onOpenSettings = { PermissionUtils.openAppNotificationSettings(context) },
+            )
+        }
+
+        // ── Notifications section ─────────────────────────────────────────────
+        SettingsSection(title = "Notifications") {
+            val masterParentEnabled = permissionGranted
+            SettingsRow(
+                title = "All notifications",
+                trailing = {
+                    Switch(
+                        checked = prefs.masterEnabled,
+                        enabled = masterParentEnabled,
+                        onCheckedChange = viewModel::setMasterEnabled,
+                    )
                 },
             )
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
-        ) {
-            // Permission banner — above the Notifications section header
-            if (!permissionGranted) {
-                item {
-                    PermissionBanner(
-                        onOpenSettings = { PermissionUtils.openAppNotificationSettings(context) },
-                    )
-                }
-            }
 
-            // Notifications section
-            item { SectionHeader("Notifications") }
-            item {
-                ListItem(
-                    headlineContent = { Text("All notifications", style = MaterialTheme.typography.bodyLarge) },
-                    supportingContent = {
-                        Text(
-                            if (prefs.masterEnabled) "Manage individual reminders below" else "All reminders paused",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = prefs.masterEnabled,
-                            enabled = permissionGranted,
-                            onCheckedChange = viewModel::setMasterEnabled,
-                        )
-                    },
-                )
-            }
-            item {
-                val parentEnabled = permissionGranted && prefs.masterEnabled
-                NotifRow(
-                    title = "Daily reminder",
-                    timeMinutes = prefs.dailyReminderMinutes,
-                    enabled = prefs.dailyReminderEnabled,
-                    parentEnabled = parentEnabled,
-                    onToggle = viewModel::setDailyReminderEnabled,
-                    onTimeChange = viewModel::setDailyReminderMinutes,
-                )
-            }
-            item {
-                val parentEnabled = permissionGranted && prefs.masterEnabled
-                NotifRow(
-                    title = "Streak at risk",
-                    timeMinutes = prefs.streakRiskMinutes,
-                    enabled = prefs.streakRiskEnabled,
-                    parentEnabled = parentEnabled,
-                    onToggle = viewModel::setStreakRiskEnabled,
-                    onTimeChange = viewModel::setStreakRiskMinutes,
-                )
-            }
-            item {
-                val parentEnabled = permissionGranted && prefs.masterEnabled
-                NotifRow(
-                    title = "Streak frozen alerts",
-                    timeMinutes = null,
-                    enabled = prefs.streakFrozenEnabled,
-                    parentEnabled = parentEnabled,
-                    onToggle = viewModel::setStreakFrozenEnabled,
-                    onTimeChange = {},
-                )
-            }
-            item {
-                val parentEnabled = permissionGranted && prefs.masterEnabled
-                NotifRow(
-                    title = "Streak reset alerts",
-                    timeMinutes = null,
-                    enabled = prefs.streakResetEnabled,
-                    parentEnabled = parentEnabled,
-                    onToggle = viewModel::setStreakResetEnabled,
-                    onTimeChange = {},
-                )
-            }
+            val parentEnabled = permissionGranted && prefs.masterEnabled
 
-            // Account section
-            item { SectionHeader("Account") }
+            NotifRow(
+                title = "Daily reminder",
+                timeMinutes = prefs.dailyReminderMinutes,
+                enabled = prefs.dailyReminderEnabled,
+                parentEnabled = parentEnabled,
+                onToggle = viewModel::setDailyReminderEnabled,
+                onTimeChange = viewModel::setDailyReminderMinutes,
+            )
+
+            NotifRow(
+                title = "Streak at risk",
+                timeMinutes = prefs.streakRiskMinutes,
+                enabled = prefs.streakRiskEnabled,
+                parentEnabled = parentEnabled,
+                onToggle = viewModel::setStreakRiskEnabled,
+                onTimeChange = viewModel::setStreakRiskMinutes,
+            )
+
+            NotifRow(
+                title = "Streak frozen alerts",
+                timeMinutes = null,
+                enabled = prefs.streakFrozenEnabled,
+                parentEnabled = parentEnabled,
+                onToggle = viewModel::setStreakFrozenEnabled,
+                onTimeChange = {},
+            )
+
+            NotifRow(
+                title = "Streak reset alerts",
+                timeMinutes = null,
+                enabled = prefs.streakResetEnabled,
+                parentEnabled = parentEnabled,
+                onToggle = viewModel::setStreakResetEnabled,
+                onTimeChange = {},
+            )
+        }
+
+        // ── Account section ───────────────────────────────────────────────────
+        SettingsSection(title = "Account") {
             if (isAuthenticated) {
-                if (accountEmail != null) {
-                    item {
-                        ListItem(
-                            headlineContent = {
-                                Text(accountEmail, style = MaterialTheme.typography.bodyLarge)
-                            },
-                        )
-                    }
-                }
-                item {
-                    ListItem(
-                        modifier = Modifier.fillMaxWidth().clickable { onSignOut() },
-                        headlineContent = {
-                            Text("Sign out", color = MaterialTheme.colorScheme.error)
-                        },
-                    )
-                }
+                SettingsRow(
+                    title = accountEmail ?: "Signed in",
+                    supporting = if (accountEmail != null) "Signed in" else null,
+                    leading = Icons.Default.AccountCircle,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsRow(
+                    title = "Sign out",
+                    titleColor = MaterialTheme.colorScheme.error,
+                    leading = Icons.AutoMirrored.Filled.Logout,
+                    leadingColor = MaterialTheme.colorScheme.error,
+                    onClick = onSignOut,
+                )
             } else {
-                item {
-                    ListItem(
-                        modifier = Modifier.fillMaxWidth().clickable { onSignIn() },
-                        headlineContent = { Text("Sign in to sync") },
-                    )
-                }
+                SettingsRow(
+                    title = "Sign in to sync",
+                    supporting = "Local data stays put",
+                    leading = Icons.AutoMirrored.Filled.Login,
+                    onClick = onSignIn,
+                )
             }
+        }
 
-            // About section
-            item { SectionHeader("About") }
-            item {
-                ListItem(
-                    headlineContent = { Text("Version") },
-                    supportingContent = { Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
-                )
-            }
-            item {
-                ListItem(
-                    modifier = Modifier.clickable { /* TODO open privacy URL */ },
-                    headlineContent = { Text("Privacy policy") },
-                )
-            }
+        // ── About section ─────────────────────────────────────────────────────
+        SettingsSection(title = "About") {
+            SettingsRow(
+                title = "Version",
+                supporting = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow(
+                title = "Privacy policy",
+                trailing = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                onClick = { /* TODO open privacy URL */ },
+            )
+        }
+
+        // ── Bottom spacer ─────────────────────────────────────────────────────
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+// ─── Section primitive ────────────────────────────────────────────────────────
+
+@Composable
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier = Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp)) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
+        )
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(content = content)
         }
     }
 }
 
+// ─── Row primitive ────────────────────────────────────────────────────────────
+
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = Spacing.xl, top = Spacing.xxl, bottom = Spacing.md),
-    )
+private fun SettingsRow(
+    title: String,
+    supporting: String? = null,
+    leading: ImageVector? = null,
+    leadingColor: Color? = null,
+    titleColor: Color? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .let { if (onClick != null) it.clickable { onClick() } else it }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        if (leading != null) {
+            Icon(
+                imageVector = leading,
+                contentDescription = null,
+                tint = leadingColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = titleColor ?: MaterialTheme.colorScheme.onSurface,
+            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        trailing?.invoke()
+    }
 }
+
+// ─── Permission banner ────────────────────────────────────────────────────────
 
 @Composable
 private fun PermissionBanner(onOpenSettings: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
+    val bannerBg = if (isDark) SyncRunningBgDark else SyncRunningBg
+    val bannerFg = if (isDark) SyncRunningFgDark else SyncRunningFg
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.xl, vertical = Spacing.sm)
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp)
             .clickable(onClick = onOpenSettings),
-        color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(8.dp),
+        color = bannerBg,
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Default.Warning,
+                imageVector = Icons.Default.NotificationsOff,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(18.dp),
+                tint = bannerFg,
+                modifier = Modifier.size(20.dp),
             )
-            Spacer(Modifier.width(Spacing.md))
+            Spacer(Modifier.width(10.dp))
             Text(
                 text = "Notifications blocked. Tap to open system settings.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
+                color = bannerFg,
                 modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = bannerFg,
+                modifier = Modifier.size(18.dp),
             )
         }
     }
 }
+
+// ─── NotifRow ─────────────────────────────────────────────────────────────────
 
 @Composable
 private fun NotifRow(
@@ -239,20 +321,18 @@ private fun NotifRow(
     onTimeChange: (Int) -> Unit,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    val rowMod = if (parentEnabled && enabled && timeMinutes != null)
-        Modifier.fillMaxWidth().clickable { showPicker = true }
-    else
-        Modifier.fillMaxWidth()
 
-    ListItem(
-        modifier = rowMod,
-        headlineContent = { Text(title, style = MaterialTheme.typography.bodyLarge) },
-        supportingContent = if (timeMinutes != null && enabled) {
-            { Text(formatMinutes(timeMinutes), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        } else null,
-        trailingContent = {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+    SettingsRow(
+        title = title,
+        supporting = if (timeMinutes != null && enabled) formatMinutes(timeMinutes) else null,
+        trailing = {
             Switch(checked = enabled, enabled = parentEnabled, onCheckedChange = onToggle)
         },
+        onClick = if (parentEnabled && enabled && timeMinutes != null) {
+            { showPicker = true }
+        } else null,
     )
 
     if (showPicker && timeMinutes != null) {
@@ -266,6 +346,8 @@ private fun NotifRow(
         )
     }
 }
+
+// ─── Time picker dialog ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -289,6 +371,8 @@ private fun TimePickerDialogStub(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 private fun formatMinutes(minutes: Int): String {
     val h = minutes / 60

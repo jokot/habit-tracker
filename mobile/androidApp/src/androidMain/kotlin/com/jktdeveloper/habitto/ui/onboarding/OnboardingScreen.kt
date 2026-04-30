@@ -6,25 +6,48 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.SmartDisplay
+import androidx.compose.material.icons.filled.SmokingRooms
+import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,12 +58,51 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.jktdeveloper.habitto.ui.theme.Spacing
+import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.HabitTemplate
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.WantActivity
+import com.jktdeveloper.habitto.ui.components.HabitGlyph
+import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.StepProgressBar
+
+// ── Step copy ────────────────────────────────────────────────────────────────
+
+private data class StepCopy(val title: String, val subtitle: String)
+
+private fun stepCopy(step: OnboardingStep) = when (step) {
+    OnboardingStep.IDENTITY -> StepCopy(
+        title = "Who do you want to become?",
+        subtitle = "Choose an identity. Habitto suggests habits that support it.",
+    )
+    OnboardingStep.HABITS -> StepCopy(
+        title = "Pick habits that prove it.",
+        subtitle = "Each habit earns points. Stay above your daily target to bank them.",
+    )
+    OnboardingStep.WANTS -> StepCopy(
+        title = "What pulls you away?",
+        subtitle = "Wants cost points. Pick the ones you do without thinking.",
+    )
+    OnboardingStep.SYNC -> StepCopy(
+        title = "Sync across devices?",
+        subtitle = "Sign in to sync. Skip if you'd rather stay local.",
+    )
+}
+
+private fun stepIndex(step: OnboardingStep) = when (step) {
+    OnboardingStep.IDENTITY -> 1
+    OnboardingStep.HABITS -> 2
+    OnboardingStep.WANTS -> 3
+    OnboardingStep.SYNC -> 4
+}
+
+// ── Root screen ──────────────────────────────────────────────────────────────
 
 @Composable
 fun OnboardingScreen(
@@ -54,344 +116,553 @@ fun OnboardingScreen(
         viewModel.finished.collect { onFinished() }
     }
 
-    val (stepIndex, stepTotal) = when (uiState.step) {
-        OnboardingStep.IDENTITY -> 1 to 3
-        OnboardingStep.HABITS -> 2 to 3
-        OnboardingStep.WANTS -> 3 to 3
-    }
+    val currentStep = uiState.step
+    val index = stepIndex(currentStep)
+    val copy = stepCopy(currentStep)
 
     Scaffold(
-        topBar = { StepProgressBar(stepIndex, stepTotal) },
-    ) { padding ->
-        when (uiState.step) {
-            OnboardingStep.IDENTITY -> IdentityStep(
+        topBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 12.dp),
+            ) {
+                StepProgressBar(step = index, total = 4)
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Step $index of 4",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = copy.title,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 28.sp,
+                        lineHeight = 34.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.4).sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = copy.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        bottomBar = {
+            OnboardingBottomBar(
+                step = currentStep,
+                primaryEnabled = when (currentStep) {
+                    OnboardingStep.IDENTITY -> uiState.selectedIdentityId != null
+                    else -> true
+                },
+                isLoading = uiState.isLoading,
+                onLeftAction = {
+                    when (currentStep) {
+                        // "Skip" on identity bails the whole onboarding flow without setup
+                        OnboardingStep.IDENTITY -> viewModel.finish()
+                        else -> viewModel.back()
+                    }
+                },
+                onRightAction = {
+                    when (currentStep) {
+                        OnboardingStep.IDENTITY -> viewModel.continueFromIdentity()
+                        OnboardingStep.HABITS -> viewModel.continueFromHabits()
+                        OnboardingStep.WANTS -> viewModel.continueFromWants()
+                        OnboardingStep.SYNC -> viewModel.finish()
+                    }
+                },
+            )
+        },
+        contentWindowInsets = WindowInsets(0.dp),
+    ) { innerPadding ->
+        when (currentStep) {
+            OnboardingStep.IDENTITY -> IdentityStepBody(
                 identities = uiState.identities,
                 selectedId = uiState.selectedIdentityId,
                 onSelect = viewModel::selectIdentity,
-                onContinue = viewModel::continueFromIdentity,
-                onSignIn = onSignIn,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.padding(innerPadding),
             )
-            OnboardingStep.HABITS -> HabitsStep(
+            OnboardingStep.HABITS -> HabitsStepBody(
                 templates = uiState.habitTemplates,
                 selectedIds = uiState.selectedTemplateIds,
                 onToggle = viewModel::toggleHabit,
-                onContinue = viewModel::continueFromHabits,
-                onSkip = viewModel::continueFromHabits,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.padding(innerPadding),
             )
-            OnboardingStep.WANTS -> WantsStep(
+            OnboardingStep.WANTS -> WantsStepBody(
                 activities = uiState.wantActivities,
                 selectedIds = uiState.selectedActivityIds,
                 onToggle = viewModel::toggleWantActivity,
-                onFinish = viewModel::finish,
-                onSkip = viewModel::finish,
-                isLoading = uiState.isLoading,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.padding(innerPadding),
+            )
+            OnboardingStep.SYNC -> SyncStepBody(
+                onSignIn = onSignIn,
+                modifier = Modifier.padding(innerPadding),
+            )
+        }
+    }
+}
+
+// ── Bottom navigation bar ────────────────────────────────────────────────────
+
+@Composable
+private fun OnboardingBottomBar(
+    step: OnboardingStep,
+    primaryEnabled: Boolean,
+    isLoading: Boolean,
+    onLeftAction: () -> Unit,
+    onRightAction: () -> Unit,
+) {
+    Column {
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onLeftAction) {
+                Text(
+                    text = if (step == OnboardingStep.IDENTITY) "Skip" else "Back",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            val primaryLabel = when (step) {
+                OnboardingStep.SYNC -> if (isLoading) "Setting up…" else "I'll do it later"
+                else -> "Next"
+            }
+            Button(
+                onClick = onRightAction,
+                enabled = primaryEnabled && !isLoading,
+            ) {
+                Text(
+                    text = primaryLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+    }
+}
+
+// ── Step 1: Identity grid ─────────────────────────────────────────────────────
+
+@Composable
+private fun IdentityStepBody(
+    identities: List<Identity>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
+    ) {
+        items(identities, key = { it.id }) { identity ->
+            IdentityGridCell(
+                identity = identity,
+                selected = identity.id == selectedId,
+                onSelect = { onSelect(identity.id) },
             )
         }
     }
 }
 
 @Composable
-private fun StepProgressBar(current: Int, total: Int) {
-    Column(
+private fun IdentityGridCell(
+    identity: Identity,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val selectedBg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.92f)
+    val selectedBorder = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.50f)
+    // Selected bg is always light regardless of theme — use a dark fg for legibility
+    val selectedTitleFg = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.18f)
+    val selectedSubtitleFg = Color.hsl(hue = hue, saturation = 0.40f, lightness = 0.30f)
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = if (selected) 2.dp else 1.dp,
+            color = if (selected) selectedBorder else MaterialTheme.colorScheme.outlineVariant,
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = Spacing.xl, vertical = Spacing.xl),
+            .clickable(onClick = onSelect),
     ) {
-        Text(
-            text = "Step $current of $total",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        LinearProgressIndicator(
-            progress = { current.toFloat() / total },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            strokeCap = StrokeCap.Round,
-        )
-    }
-}
-
-@Composable
-private fun StepHeader(title: String, subtitle: String) {
-    Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(Spacing.xs))
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun PrimaryActionBar(
-    primaryText: String,
-    primaryEnabled: Boolean,
-    onPrimary: () -> Unit,
-    skipText: String? = null,
-    onSkip: (() -> Unit)? = null,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Button(
-            onClick = onPrimary,
-            enabled = primaryEnabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp),
-        ) {
-            Text(primaryText, style = MaterialTheme.typography.titleMedium)
-        }
-        if (skipText != null && onSkip != null) {
-            Spacer(Modifier.height(Spacing.xs))
-            TextButton(
-                onClick = onSkip,
-                enabled = primaryEnabled || onSkip !== onPrimary,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(skipText)
+        Box(modifier = Modifier.padding(14.dp)) {
+            // Selected check badge at top-right
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(selectedBorder)
+                        .align(Alignment.TopEnd),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun IdentityStep(
-    identities: List<Identity>,
-    selectedId: String?,
-    onSelect: (String) -> Unit,
-    onContinue: () -> Unit,
-    onSignIn: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = Spacing.xl),
-    ) {
-        StepHeader(
-            title = "Who do you want to become?",
-            subtitle = "Pick an identity. We'll suggest habits that fit.",
-        )
-        Spacer(Modifier.height(Spacing.xl))
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            items(identities, key = { it.id }) { identity ->
-                IdentityCard(
-                    identity = identity,
-                    selected = identity.id == selectedId,
-                    onSelect = { onSelect(identity.id) },
+            Column {
+                HabitGlyph(
+                    icon = identityIcon(identity.name),
+                    hue = hue,
+                    size = 36.dp,
                 )
-            }
-            item { Spacer(Modifier.height(Spacing.md)) }
-        }
-        Spacer(Modifier.height(Spacing.md))
-        PrimaryActionBar(
-            primaryText = "Continue",
-            primaryEnabled = selectedId != null,
-            onPrimary = onContinue,
-        )
-        androidx.compose.material3.TextButton(
-            onClick = onSignIn,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) {
-            androidx.compose.material3.Text("Already have an account? Sign in")
-        }
-        Spacer(Modifier.height(Spacing.xl))
-    }
-}
-
-@Composable
-private fun IdentityCard(identity: Identity, selected: Boolean, onSelect: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect),
-        shape = RoundedCornerShape(20.dp),
-        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surface,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.xl),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                        shape = CircleShape,
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = identity.name,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
                     ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(identity.icon, style = MaterialTheme.typography.titleLarge)
-            }
-            Spacer(Modifier.size(Spacing.lg))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    identity.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface,
+                    color = if (selected) selectedTitleFg else MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(Spacing.xs))
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    identity.description,
+                    text = identity.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) selectedSubtitleFg else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
 }
 
+// ── Step 2: Habits multi-select ───────────────────────────────────────────────
+
 @Composable
-private fun HabitsStep(
+private fun HabitsStepBody(
     templates: List<HabitTemplate>,
     selectedIds: Set<String>,
     onToggle: (String) -> Unit,
-    onContinue: () -> Unit,
-    onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize().padding(horizontal = Spacing.xl)) {
-        StepHeader(
-            title = "Recommended habits",
-            subtitle = "Pick 2–3 to start. Less is more. (${selectedIds.size} selected)",
-        )
-        Spacer(Modifier.height(Spacing.xl))
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            items(templates, key = { it.id }) { template ->
-                SelectableRow(
-                    title = template.name,
-                    subtitle = "Start with ${template.defaultThreshold.toInt()} ${template.unit} = 1 pt",
-                    selected = template.id in selectedIds,
-                    onToggle = { onToggle(template.id) },
-                )
-            }
-            item { Spacer(Modifier.height(Spacing.md)) }
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
+    ) {
+        items(templates, key = { it.id }) { template ->
+            val selected = template.id in selectedIds
+            HabitTemplateRow(
+                template = template,
+                selected = selected,
+                onToggle = { onToggle(template.id) },
+            )
         }
-        Spacer(Modifier.height(Spacing.md))
-        PrimaryActionBar(
-            primaryText = "Continue",
-            primaryEnabled = true,
-            onPrimary = onContinue,
-            skipText = "Skip",
-            onSkip = onSkip,
-        )
-        Spacer(Modifier.height(Spacing.xl))
     }
 }
 
 @Composable
-private fun WantsStep(
-    activities: List<WantActivity>,
-    selectedIds: Set<String>,
-    onToggle: (String) -> Unit,
-    onFinish: () -> Unit,
-    onSkip: () -> Unit,
-    isLoading: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.fillMaxSize().padding(horizontal = Spacing.xl)) {
-        StepHeader(
-            title = "What do you do for fun?",
-            subtitle = "These cost points. Earn them first. (${selectedIds.size} selected)",
-        )
-        Spacer(Modifier.height(Spacing.xl))
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            items(activities, key = { it.id }) { activity ->
-                val costText = if (activity.costPerUnit >= 1.0) {
-                    "${activity.costPerUnit.toInt()} pt per ${activity.unit}"
-                } else {
-                    "1 pt per ${(1.0 / activity.costPerUnit).toInt()} ${activity.unit}"
-                }
-                SelectableRow(
-                    title = activity.name,
-                    subtitle = costText,
-                    selected = activity.id in selectedIds,
-                    onToggle = { onToggle(activity.id) },
-                )
-            }
-            item { Spacer(Modifier.height(Spacing.md)) }
-        }
-        Spacer(Modifier.height(Spacing.md))
-        PrimaryActionBar(
-            primaryText = if (isLoading) "Setting up…" else "Get Started",
-            primaryEnabled = !isLoading,
-            onPrimary = onFinish,
-            skipText = "Skip",
-            onSkip = onSkip,
-        )
-        Spacer(Modifier.height(Spacing.xl))
-    }
-}
-
-@Composable
-private fun SelectableRow(
-    title: String,
-    subtitle: String,
+private fun HabitTemplateRow(
+    template: HabitTemplate,
     selected: Boolean,
     onToggle: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surface,
-        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outlineVariant,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(
-                checked = selected,
-                onCheckedChange = { onToggle() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.outline,
-                ),
+            HabitGlyph(
+                icon = habitIcon(template.name),
+                hue = IdentityHue.DEFAULT,
+                size = 40.dp,
             )
-            Column(modifier = Modifier.padding(start = Spacing.sm).weight(1f)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = template.name,
+                    style = MaterialTheme.typography.titleSmall,
                     color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
                     else MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(Spacing.xs))
+                val threshold = template.defaultThreshold.toInt()
                 Text(
-                    text = subtitle,
+                    text = "Target $threshold ${template.unit} · 1 pt per $threshold",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            CheckSquare(
+                checked = selected,
+                isError = false,
+                onCheckedChange = onToggle,
+            )
         }
     }
+}
+
+// ── Step 3: Wants multi-select ────────────────────────────────────────────────
+
+@Composable
+private fun WantsStepBody(
+    activities: List<WantActivity>,
+    selectedIds: Set<String>,
+    onToggle: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
+    ) {
+        items(activities, key = { it.id }) { activity ->
+            val selected = activity.id in selectedIds
+            WantActivityRow(
+                activity = activity,
+                selected = selected,
+                onToggle = { onToggle(activity.id) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun WantActivityRow(
+    activity: WantActivity,
+    selected: Boolean,
+    onToggle: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) MaterialTheme.colorScheme.errorContainer
+        else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HabitGlyph(
+                icon = wantIcon(activity.name),
+                hue = 8f,
+                size = 40.dp,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = activity.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (selected) MaterialTheme.colorScheme.onErrorContainer
+                    else MaterialTheme.colorScheme.onSurface,
+                )
+                // Canvas format: "−N pt / unit". Use costPerUnit; floor to 1 if < 1
+                val cost = activity.costPerUnit.toInt().coerceAtLeast(1)
+                Text(
+                    text = "−$cost pt / ${activity.unit}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected) MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.75f)
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            CheckSquare(
+                checked = selected,
+                isError = true,
+                onCheckedChange = onToggle,
+            )
+        }
+    }
+}
+
+// ── Step 4: Sync ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun SyncStepBody(
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 96.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = onSignIn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) {
+                    Text(
+                        text = "Continue with email",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onSignIn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Continue with Google",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "You can sign in later from Settings. Your data stays on this device until you do.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        )
+    }
+}
+
+// ── Shared: CheckSquare ───────────────────────────────────────────────────────
+
+@Composable
+private fun CheckSquare(
+    checked: Boolean,
+    isError: Boolean,
+    onCheckedChange: () -> Unit,
+) {
+    val fillColor = if (isError) MaterialTheme.colorScheme.error
+    else MaterialTheme.colorScheme.primary
+    val borderColor = if (checked) fillColor
+    else MaterialTheme.colorScheme.outline
+
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (checked) fillColor else MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onCheckedChange),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!checked) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(2.dp, borderColor),
+                modifier = Modifier.fillMaxSize(),
+            ) {}
+        } else {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+// ── Icon helpers ──────────────────────────────────────────────────────────────
+
+private fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
+    "reader" -> Icons.AutoMirrored.Filled.MenuBook
+    "builder", "maker" -> Icons.Default.Forum
+    "athlete" -> Icons.AutoMirrored.Filled.DirectionsRun
+    "writer" -> Icons.Default.Forum
+    "learner" -> Icons.Default.School
+    "minimalist" -> Icons.Default.SelfImprovement
+    "devotee", "calm" -> Icons.Default.SelfImprovement
+    "health-conscious", "healthy" -> Icons.Default.WaterDrop
+    "sleeper" -> Icons.Default.Bedtime
+    "parent" -> Icons.Default.Forum
+    else -> Icons.Default.CheckCircle
+}
+
+private fun habitIcon(name: String): ImageVector = when {
+    name.contains("read", ignoreCase = true) -> Icons.AutoMirrored.Filled.MenuBook
+    name.contains("water", ignoreCase = true) || name.contains("drink", ignoreCase = true) -> Icons.Default.WaterDrop
+    name.contains("sleep", ignoreCase = true) || name.contains("bedtime", ignoreCase = true) -> Icons.Default.Bedtime
+    name.contains("run", ignoreCase = true) || name.contains("walk", ignoreCase = true) ||
+        name.contains("cycl", ignoreCase = true) || name.contains("push", ignoreCase = true) ||
+        name.contains("squat", ignoreCase = true) || name.contains("plank", ignoreCase = true) ||
+        name.contains("stretch", ignoreCase = true) -> Icons.AutoMirrored.Filled.DirectionsRun
+    name.contains("meditat", ignoreCase = true) || name.contains("pray", ignoreCase = true) -> Icons.Default.SelfImprovement
+    name.contains("school", ignoreCase = true) || name.contains("course", ignoreCase = true) ||
+        name.contains("flash", ignoreCase = true) || name.contains("language", ignoreCase = true) ||
+        name.contains("learn", ignoreCase = true) -> Icons.Default.School
+    name.contains("video", ignoreCase = true) -> Icons.Default.SmartDisplay
+    else -> Icons.Default.CheckCircle
+}
+
+private fun wantIcon(name: String): ImageVector = when {
+    name.contains("twitter", ignoreCase = true) || name.contains("/x", ignoreCase = true) -> Icons.Default.ChatBubble
+    name.contains("instagram", ignoreCase = true) -> Icons.Default.PhotoCamera
+    name.contains("tiktok", ignoreCase = true) || name.contains("scroll", ignoreCase = true) || name.contains("reel", ignoreCase = true) || name.contains("short", ignoreCase = true) -> Icons.Default.PlayCircle
+    name.contains("youtube", ignoreCase = true) -> Icons.Default.SmartDisplay
+    name.contains("netflix", ignoreCase = true) || name.contains("stream", ignoreCase = true) -> Icons.Default.SmartDisplay
+    name.contains("reddit", ignoreCase = true) -> Icons.Default.Forum
+    name.contains("game", ignoreCase = true) || name.contains("valorant", ignoreCase = true) || name.contains("pc gaming", ignoreCase = true) -> Icons.Default.SportsEsports
+    name.contains("snack", ignoreCase = true) || name.contains("food", ignoreCase = true) || name.contains("junk", ignoreCase = true) || name.contains("donut", ignoreCase = true) || name.contains("dessert", ignoreCase = true) -> Icons.Default.Restaurant
+    name.contains("smoke", ignoreCase = true) || name.contains("smoking", ignoreCase = true) -> Icons.Default.SmokingRooms
+    name.contains("shop", ignoreCase = true) || name.contains("purchase", ignoreCase = true) -> Icons.Default.Restaurant
+    name.contains("drink", ignoreCase = true) || name.contains("sugary", ignoreCase = true) -> Icons.Default.Restaurant
+    else -> Icons.Default.MoreHoriz
 }
