@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.HabitTemplate
 import com.habittracker.domain.model.Identity
+import com.habittracker.domain.model.TemplateWithIdentities
 import com.habittracker.domain.model.WantActivity
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
@@ -151,13 +152,21 @@ fun OnboardingScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (currentStep == OnboardingStep.IDENTITY) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Pick 1–4 to start. You can add more later.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
         bottomBar = {
             OnboardingBottomBar(
                 step = currentStep,
                 primaryEnabled = when (currentStep) {
-                    OnboardingStep.IDENTITY -> uiState.selectedIdentityId != null
+                    OnboardingStep.IDENTITY -> uiState.selectedIdentityIds.isNotEmpty()
                     else -> true
                 },
                 isLoading = uiState.isLoading,
@@ -183,8 +192,8 @@ fun OnboardingScreen(
         when (currentStep) {
             OnboardingStep.IDENTITY -> IdentityStepBody(
                 identities = uiState.identities,
-                selectedId = uiState.selectedIdentityId,
-                onSelect = viewModel::selectIdentity,
+                selectedIds = uiState.selectedIdentityIds,
+                onToggle = viewModel::toggleIdentity,
                 modifier = Modifier.padding(innerPadding),
             )
             OnboardingStep.HABITS -> HabitsStepBody(
@@ -264,15 +273,13 @@ private fun OnboardingBottomBar(
 @Composable
 private fun IdentityStepBody(
     identities: List<Identity>,
-    selectedId: String?,
-    onSelect: (String) -> Unit,
+    selectedIds: Set<String>,
+    onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
+        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
@@ -280,8 +287,8 @@ private fun IdentityStepBody(
         items(identities, key = { it.id }) { identity ->
             IdentityGridCell(
                 identity = identity,
-                selected = identity.id == selectedId,
-                onSelect = { onSelect(identity.id) },
+                selected = identity.id in selectedIds,
+                onSelect = { onToggle(identity.id) },
             )
         }
     }
@@ -358,7 +365,7 @@ private fun IdentityGridCell(
 
 @Composable
 private fun HabitsStepBody(
-    templates: List<HabitTemplate>,
+    templates: List<TemplateWithIdentities>,
     selectedIds: Set<String>,
     onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -370,12 +377,13 @@ private fun HabitsStepBody(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
     ) {
-        items(templates, key = { it.id }) { template ->
-            val selected = template.id in selectedIds
+        items(templates, key = { it.template.id }) { row ->
+            val selected = row.template.id in selectedIds
             HabitTemplateRow(
-                template = template,
+                template = row.template,
+                recommendedBy = row.recommendedBy,
                 selected = selected,
-                onToggle = { onToggle(template.id) },
+                onToggle = { onToggle(row.template.id) },
             )
         }
     }
@@ -384,6 +392,7 @@ private fun HabitsStepBody(
 @Composable
 private fun HabitTemplateRow(
     template: HabitTemplate,
+    recommendedBy: Set<Identity>,
     selected: Boolean,
     onToggle: () -> Unit,
 ) {
@@ -424,6 +433,14 @@ private fun HabitTemplateRow(
                     color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (recommendedBy.size > 1) {
+                    Text(
+                        text = "Recommended by: ${recommendedBy.joinToString(" · ") { it.name }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
             CheckSquare(
                 checked = selected,
