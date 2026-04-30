@@ -21,8 +21,11 @@ import com.habittracker.data.sync.SyncEngine
 import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.ComputeStreakUseCase
-import com.habittracker.domain.usecase.GetHabitTemplatesForIdentityUseCase
+import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
+import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
+import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
+import com.habittracker.domain.usecase.SetupUserIdentitiesUseCase
 import com.habittracker.domain.usecase.IsOnboardedUseCase
 import com.habittracker.domain.usecase.LogHabitUseCase
 import com.habittracker.domain.usecase.LogWantUseCase
@@ -98,7 +101,10 @@ class AppContainer(context: Context) {
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
     val isOnboardedUseCase = IsOnboardedUseCase(habitRepository)
-    val getHabitTemplatesForIdentityUseCase = GetHabitTemplatesForIdentityUseCase()
+    val getUserIdentitiesUseCase = GetUserIdentitiesUseCase(identityRepository)
+    val setupUserIdentitiesUseCase = SetupUserIdentitiesUseCase(identityRepository)
+    val getHabitTemplatesForIdentitiesUseCase = GetHabitTemplatesForIdentitiesUseCase()
+    val linkOnboardingHabitsToIdentitiesUseCase = LinkOnboardingHabitsToIdentitiesUseCase(identityRepository)
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
     val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
 
@@ -158,6 +164,10 @@ class AppContainer(context: Context) {
 
     suspend fun clearAuthenticatedUserData(authUserId: String) {
         db.habitTrackerDatabaseQueries.transaction {
+            // Identity tables first — habit_identities subquery references LocalHabit.userId,
+            // so it must run before LocalHabit rows are deleted.
+            db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(authUserId)
+            db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearHabitsForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearHabitLogsForUser(authUserId)
             db.habitTrackerDatabaseQueries.clearWantLogsForUser(authUserId)
