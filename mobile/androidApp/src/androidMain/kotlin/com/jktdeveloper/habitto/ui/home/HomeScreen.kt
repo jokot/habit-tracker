@@ -73,6 +73,7 @@ import com.habittracker.domain.model.WantActivity
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.IdentityStrip
 import com.jktdeveloper.habitto.ui.components.SyncChip
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.jktdeveloper.habitto.ui.theme.InterFontFamily
@@ -174,6 +175,12 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
             ) {
+
+                // ── Identity strip ────────────────────────────────────────────
+                item {
+                    val identities by viewModel.userIdentities.collectAsState()
+                    IdentityStrip(identities = identities)
+                }
 
                 // ── DailyStatusCard ───────────────────────────────────────────
                 item {

@@ -9,6 +9,7 @@ import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
+import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.usecase.InsufficientPointsException
@@ -19,12 +20,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -86,6 +89,10 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _logoutUnsyncedCount = MutableStateFlow(0)
     val logoutUnsyncedCount: StateFlow<Int> = _logoutUnsyncedCount.asStateFlow()
+
+    val userIdentities: StateFlow<List<Identity>> =
+        container.getUserIdentitiesUseCase.execute(container.currentUserId())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** habitId → pending tap batch. Drops to empty on commit or cancel. */
     private val _pending = MutableStateFlow<Map<String, PendingHabitLog>>(emptyMap())
