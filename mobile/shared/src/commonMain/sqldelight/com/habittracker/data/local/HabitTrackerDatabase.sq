@@ -39,6 +39,24 @@ CREATE TABLE IF NOT EXISTS LocalIdentity (
     icon TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS LocalUserIdentity (
+    userId TEXT NOT NULL,
+    identityId TEXT NOT NULL,
+    addedAt INTEGER NOT NULL,
+    syncedAt INTEGER,
+    PRIMARY KEY (userId, identityId)
+);
+
+CREATE TABLE IF NOT EXISTS LocalHabitIdentity (
+    habitId TEXT NOT NULL,
+    identityId TEXT NOT NULL,
+    addedAt INTEGER NOT NULL,
+    syncedAt INTEGER,
+    PRIMARY KEY (habitId, identityId)
+);
+
+CREATE INDEX IF NOT EXISTS idx_habit_identity_identity ON LocalHabitIdentity(identityId);
+
 CREATE TABLE IF NOT EXISTS LocalWantActivity (
     id TEXT NOT NULL PRIMARY KEY,
     userId TEXT,
@@ -195,3 +213,61 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 mergePulledWantActivity:
 INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- LocalUserIdentity queries
+upsertUserIdentity:
+INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt)
+VALUES (?, ?, ?, NULL);
+
+mergePulledUserIdentity:
+INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt)
+VALUES (?, ?, ?, ?);
+
+getUserIdentities:
+SELECT * FROM LocalUserIdentity WHERE userId = ? ORDER BY addedAt ASC;
+
+deleteUserIdentity:
+DELETE FROM LocalUserIdentity WHERE userId = ? AND identityId = ?;
+
+deleteAllUserIdentitiesForUser:
+DELETE FROM LocalUserIdentity WHERE userId = ?;
+
+getUnsyncedUserIdentitiesForUser:
+SELECT * FROM LocalUserIdentity WHERE userId = ? AND syncedAt IS NULL;
+
+markUserIdentitySynced:
+UPDATE LocalUserIdentity SET syncedAt = ? WHERE userId = ? AND identityId = ?;
+
+-- LocalHabitIdentity queries
+upsertHabitIdentity:
+INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt)
+VALUES (?, ?, ?, NULL);
+
+mergePulledHabitIdentity:
+INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt)
+VALUES (?, ?, ?, ?);
+
+getHabitIdentities:
+SELECT * FROM LocalHabitIdentity WHERE habitId = ? ORDER BY addedAt ASC;
+
+deleteHabitIdentitiesForHabit:
+DELETE FROM LocalHabitIdentity WHERE habitId = ?;
+
+clearHabitIdentitiesForUser:
+DELETE FROM LocalHabitIdentity
+WHERE habitId IN (SELECT id FROM LocalHabit WHERE userId = ?);
+
+getUnsyncedHabitIdentitiesForUser:
+SELECT li.*
+FROM LocalHabitIdentity li
+INNER JOIN LocalHabit h ON h.id = li.habitId
+WHERE h.userId = ? AND li.syncedAt IS NULL;
+
+markHabitIdentitySynced:
+UPDATE LocalHabitIdentity SET syncedAt = ? WHERE habitId = ? AND identityId = ?;
+
+getHabitsForIdentity:
+SELECT h.*
+FROM LocalHabit h
+INNER JOIN LocalHabitIdentity li ON li.habitId = h.id
+WHERE h.userId = ? AND li.identityId = ?;
