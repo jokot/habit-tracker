@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Today
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -16,6 +17,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -37,13 +39,14 @@ fun BottomNav(
     currentRoute: String?,
     navController: NavController,
 ) {
+    val barBg = if (isSystemInDarkTheme()) Color(0xFF181816) else Color.White
     Column {
         HorizontalDivider(
             thickness = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant,
         )
         NavigationBar(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = barBg,
         ) {
             NAV_ITEMS.forEach { item ->
             NavigationBarItem(
