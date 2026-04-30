@@ -36,6 +36,11 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object StreakHistory : Screen("streak-history")
     object You : Screen("you")
+    object IdentityList : Screen("identity_list")
+    object IdentityDetail : Screen("identity_detail/{identityId}") {
+        const val ARG_ID = "identityId"
+        fun route(id: String) = "identity_detail/$id"
+    }
 }
 
 @Composable
@@ -201,6 +206,21 @@ fun AppNavigation(container: AppContainer) {
                         }
                     },
                 )
+            }
+
+            composable(Screen.IdentityList.route) {
+                androidx.compose.material3.Text("IdentityList placeholder")
+            }
+
+            composable(
+                route = Screen.IdentityDetail.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.IdentityDetail.ARG_ID) {
+                        type = androidx.navigation.NavType.StringType
+                    },
+                ),
+            ) {
+                androidx.compose.material3.Text("IdentityDetail placeholder")
             }
         }
     }
