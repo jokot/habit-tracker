@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,7 @@ fun IdentitySparkline(heat: List<Int>, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(3.dp))
                     .background(heatColor(level, isDark)),
             )
