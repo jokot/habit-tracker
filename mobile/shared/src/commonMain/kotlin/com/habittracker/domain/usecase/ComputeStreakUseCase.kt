@@ -173,22 +173,6 @@ class ComputeStreakUseCase(
         else -> 4
     }
 
-    @Suppress("unused") // retained as reference; old distinct-count formula
-    private fun heatBucket(distinct: Int, totalHabits: Int): Int {
-        if (totalHabits == 0) return 0
-        val ratio = distinct.toDouble() / totalHabits
-        return when {
-            ratio <= 0.0 -> 0
-            ratio <= 0.25 -> 1
-            ratio <= 0.5 -> 2
-            ratio <= 0.75 -> 3
-            else -> 4
-        }
-    }
-
-    private fun distinctOnDay(logs: List<HabitLog>, date: LocalDate): Int =
-        logs.filter { sameLocalDate(date, it.loggedAt) }.distinctBy { it.habitId }.size
-
     private fun sameLocalDate(date: LocalDate, instant: Instant): Boolean =
         instant.toLocalDate() == date
 
