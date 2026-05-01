@@ -3,7 +3,6 @@ package com.jktdeveloper.habitto.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,12 +45,13 @@ fun IdentityHubCard(identities: List<Identity>, onClick: () -> Unit) {
     val gradEnd = MaterialTheme.colorScheme.surface
 
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Box(
             modifier = Modifier.background(

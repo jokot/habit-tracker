@@ -118,12 +118,13 @@ private fun IdentityCard(iws: IdentityWithStats, onClick: () -> Unit) {
     val gradEnd = MaterialTheme.colorScheme.surface
 
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
+            .padding(horizontal = 16.dp),
     ) {
         Box(
             modifier = Modifier.background(
