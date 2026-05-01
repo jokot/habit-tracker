@@ -1,7 +1,6 @@
 package com.jktdeveloper.habitto.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -20,10 +19,10 @@ import com.habittracker.domain.model.Identity
 @Composable
 fun IdentityChip(identity: Identity, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
@@ -48,10 +47,10 @@ fun IdentityChip(identity: Identity, onClick: () -> Unit) {
 @Composable
 fun IdentityMorePill(extraCount: Int, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Text(
             text = "+$extraCount more",
