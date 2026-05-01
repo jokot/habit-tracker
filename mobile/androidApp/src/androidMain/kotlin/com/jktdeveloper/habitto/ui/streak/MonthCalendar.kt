@@ -164,6 +164,10 @@ private fun DayCell(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // Intentionally no text label per design (cells are colour-only heat map)
+        when (appearance.overlay) {
+            OverlayKind.FROZEN -> FrozenOverlay(appearance.overlayColor)
+            OverlayKind.BROKEN -> BrokenOverlay(appearance.overlayColor)
+            OverlayKind.NONE -> Unit
+        }
     }
 }

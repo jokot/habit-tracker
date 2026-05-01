@@ -20,8 +20,12 @@ import com.jktdeveloper.habitto.ui.theme.HeatL3Dark
 import com.jktdeveloper.habitto.ui.theme.HeatL4
 import com.jktdeveloper.habitto.ui.theme.HeatL4Dark
 import com.jktdeveloper.habitto.ui.theme.StreakBroken
+import com.jktdeveloper.habitto.ui.theme.StreakBrokenBg
+import com.jktdeveloper.habitto.ui.theme.StreakBrokenBgDark
 import com.jktdeveloper.habitto.ui.theme.StreakBrokenDark
 import com.jktdeveloper.habitto.ui.theme.StreakFrozen
+import com.jktdeveloper.habitto.ui.theme.StreakFrozenBg
+import com.jktdeveloper.habitto.ui.theme.StreakFrozenBgDark
 import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
 
 data class CellAppearance(
@@ -30,7 +34,13 @@ data class CellAppearance(
     val ringWidth: Dp,
     val alpha: Float,
     val border: Color,
+    /** Per canvas tokens.css spec: FROZEN = X overlay, BROKEN = horizontal dash, else null. */
+    val overlay: OverlayKind = OverlayKind.NONE,
+    /** Stroke color for the overlay (cyan for frozen, red for broken). */
+    val overlayColor: Color = Color.Transparent,
 )
+
+enum class OverlayKind { NONE, FROZEN, BROKEN }
 
 @Composable
 fun resolveCellAppearance(day: StreakDay, isDark: Boolean): CellAppearance {
@@ -42,18 +52,22 @@ fun resolveCellAppearance(day: StreakDay, isDark: Boolean): CellAppearance {
     val border = if (isDark) HeatCellBorderDark else HeatCellBorder
     return when (day.state) {
         StreakDayState.FROZEN -> CellAppearance(
-            fill = if (isDark) StreakFrozenDark else StreakFrozen,
-            ringColor = null,
-            ringWidth = 0.dp,
+            fill = if (isDark) StreakFrozenBgDark else StreakFrozenBg,
+            ringColor = if (isDark) StreakFrozenDark else StreakFrozen,
+            ringWidth = 1.dp,
             alpha = 1f,
             border = border,
+            overlay = OverlayKind.FROZEN,
+            overlayColor = if (isDark) StreakFrozenDark else StreakFrozen,
         )
         StreakDayState.BROKEN -> CellAppearance(
-            fill = if (isDark) StreakBrokenDark else StreakBroken,
-            ringColor = null,
-            ringWidth = 0.dp,
+            fill = if (isDark) StreakBrokenBgDark else StreakBrokenBg,
+            ringColor = if (isDark) StreakBrokenDark else StreakBroken,
+            ringWidth = 1.dp,
             alpha = 1f,
             border = border,
+            overlay = OverlayKind.BROKEN,
+            overlayColor = if (isDark) StreakBrokenDark else StreakBroken,
         )
         StreakDayState.TODAY_PENDING -> CellAppearance(
             fill = heatColors[0],
