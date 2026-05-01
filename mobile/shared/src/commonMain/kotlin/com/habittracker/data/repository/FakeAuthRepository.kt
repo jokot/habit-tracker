@@ -6,6 +6,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class FakeAuthRepository(
     private val shouldFailAuth: Boolean = false,
+    var refreshSucceeds: Boolean = true,
 ) : AuthRepository {
 
     private var session: UserSession? = null
@@ -40,6 +41,12 @@ class FakeAuthRepository(
     override suspend fun signOut(): Result<Unit> {
         session = null
         return Result.success(Unit)
+    }
+
+    override suspend fun tryRefreshSession(): Result<Unit> {
+        if (session == null) return Result.failure(IllegalStateException("No session"))
+        return if (refreshSucceeds) Result.success(Unit)
+        else Result.failure(Exception("Refresh failed"))
     }
 
     override fun currentUserId(): String? = session?.userId
