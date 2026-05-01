@@ -87,6 +87,8 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onSignIn: () -> Unit,
     onOpenStreakHistory: () -> Unit,
+    onIdentityClick: (String) -> Unit,
+    onIdentitiesClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
@@ -176,7 +178,11 @@ fun HomeScreen(
                 // ── Identity strip ────────────────────────────────────────────
                 item {
                     val identities by viewModel.userIdentities.collectAsState()
-                    IdentityStrip(identities = identities)
+                    IdentityStrip(
+                        identities = identities,
+                        onChipClick = { onIdentityClick(it.id) },
+                        onMoreClick = onIdentitiesClick,
+                    )
                 }
 
                 // ── DailyStatusCard ───────────────────────────────────────────

@@ -21,11 +21,13 @@ import com.habittracker.data.sync.SyncEngine
 import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.ComputeStreakUseCase
+import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetDayPointsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
 import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
+import com.habittracker.domain.usecase.ObserveUserIdentitiesWithStatsUseCase
 import com.habittracker.domain.usecase.SetupUserIdentitiesUseCase
 import com.habittracker.domain.usecase.IsOnboardedUseCase
 import com.habittracker.domain.usecase.LogHabitUseCase
@@ -108,6 +110,14 @@ class AppContainer(context: Context) {
     val setupUserIdentitiesUseCase = SetupUserIdentitiesUseCase(identityRepository)
     val getHabitTemplatesForIdentitiesUseCase = GetHabitTemplatesForIdentitiesUseCase()
     val linkOnboardingHabitsToIdentitiesUseCase = LinkOnboardingHabitsToIdentitiesUseCase(identityRepository)
+    val computeIdentityStatsUseCase = ComputeIdentityStatsUseCase(
+        habitLogRepo = habitLogRepository,
+        identityRepo = identityRepository,
+    )
+    val observeUserIdentitiesWithStatsUseCase = ObserveUserIdentitiesWithStatsUseCase(
+        identityRepo = identityRepository,
+        statsUseCase = computeIdentityStatsUseCase,
+    )
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
     val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
 

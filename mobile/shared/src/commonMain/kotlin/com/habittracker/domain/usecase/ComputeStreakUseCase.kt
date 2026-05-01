@@ -118,20 +118,60 @@ class ComputeStreakUseCase(
             prev = state
             cursor = cursor.plus(1, DateTimeUnit.DAY)
         }
+        // Pre-compute target sum + per-(day,habit) points for heat bucketing.
+        // Uses CURRENT habit set as denominator. Stale-heat when habits change is deferred
+        // until Habit CRUD ships (per-log target snapshot column or habit-history rows).
+        val targetSum = habits.sumOf { it.dailyTarget }.coerceAtLeast(1)
+        val habitsById = habits.associateBy { it.id }
+        val rawByDayHabit = mutableMapOf<Pair<LocalDate, String>, Int>()
+        pastLogs.forEach { log ->
+            val date = log.loggedAt.toLocalDate()
+            val habit = habitsById[log.habitId] ?: return@forEach
+            val pts = PointCalculator.pointsEarned(log.quantity, habit.thresholdPerPoint)
+            val key = date to log.habitId
+            rawByDayHabit[key] = (rawByDayHabit[key] ?: 0) + pts
+        }
+        val pointsByDay = mutableMapOf<LocalDate, Int>()
+        rawByDayHabit.forEach { (key, pts) ->
+            val (date, habitId) = key
+            val target = habitsById[habitId]?.dailyTarget ?: return@forEach
+            pointsByDay[date] = (pointsByDay[date] ?: 0) + pts.coerceAtMost(target)
+        }
+
         val days = mutableListOf<StreakDay>()
         var d = range.start
         while (d < range.endExclusive) {
             val state = perDay[d] ?: StreakDayState.EMPTY
-            val distinctCount = distinctOnDay(pastLogs, d)
-            // Heatmap is a separate "activity" signal — colored by distinct habits
-            // logged on the day, regardless of whether the day qualifies as strict-COMPLETE.
-            // distinctCount=0 naturally yields heatLevel=0, so days with zero logs are still cold.
-            val heat = if (state == StreakDayState.FUTURE) 0
-                       else heatBucket(distinctCount, habitCount)
+            val allLogged = d in completeDays
+            val heat = if (state == StreakDayState.FUTURE || habitCount == 0) 0
+                       else bucketFor(pointsByDay[d] ?: 0, allLogged, habitCount, targetSum)
             days += StreakDay(d, state, heat)
             d = d.plus(1, DateTimeUnit.DAY)
         }
         return StreakRangeResult(days = days, firstLogDate = firstLogDate)
+    }
+
+    /**
+     * Heat bucket anchored at domain concepts:
+     * - 0: no logs OR partial day (not all habits earned ≥1 point)
+     * - 1: bare minimum (all habits earned ≥1, low effort beyond)
+     * - 2-3: mid range (thirds between bare min and full target)
+     * - 4: full target met (every habit reached its dailyTarget)
+     *
+     * Degenerate case (all habits dailyTarget=1, so bareMin == full): only bucket 0 or 4.
+     */
+    private fun bucketFor(pointsCapped: Int, allLogged: Boolean, bareMin: Int, full: Int): Int {
+        if (pointsCapped == 0 || !allLogged) return 0
+        val span = (full - bareMin).coerceAtLeast(0)
+        val third = span / 3
+        val mid1 = bareMin + third
+        val mid2 = bareMin + 2 * third
+        return when {
+            pointsCapped < mid1 -> 1
+            pointsCapped < mid2 -> 2
+            pointsCapped < full -> 3
+            else -> 4
+        }
     }
 
     /** Strict streak rule: every habit must have at least one log on [date].
@@ -148,21 +188,6 @@ class ComputeStreakUseCase(
             .toSet()
         return habits.all { it.id in loggedHabitIds }
     }
-
-    private fun heatBucket(distinct: Int, totalHabits: Int): Int {
-        if (totalHabits == 0) return 0
-        val ratio = distinct.toDouble() / totalHabits
-        return when {
-            ratio <= 0.0 -> 0
-            ratio <= 0.25 -> 1
-            ratio <= 0.5 -> 2
-            ratio <= 0.75 -> 3
-            else -> 4
-        }
-    }
-
-    private fun distinctOnDay(logs: List<HabitLog>, date: LocalDate): Int =
-        logs.filter { sameLocalDate(date, it.loggedAt) }.distinctBy { it.habitId }.size
 
     private fun sameLocalDate(date: LocalDate, instant: Instant): Boolean =
         instant.toLocalDate() == date

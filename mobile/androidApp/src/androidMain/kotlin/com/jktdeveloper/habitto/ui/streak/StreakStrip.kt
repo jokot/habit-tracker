@@ -332,5 +332,11 @@ internal fun StreakDayCell(
                 }
             }
             .clickable(onClick = onTap),
-    )
+    ) {
+        when (appearance.overlay) {
+            OverlayKind.FROZEN -> FrozenOverlay(appearance.overlayColor)
+            OverlayKind.BROKEN -> BrokenOverlay(appearance.overlayColor)
+            OverlayKind.NONE -> Unit
+        }
+    }
 }

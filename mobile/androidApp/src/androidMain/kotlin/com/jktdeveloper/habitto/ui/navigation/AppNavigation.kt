@@ -36,6 +36,11 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object StreakHistory : Screen("streak-history")
     object You : Screen("you")
+    object IdentityList : Screen("identity_list")
+    object IdentityDetail : Screen("identity_detail/{identityId}") {
+        const val ARG_ID = "identityId"
+        fun route(id: String) = "identity_detail/$id"
+    }
 }
 
 @Composable
@@ -129,6 +134,8 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
+                    onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
+                    onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
                 )
             }
 
@@ -200,6 +207,36 @@ fun AppNavigation(container: AppContainer) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
                     },
+                    onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
+                )
+            }
+
+            composable(Screen.IdentityList.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.identity.IdentityListViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.identity.IdentityListScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
+                )
+            }
+
+            composable(
+                route = Screen.IdentityDetail.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.IdentityDetail.ARG_ID) {
+                        type = androidx.navigation.NavType.StringType
+                    },
+                ),
+            ) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString(Screen.IdentityDetail.ARG_ID) ?: return@composable
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.identity.IdentityDetailViewModel(container, id)
+                }
+                com.jktdeveloper.habitto.ui.identity.IdentityDetailScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
         }

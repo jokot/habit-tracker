@@ -17,8 +17,9 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Identity
 
 @Composable
-fun IdentityChip(identity: Identity) {
+fun IdentityChip(identity: Identity, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -44,8 +45,9 @@ fun IdentityChip(identity: Identity) {
 }
 
 @Composable
-fun IdentityMorePill(extraCount: Int) {
+fun IdentityMorePill(extraCount: Int, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
