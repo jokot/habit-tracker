@@ -8,14 +8,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 
-/** Diagonal X overlay for FROZEN cells (canvas tokens.css spec). */
+/** Diagonal X overlay for FROZEN cells. Smaller / thinner than tokens.css spec
+ *  for better visual weight against pale bg at small cell sizes. */
 @Composable
 fun FrozenOverlay(color: Color) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val pad = minOf(w, h) * 0.15f
-        val stroke = minOf(w, h) * 0.12f
+        val pad = minOf(w, h) * 0.28f
+        val stroke = minOf(w, h) * 0.07f
         drawLine(
             color = color,
             start = Offset(pad, pad),
@@ -39,8 +40,8 @@ fun BrokenOverlay(color: Color) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val length = w * 0.5f
-        val stroke = (h * 0.18f).coerceAtLeast(1.5f)
+        val length = w * 0.4f
+        val stroke = (h * 0.10f).coerceAtLeast(1.5f)
         drawLine(
             color = color,
             start = Offset((w - length) / 2f, h / 2f),
