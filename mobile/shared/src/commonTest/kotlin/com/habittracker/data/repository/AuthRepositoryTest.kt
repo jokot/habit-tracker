@@ -58,4 +58,27 @@ class AuthRepositoryTest {
         val result = repo.signIn("user@example.com", "wrongpassword")
         assertTrue(result.isFailure)
     }
+
+    @Test
+    fun `tryRefreshSession returns failure when no session`() = runTest {
+        val repo = FakeAuthRepository()
+        val result = repo.tryRefreshSession()
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `tryRefreshSession returns success when session active and refreshSucceeds true`() = runTest {
+        val repo = FakeAuthRepository(refreshSucceeds = true)
+        repo.signIn("user@test", "pw")
+        val result = repo.tryRefreshSession()
+        assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun `tryRefreshSession returns failure when refreshSucceeds false`() = runTest {
+        val repo = FakeAuthRepository(refreshSucceeds = false)
+        repo.signIn("user@test", "pw")
+        val result = repo.tryRefreshSession()
+        assertTrue(result.isFailure)
+    }
 }

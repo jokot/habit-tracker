@@ -1,5 +1,6 @@
 package com.jktdeveloper.habitto.ui.navigation
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -74,6 +76,16 @@ fun AppNavigation(container: AppContainer) {
             Screen.Home.route
         } else {
             Screen.Onboarding.route
+        }
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        container.sessionExpiredEvents.collect {
+            Toast.makeText(context, "Session expired — sign in again", Toast.LENGTH_LONG).show()
+            navController.navigate(Screen.Auth.route) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
         }
     }
 

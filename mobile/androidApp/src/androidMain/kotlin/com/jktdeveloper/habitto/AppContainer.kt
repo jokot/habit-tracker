@@ -19,6 +19,7 @@ import com.habittracker.data.sync.PostgrestSupabaseSyncClient
 import com.habittracker.data.sync.SupabaseSyncClient
 import com.habittracker.data.sync.SyncEngine
 import com.habittracker.data.sync.SyncIdentity
+import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.ComputeStreakUseCase
 import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
@@ -40,9 +41,19 @@ import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.habittracker.data.sync.SyncReason
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
 
 /** Observable snapshot of who the app is currently acting as. */
 data class AuthState(val userId: String, val isAuthenticated: Boolean)
@@ -123,6 +134,11 @@ class AppContainer(context: Context) {
 
     private val _authState = MutableStateFlow(snapshotAuthState())
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val sessionExpiredEvents: SharedFlow<Unit> = _sessionExpiredEvents.asSharedFlow()
 
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
@@ -221,11 +237,36 @@ class AppContainer(context: Context) {
         watermarks.reset()
     }
 
+    private fun startSessionGuard() {
+        applicationScope.launch {
+            syncEngine.syncState
+                .filterIsInstance<SyncState.Error>()
+                .filter { it.message == "Session expired" }
+                .distinctUntilChanged()
+                .collect { handleSessionExpired() }
+        }
+    }
+
+    private suspend fun handleSessionExpired() {
+        if (!isAuthenticated()) return
+        val refresh = authRepository.tryRefreshSession()
+        if (refresh.isSuccess) {
+            runCatching { syncEngine.sync(SyncReason.MANUAL) }
+            return
+        }
+        val userId = currentUserId()
+        runCatching { clearAuthenticatedUserData(userId) }
+        runCatching { authRepository.signOut() }
+        refreshAuthState()
+        _sessionExpiredEvents.tryEmit(Unit)
+    }
+
     init {
         // If the DB was wiped due to a schema version bump (dev-only migration path),
         // reset sync watermarks so the next pull fetches everything from the server.
         if (driverFactory.lastCreateWasWipe) {
             watermarks.reset()
         }
+        startSessionGuard()
     }
 }
