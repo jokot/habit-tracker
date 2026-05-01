@@ -258,8 +258,11 @@ class ComputeStreakUseCaseTest {
     }
 
     @Test
-    fun `heatLevel scales with distinct habits logged`() = runTest {
-        // 4 habits total: log 1 (L1 = 0.25), 2 (L2 = 0.5), 3 (L3 = 0.75), 4 (L4 = 1.0)
+    fun `heatLevel anchored at streak rule — partial days bucket 0, full day bucket 4`() = runTest {
+        // 4 habits, each dailyTarget=1, threshold=1. Strict bucket formula:
+        //   bareMin = habitCount = 4, full = targetSum = 4, span = 0 → only buckets 0 or 4.
+        //   Partial day (some habits logged, not all) → bucket 0 (below streak floor).
+        //   Full day (all 4 logged) → bucket 4 (target met).
         val d1 = today.minusDays(4)
         val d2 = today.minusDays(3)
         val d3 = today.minusDays(2)
@@ -274,10 +277,10 @@ class ComputeStreakUseCaseTest {
         val range = DateRange(d1, today.plusDays(1))
         val result = uc.computeNow(userId, range)
         val byDate = result.days.associateBy { it.date }
-        assertEquals(1, byDate[d1]?.heatLevel) // 1/4 = 0.25 → L1
-        assertEquals(2, byDate[d2]?.heatLevel) // 2/4 = 0.5  → L2
-        assertEquals(3, byDate[d3]?.heatLevel) // 3/4 = 0.75 → L3
-        assertEquals(4, byDate[d4]?.heatLevel) // 4/4 = 1.0  → L4
+        assertEquals(0, byDate[d1]?.heatLevel) // 1/4 logged → partial → bucket 0
+        assertEquals(0, byDate[d2]?.heatLevel) // 2/4 logged → partial → bucket 0
+        assertEquals(0, byDate[d3]?.heatLevel) // 3/4 logged → partial → bucket 0
+        assertEquals(4, byDate[d4]?.heatLevel) // 4/4 logged → full → bucket 4
     }
 
     @Test

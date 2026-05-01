@@ -92,7 +92,7 @@ class ComputeIdentityStatsUseCaseTest {
             repo.seedHabit(it)
             repo.linkHabitToIdentities(it.id, setOf(identityId))
         }
-        // Log h1 + h2 today (each meets dailyTarget=1) → 2 of 4 targets met → ratio 0.5 → bucket 2
+        // Partial day (only 2 of 4 habits logged) → bucket 0 (below streak floor)
         val logs = listOf(makeLog("h1", today), makeLog("h2", today))
         val sut = ComputeIdentityStatsUseCase(
             habitLogRepo = AllLogsRepo(logs),
@@ -101,7 +101,28 @@ class ComputeIdentityStatsUseCaseTest {
             clock = IdentityStatsFixedClock(today),
         )
         val out = sut.computeNow(userId, identityId)
-        assertEquals(2, out.last14Heat.last())
+        assertEquals(0, out.last14Heat.last())
+    }
+
+    @Test
+    fun allHabitsLoggedYieldsBucketFourWhenAllTargetsOne() = runTest {
+        // 4 habits, each dailyTarget=1. bareMin == full == 4.
+        // All logged once → pointsCapped = 4, pointsCapped >= full → bucket 4.
+        val repo = FakeIdentityRepository(seed = listOf(seedIdentity))
+        val habits = (1..4).map { makeHabit("h$it") }
+        habits.forEach {
+            repo.seedHabit(it)
+            repo.linkHabitToIdentities(it.id, setOf(identityId))
+        }
+        val logs = habits.map { makeLog(it.id, today) }
+        val sut = ComputeIdentityStatsUseCase(
+            habitLogRepo = AllLogsRepo(logs),
+            identityRepo = repo,
+            timeZone = tz,
+            clock = IdentityStatsFixedClock(today),
+        )
+        val out = sut.computeNow(userId, identityId)
+        assertEquals(4, out.last14Heat.last())
     }
 
     @Test

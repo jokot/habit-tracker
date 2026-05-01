@@ -142,12 +142,36 @@ class ComputeStreakUseCase(
         var d = range.start
         while (d < range.endExclusive) {
             val state = perDay[d] ?: StreakDayState.EMPTY
+            val allLogged = d in completeDays
             val heat = if (state == StreakDayState.FUTURE || habitCount == 0) 0
-                       else heatBucketFromRatio((pointsByDay[d] ?: 0).toDouble() / targetSum)
+                       else bucketFor(pointsByDay[d] ?: 0, allLogged, habitCount, targetSum)
             days += StreakDay(d, state, heat)
             d = d.plus(1, DateTimeUnit.DAY)
         }
         return StreakRangeResult(days = days, firstLogDate = firstLogDate)
+    }
+
+    /**
+     * Heat bucket anchored at domain concepts:
+     * - 0: no logs OR partial day (not all habits earned ≥1 point)
+     * - 1: bare minimum (all habits earned ≥1, low effort beyond)
+     * - 2-3: mid range (thirds between bare min and full target)
+     * - 4: full target met (every habit reached its dailyTarget)
+     *
+     * Degenerate case (all habits dailyTarget=1, so bareMin == full): only bucket 0 or 4.
+     */
+    private fun bucketFor(pointsCapped: Int, allLogged: Boolean, bareMin: Int, full: Int): Int {
+        if (pointsCapped == 0 || !allLogged) return 0
+        val span = (full - bareMin).coerceAtLeast(0)
+        val third = span / 3
+        val mid1 = bareMin + third
+        val mid2 = bareMin + 2 * third
+        return when {
+            pointsCapped < mid1 -> 1
+            pointsCapped < mid2 -> 2
+            pointsCapped < full -> 3
+            else -> 4
+        }
     }
 
     /** Strict streak rule: every habit must have at least one log on [date].
@@ -163,14 +187,6 @@ class ComputeStreakUseCase(
             .map { it.habitId }
             .toSet()
         return habits.all { it.id in loggedHabitIds }
-    }
-
-    private fun heatBucketFromRatio(ratio: Double): Int = when {
-        ratio <= 0.0 -> 0
-        ratio <= 0.25 -> 1
-        ratio <= 0.5 -> 2
-        ratio <= 0.75 -> 3
-        else -> 4
     }
 
     private fun sameLocalDate(date: LocalDate, instant: Instant): Boolean =

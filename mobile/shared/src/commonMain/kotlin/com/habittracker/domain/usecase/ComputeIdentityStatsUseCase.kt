@@ -62,8 +62,8 @@ class ComputeIdentityStatsUseCase(
 
         val streak = computeStreak(today, habitIds, loggedHabitsByDay)
         val daysActive = loggedHabitsByDay.keys.count { it <= today }
-        val last14 = buildHeatList(today, 14, pointsByDay, targetSum)
-        val last90 = buildHeatList(today, 90, pointsByDay, targetSum)
+        val last14 = buildHeatList(today, 14, pointsByDay, loggedHabitsByDay, habits)
+        val last90 = buildHeatList(today, 90, pointsByDay, loggedHabitsByDay, habits)
 
         return IdentityStats(
             identityId = identityId,
@@ -90,23 +90,45 @@ class ComputeIdentityStatsUseCase(
         return run
     }
 
-    private fun buildHeatList(today: LocalDate, length: Int, pointsByDay: Map<LocalDate, Int>, targetSum: Int): List<Int> {
+    private fun buildHeatList(
+        today: LocalDate,
+        length: Int,
+        pointsByDay: Map<LocalDate, Int>,
+        loggedHabitsByDay: Map<LocalDate, Set<String>>,
+        habits: List<Habit>,
+    ): List<Int> {
+        val bareMin = habits.size
+        val full = habits.sumOf { it.dailyTarget }
         val list = ArrayList<Int>(length)
         var cursor = today.minus(length - 1, DateTimeUnit.DAY)
         while (list.size < length) {
             val pts = pointsByDay[cursor] ?: 0
-            val ratio = pts.toDouble() / targetSum
-            list += heatBucket(ratio)
+            val logged = loggedHabitsByDay[cursor]?.size ?: 0
+            val allLogged = logged == habits.size
+            list += bucketFor(pts, allLogged, bareMin, full)
             cursor = cursor.plus(1, DateTimeUnit.DAY)
         }
         return list
     }
 
-    private fun heatBucket(ratio: Double): Int = when {
-        ratio <= 0.0 -> 0
-        ratio <= 0.25 -> 1
-        ratio <= 0.5 -> 2
-        ratio <= 0.75 -> 3
-        else -> 4
+    /**
+     * Heat bucket anchored at domain concepts:
+     * - 0: no logs OR partial day
+     * - 1: bare minimum (all habits earned ≥1)
+     * - 2-3: thirds between bare min and full target
+     * - 4: full target met
+     */
+    private fun bucketFor(pointsCapped: Int, allLogged: Boolean, bareMin: Int, full: Int): Int {
+        if (pointsCapped == 0 || !allLogged) return 0
+        val span = (full - bareMin).coerceAtLeast(0)
+        val third = span / 3
+        val mid1 = bareMin + third
+        val mid2 = bareMin + 2 * third
+        return when {
+            pointsCapped < mid1 -> 1
+            pointsCapped < mid2 -> 2
+            pointsCapped < full -> 3
+            else -> 4
+        }
     }
 }
