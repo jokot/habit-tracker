@@ -30,9 +30,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import com.jktdeveloper.habitto.util.dayBoundaryFlow
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
@@ -116,79 +117,79 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             container.authState
                 .flatMapLatest { auth ->
-                    val userId = auth.userId
-                    val now = Clock.System.now()
-                    val todayDate = now.toLocalDateTime(TimeZone.UTC).date
-                    val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
-                    val dayEnd = dayStart + 1.days
-                    val weekStart = weekStartUtc()
+                    dayBoundaryFlow().flatMapLatest { todayDate ->
+                        val userId = auth.userId
+                        val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
+                        val dayEnd = dayStart + 1.days
+                        val weekStart = weekStartUtcFor(todayDate)
 
-                    combine(
-                        container.habitRepository.observeHabitsForUser(userId),
-                        container.habitLogRepository.observeAllActiveLogsForUser(userId),
-                        container.wantActivityRepository.observeWantActivities(userId),
-                        container.wantLogRepository.observeAllActiveLogsForUser(userId),
-                    ) { habits, habitLogs, wants, wantLogs ->
-                        val habitsById = habits.associateBy { it.id }
-                        val habitsWithProgress = habits.map { habit ->
-                            val pointsToday = habitLogs
-                                .filter {
-                                    it.habitId == habit.id && it.loggedAt >= dayStart && it.loggedAt < dayEnd
+                        combine(
+                            container.habitRepository.observeHabitsForUser(userId),
+                            container.habitLogRepository.observeAllActiveLogsForUser(userId),
+                            container.wantActivityRepository.observeWantActivities(userId),
+                            container.wantLogRepository.observeAllActiveLogsForUser(userId),
+                        ) { habits, habitLogs, wants, wantLogs ->
+                            val habitsById = habits.associateBy { it.id }
+                            val habitsWithProgress = habits.map { habit ->
+                                val pointsToday = habitLogs
+                                    .filter {
+                                        it.habitId == habit.id && it.loggedAt >= dayStart && it.loggedAt < dayEnd
+                                    }
+                                    .sumOf {
+                                        PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                    }
+                                HabitWithProgress(habit, pointsToday)
+                            }
+
+                            val earned = habitLogs
+                                .filter { it.loggedAt >= weekStart }
+                                .groupBy { log ->
+                                    log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date
                                 }
-                                .sumOf {
-                                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                .entries.sumOf { (key, dayLogs) ->
+                                    val habit = habitsById[key.first] ?: return@sumOf 0
+                                    dayLogs.sumOf {
+                                        PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                    }.coerceAtMost(habit.dailyTarget)
                                 }
-                            HabitWithProgress(habit, pointsToday)
+                            val spent = wantLogs
+                                .filter { it.loggedAt >= weekStart }
+                                .sumOf { log ->
+                                    wants.firstOrNull { it.id == log.activityId }?.let {
+                                        PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
+                                    } ?: 0
+                                }
+                            val earnedToday = habitLogs
+                                .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
+                                .groupBy { it.habitId }
+                                .entries.sumOf { (habitId, dayLogs) ->
+                                    val habit = habitsById[habitId] ?: return@sumOf 0
+                                    dayLogs.sumOf {
+                                        PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
+                                    }.coerceAtMost(habit.dailyTarget)
+                                }
+                            val spentToday = wantLogs
+                                .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
+                                .sumOf { log ->
+                                    wants.firstOrNull { it.id == log.activityId }?.let {
+                                        PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
+                                    } ?: 0
+                                }
+
+                            HomeUiState(
+                                habitsWithProgress = habitsWithProgress,
+                                pointBalance = PointBalance(
+                                    earned = earned,
+                                    spent = spent,
+                                    balance = maxOf(0, earned - spent),
+                                    earnedToday = earnedToday,
+                                    spentToday = spentToday,
+                                ),
+                                wantActivities = wants,
+                                isAuthenticated = auth.isAuthenticated,
+                                isLoading = false,
+                            )
                         }
-
-                        val earned = habitLogs
-                            .filter { it.loggedAt >= weekStart }
-                            .groupBy { log ->
-                                log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date
-                            }
-                            .entries.sumOf { (key, dayLogs) ->
-                                val habit = habitsById[key.first] ?: return@sumOf 0
-                                dayLogs.sumOf {
-                                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
-                                }.coerceAtMost(habit.dailyTarget)
-                            }
-                        val spent = wantLogs
-                            .filter { it.loggedAt >= weekStart }
-                            .sumOf { log ->
-                                wants.firstOrNull { it.id == log.activityId }?.let {
-                                    PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
-                                } ?: 0
-                            }
-                        val earnedToday = habitLogs
-                            .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
-                            .groupBy { it.habitId }
-                            .entries.sumOf { (habitId, dayLogs) ->
-                                val habit = habitsById[habitId] ?: return@sumOf 0
-                                dayLogs.sumOf {
-                                    PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)
-                                }.coerceAtMost(habit.dailyTarget)
-                            }
-                        val spentToday = wantLogs
-                            .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
-                            .sumOf { log ->
-                                wants.firstOrNull { it.id == log.activityId }?.let {
-                                    PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
-                                } ?: 0
-                            }
-
-                        HomeUiState(
-                            habitsWithProgress = habitsWithProgress,
-                            pointBalance = PointBalance(
-                                earned = earned,
-                                spent = spent,
-                                balance = maxOf(0, earned - spent),
-                                earnedToday = earnedToday,
-                                spentToday = spentToday,
-                            ),
-                            wantActivities = wants,
-                            isAuthenticated = auth.isAuthenticated,
-                            isLoading = false,
-                        )
                     }
                 }
                 .collect { _uiState.value = it }
@@ -200,14 +201,14 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             container.authState
                 .flatMapLatest { auth ->
-                    val tz = TimeZone.currentSystemDefault()
-                    val today = Clock.System.now().toLocalDateTime(tz).date
-                    val start = today.minus(6, DateTimeUnit.DAY)
-                    val range = com.habittracker.domain.model.DateRange(
-                        start = start,
-                        endExclusive = today.plus(1, DateTimeUnit.DAY),
-                    )
-                    container.computeStreakUseCase.observeRange(auth.userId, range)
+                    dayBoundaryFlow().flatMapLatest { today ->
+                        val start = today.minus(6, DateTimeUnit.DAY)
+                        val range = com.habittracker.domain.model.DateRange(
+                            start = start,
+                            endExclusive = today.plus(1, DateTimeUnit.DAY),
+                        )
+                        container.computeStreakUseCase.observeRange(auth.userId, range)
+                    }
                 }
                 .collect { _streakStrip.value = it }
         }
@@ -392,10 +393,8 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     }
 }
 
-private fun weekStartUtc(): Instant {
-    val now = Clock.System.now()
-    val localDate = now.toLocalDateTime(TimeZone.UTC).date
-    val daysFromMonday = localDate.dayOfWeek.ordinal
-    val monday = localDate.minus(daysFromMonday, DateTimeUnit.DAY)
+private fun weekStartUtcFor(today: LocalDate): Instant {
+    val daysFromMonday = today.dayOfWeek.ordinal
+    val monday = today.minus(daysFromMonday, DateTimeUnit.DAY)
     return monday.atStartOfDayIn(TimeZone.UTC)
 }
