@@ -1,17 +1,13 @@
 package com.jktdeveloper.habitto.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDayState
 
@@ -21,7 +17,8 @@ import com.habittracker.domain.model.StreakDayState
  * constraint). Uses Column-of-Rows so width is bounded by parent and height is
  * determined by row count × cell aspect ratio.
  *
- * Each cell colors via state when state is FROZEN/BROKEN, else heat bucket.
+ * Each cell renders via `HeatCell`: state coloring (FROZEN ice / BROKEN red) per
+ * canvas tokens.css spec, otherwise heat bucket color.
  */
 @Composable
 fun IdentityHeatGrid(
@@ -30,7 +27,6 @@ fun IdentityHeatGrid(
     modifier: Modifier = Modifier,
     columns: Int = 15,
 ) {
-    val isDark = isSystemInDarkTheme()
     val pairs = heat.zip(states)
     val rows = pairs.chunked(columns)
     Column(
@@ -43,12 +39,10 @@ fun IdentityHeatGrid(
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 rowCells.forEach { (level, state) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(cellColor(level, state, isDark)),
+                    HeatCell(
+                        level = level,
+                        state = state,
+                        modifier = Modifier.weight(1f).aspectRatio(1f),
                     )
                 }
                 repeat(columns - rowCells.size) {
