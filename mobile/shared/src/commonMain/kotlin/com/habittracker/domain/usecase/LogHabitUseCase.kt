@@ -32,6 +32,8 @@ data class LogHabitResult(
 class LogHabitUseCase(
     private val habitLogRepository: HabitLogRepository,
     private val habitRepository: HabitRepository,
+    private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    private val clock: Clock = Clock.System,
 ) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun execute(userId: String, habitId: String, quantity: Double): Result<LogHabitResult> =
@@ -39,10 +41,10 @@ class LogHabitUseCase(
             val habit = habitRepository.getHabitsForUser(userId)
                 .firstOrNull { it.id == habitId }
                 ?: error("Habit $habitId not found for user $userId")
-            val now = Clock.System.now()
-            val todayDate = now.toLocalDateTime(TimeZone.UTC).date
-            val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
-            val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, TimeZone.UTC)
+            val now = clock.now()
+            val todayDate = now.toLocalDateTime(timeZone).date
+            val dayStart = todayDate.atStartOfDayIn(timeZone)
+            val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
             val existing = habitLogRepository.getActiveLogsForHabitOnDay(userId, habitId, dayStart, dayEnd)
             val rawBefore = existing.sumOf {
                 PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint)

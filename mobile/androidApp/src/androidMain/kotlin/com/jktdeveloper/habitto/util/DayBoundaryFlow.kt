@@ -6,26 +6,32 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * Emits today's [LocalDate] now and re-emits each time the local calendar day flips.
- * Foreground-only by design: the delay pauses with the host coroutine scope.
+ * Emits today's [LocalDate] on subscribe and re-emits whenever the local calendar day
+ * changes. Polls every [pollInterval] (default 60s) to detect day flips.
+ *
+ * Polling instead of `delay(timeUntilMidnight)` because `delay` does not advance the
+ * coroutine clock while the host process is suspended (e.g. laptop sleep with the
+ * emulator paused). On resume, a delay-until-midnight scheduled before sleep would
+ * still hold the same remaining duration even though wall-clock midnight has passed.
+ * Polling at a fixed cadence converges within one interval after wake.
  */
 fun dayBoundaryFlow(
     tz: TimeZone = TimeZone.currentSystemDefault(),
     clock: Clock = Clock.System,
+    pollIntervalMs: Long = 60_000L,
 ): Flow<LocalDate> = flow {
+    var lastEmitted: LocalDate? = null
     while (currentCoroutineContext().isActive) {
-        val now = clock.now()
-        val today = now.toLocalDateTime(tz).date
-        emit(today)
-        val nextMidnight = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
-        delay(nextMidnight - now)
+        val today = clock.now().toLocalDateTime(tz).date
+        if (today != lastEmitted) {
+            emit(today)
+            lastEmitted = today
+        }
+        delay(pollIntervalMs)
     }
 }

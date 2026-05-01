@@ -119,9 +119,10 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 .flatMapLatest { auth ->
                     dayBoundaryFlow().flatMapLatest { todayDate ->
                         val userId = auth.userId
-                        val dayStart = todayDate.atStartOfDayIn(TimeZone.UTC)
+                        val tz = TimeZone.currentSystemDefault()
+                        val dayStart = todayDate.atStartOfDayIn(tz)
                         val dayEnd = dayStart + 1.days
-                        val weekStart = weekStartUtcFor(todayDate)
+                        val weekStart = weekStartLocalFor(todayDate, tz)
 
                         combine(
                             container.habitRepository.observeHabitsForUser(userId),
@@ -144,7 +145,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                             val earned = habitLogs
                                 .filter { it.loggedAt >= weekStart }
                                 .groupBy { log ->
-                                    log.habitId to log.loggedAt.toLocalDateTime(TimeZone.UTC).date
+                                    log.habitId to log.loggedAt.toLocalDateTime(tz).date
                                 }
                                 .entries.sumOf { (key, dayLogs) ->
                                     val habit = habitsById[key.first] ?: return@sumOf 0
@@ -393,8 +394,8 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     }
 }
 
-private fun weekStartUtcFor(today: LocalDate): Instant {
+private fun weekStartLocalFor(today: LocalDate, tz: TimeZone): Instant {
     val daysFromMonday = today.dayOfWeek.ordinal
     val monday = today.minus(daysFromMonday, DateTimeUnit.DAY)
-    return monday.atStartOfDayIn(TimeZone.UTC)
+    return monday.atStartOfDayIn(tz)
 }
