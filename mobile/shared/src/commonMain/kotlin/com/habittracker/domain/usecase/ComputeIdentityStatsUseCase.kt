@@ -5,6 +5,7 @@ import com.habittracker.data.repository.IdentityRepository
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.IdentityStats
+import com.habittracker.domain.model.StreakDayState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -62,8 +63,11 @@ class ComputeIdentityStatsUseCase(
 
         val streak = computeStreak(today, habitIds, loggedHabitsByDay)
         val daysActive = loggedHabitsByDay.keys.count { it <= today }
+        val firstActivity = loggedHabitsByDay.keys.minOrNull()
         val last14 = buildHeatList(today, 14, pointsByDay, loggedHabitsByDay, habits)
         val last90 = buildHeatList(today, 90, pointsByDay, loggedHabitsByDay, habits)
+        val last14States = buildStateList(today, 14, habitIds, loggedHabitsByDay, firstActivity)
+        val last90States = buildStateList(today, 90, habitIds, loggedHabitsByDay, firstActivity)
 
         return IdentityStats(
             identityId = identityId,
@@ -72,6 +76,8 @@ class ComputeIdentityStatsUseCase(
             habitCount = habits.size,
             last14Heat = last14,
             last90Heat = last90,
+            last14States = last14States,
+            last90States = last90States,
         )
     }
 
@@ -107,6 +113,59 @@ class ComputeIdentityStatsUseCase(
             val allLogged = logged == habits.size
             list += bucketFor(pts, allLogged, bareMin, full)
             cursor = cursor.plus(1, DateTimeUnit.DAY)
+        }
+        return list
+    }
+
+    /**
+     * Per-day state walk for the per-identity heat surfaces. Mirrors ComputeStreakUseCase's
+     * state machine but scoped to this identity's habits.
+     *
+     * - COMPLETE: all this-identity's habits earned ≥1 point that day
+     * - FROZEN: PAST day where the prior day was COMPLETE but this day wasn't
+     *           (one-day grace bridge — streak still alive across the gap)
+     * - BROKEN: PAST day reached after 2+ consecutive non-COMPLETE days
+     * - TODAY_PENDING: today, not yet COMPLETE
+     * - EMPTY: pre-activity OR post-broken inactive stretch
+     */
+    private fun buildStateList(
+        today: LocalDate,
+        length: Int,
+        habitIds: Set<String>,
+        loggedHabitsByDay: Map<LocalDate, Set<String>>,
+        firstActivity: LocalDate?,
+    ): List<StreakDayState> {
+        val isComplete: (LocalDate) -> Boolean = { d ->
+            habitIds.isNotEmpty() && habitIds.all { it in loggedHabitsByDay[d].orEmpty() }
+        }
+        // Walk from firstActivity (or rangeStart) up to today to know the carrying state
+        // when rangeStart is reached. Then emit only the requested window.
+        val rangeStart = today.minus(length - 1, DateTimeUnit.DAY)
+        val anchor = firstActivity ?: rangeStart
+        val walkStart = if (anchor < rangeStart) anchor else rangeStart
+        val perDay = mutableMapOf<LocalDate, StreakDayState>()
+        var prev: StreakDayState? = null
+        var cursor = walkStart
+        while (cursor <= today) {
+            val state = when {
+                cursor < anchor -> StreakDayState.EMPTY
+                isComplete(cursor) -> StreakDayState.COMPLETE
+                cursor == today -> StreakDayState.TODAY_PENDING
+                prev == StreakDayState.COMPLETE -> StreakDayState.FROZEN
+                prev == StreakDayState.FROZEN -> StreakDayState.BROKEN
+                prev == StreakDayState.BROKEN -> StreakDayState.BROKEN
+                prev == StreakDayState.TODAY_PENDING -> StreakDayState.FROZEN
+                else -> StreakDayState.EMPTY
+            }
+            perDay[cursor] = state
+            prev = state
+            cursor = cursor.plus(1, DateTimeUnit.DAY)
+        }
+        val list = ArrayList<StreakDayState>(length)
+        var d = rangeStart
+        while (list.size < length) {
+            list += perDay[d] ?: StreakDayState.EMPTY
+            d = d.plus(1, DateTimeUnit.DAY)
         }
         return list
     }

@@ -147,7 +147,7 @@ private fun IdentityCard(iws: IdentityWithStats, onClick: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     StatsRow(stats.currentStreak, stats.habitCount, stats.daysActive)
                     Spacer(Modifier.height(12.dp))
-                    IdentitySparkline(stats.last14Heat)
+                    IdentitySparkline(stats.last14Heat, stats.last14States)
                 }
                 Icon(
                     Icons.AutoMirrored.Outlined.KeyboardArrowRight,

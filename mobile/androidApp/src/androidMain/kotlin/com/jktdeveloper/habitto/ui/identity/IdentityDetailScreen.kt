@@ -164,7 +164,7 @@ private fun Body(state: IdentityDetailState.Loaded, padding: PaddingValues) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Box(modifier = Modifier.padding(14.dp)) {
-                        IdentityHeatGrid(stats.last90Heat)
+                        IdentityHeatGrid(stats.last90Heat, stats.last90States)
                     }
                 }
             }
