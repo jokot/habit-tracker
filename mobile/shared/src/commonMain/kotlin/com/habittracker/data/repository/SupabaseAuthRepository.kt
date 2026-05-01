@@ -48,6 +48,10 @@ class SupabaseAuthRepository(
         client.auth.signOut()
     }
 
+    override suspend fun tryRefreshSession(): Result<Unit> = runCatching {
+        client.auth.refreshCurrentSession()
+    }
+
     override fun currentUserId(): String? =
         client.auth.currentSessionOrNull()?.user?.id
 
