@@ -23,6 +23,7 @@ interface IdentityRepository {
     suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant)
     suspend fun setPinAtomically(userId: String, identityId: String)
     suspend fun getPinnedIdentityIdForUser(userId: String): String?
+    suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow?
 
     // Habit → identities (new)
     /**

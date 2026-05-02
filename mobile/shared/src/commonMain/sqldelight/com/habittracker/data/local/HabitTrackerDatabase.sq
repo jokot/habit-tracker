@@ -259,6 +259,9 @@ UPDATE LocalUserIdentity SET removedAt = ?, isPinned = 0, syncedAt = NULL WHERE 
 getPinnedIdentityIdForUser:
 SELECT identityId FROM LocalUserIdentity WHERE userId = ? AND isPinned = 1 AND removedAt IS NULL LIMIT 1;
 
+getUserIdentityRow:
+SELECT * FROM LocalUserIdentity WHERE userId = ? AND identityId = ? LIMIT 1;
+
 -- LocalHabitIdentity queries
 upsertHabitIdentity:
 INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt)

@@ -115,6 +115,19 @@ class LocalIdentityRepository(
     override suspend fun getPinnedIdentityIdForUser(userId: String): String? =
         q.getPinnedIdentityIdForUser(userId).executeAsOneOrNull()
 
+    override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? =
+        q.getUserIdentityRow(userId, identityId).executeAsOneOrNull()?.let {
+            UserIdentityRow(
+                userId = it.userId,
+                identityId = it.identityId,
+                addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
+                isPinned = it.isPinned == 1L,
+                whyText = it.whyText,
+                removedAt = it.removedAt?.let(Instant::fromEpochMilliseconds),
+            )
+        }
+
     // ── habit identities ─────────────────────────────────────────────────
 
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {

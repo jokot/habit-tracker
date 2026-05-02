@@ -105,6 +105,9 @@ class FakeIdentityRepository(
     override suspend fun getPinnedIdentityIdForUser(userId: String): String? =
         userIdentities.value.firstOrNull { it.userId == userId && it.isPinned && it.removedAt == null }?.identityId
 
+    override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? =
+        userIdentities.value.firstOrNull { it.userId == userId && it.identityId == identityId }
+
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {
         val now = Clock.System.now()
         val keep = habitIdentities.value.filterNot { it.habitId == habitId && it.identityId !in identityIds }
