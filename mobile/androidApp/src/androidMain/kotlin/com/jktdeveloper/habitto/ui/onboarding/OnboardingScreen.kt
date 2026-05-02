@@ -161,14 +161,6 @@ fun OnboardingScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (currentStep == OnboardingStep.IDENTITY) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Pick 1–4 to start. You can add more later.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         },
         bottomBar = {
