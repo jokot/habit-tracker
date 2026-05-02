@@ -37,6 +37,11 @@ import com.habittracker.domain.usecase.SetupUserHabitsUseCase
 import com.habittracker.domain.usecase.SetupUserWantActivitiesUseCase
 import com.habittracker.domain.usecase.UndoHabitLogUseCase
 import com.habittracker.domain.usecase.UndoWantLogUseCase
+import com.habittracker.domain.usecase.PinIdentityUseCase
+import com.habittracker.domain.usecase.UnpinIdentityUseCase
+import com.habittracker.domain.usecase.RemoveIdentityUseCase
+import com.habittracker.domain.usecase.UpdateIdentityWhyUseCase
+import com.habittracker.domain.usecase.AddIdentityWithHabitsUseCase
 import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.habittracker.data.sync.SyncReason
@@ -131,6 +136,15 @@ class AppContainer(context: Context) {
     )
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
     val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
+    val pinIdentityUseCase = PinIdentityUseCase(identityRepository)
+    val unpinIdentityUseCase = UnpinIdentityUseCase(identityRepository)
+    val removeIdentityUseCase = RemoveIdentityUseCase(identityRepository)
+    val updateIdentityWhyUseCase = UpdateIdentityWhyUseCase(identityRepository)
+    val addIdentityWithHabitsUseCase = AddIdentityWithHabitsUseCase(
+        habitRepo = habitRepository,
+        identityRepo = identityRepository,
+        templates = getHabitTemplatesForIdentitiesUseCase,
+    )
 
     private val _authState = MutableStateFlow(snapshotAuthState())
     val authState: StateFlow<AuthState> = _authState.asStateFlow()

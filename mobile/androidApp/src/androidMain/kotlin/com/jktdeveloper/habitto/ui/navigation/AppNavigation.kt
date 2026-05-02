@@ -43,6 +43,7 @@ sealed class Screen(val route: String) {
         const val ARG_ID = "identityId"
         fun route(id: String) = "identity_detail/$id"
     }
+    object AddIdentity : Screen("add_identity")
 }
 
 @Composable
