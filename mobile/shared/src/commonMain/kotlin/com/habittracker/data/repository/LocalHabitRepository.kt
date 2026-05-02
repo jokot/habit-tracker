@@ -41,6 +41,8 @@ class LocalHabitRepository(
             dailyTarget = habit.dailyTarget.toLong(),
             createdAt = habit.createdAt.toEpochMilliseconds(),
             updatedAt = updatedAt.toEpochMilliseconds(),
+            effectiveFrom = habit.effectiveFrom?.toEpochMilliseconds(),
+            effectiveTo = habit.effectiveTo?.toEpochMilliseconds(),
         )
     }
 
@@ -86,6 +88,16 @@ class LocalHabitRepository(
             createdAt = row.createdAt.toEpochMilliseconds(),
             updatedAt = row.updatedAt.toEpochMilliseconds(),
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
+            effectiveFrom = row.effectiveFrom?.toEpochMilliseconds(),
+            effectiveTo = row.effectiveTo?.toEpochMilliseconds(),
+        )
+    }
+
+    override suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: Instant) {
+        db.habitTrackerDatabaseQueries.markHabitDeleted(
+            effectiveTo = effectiveTo.toEpochMilliseconds(),
+            id = habitId,
+            userId = userId,
         )
     }
 }
@@ -101,4 +113,6 @@ private fun LocalHabit.toDomain(): Habit = Habit(
     createdAt = Instant.fromEpochMilliseconds(createdAt),
     updatedAt = Instant.fromEpochMilliseconds(updatedAt),
     syncedAt = syncedAt?.let { Instant.fromEpochMilliseconds(it) },
+    effectiveFrom = effectiveFrom?.let { Instant.fromEpochMilliseconds(it) },
+    effectiveTo = effectiveTo?.let { Instant.fromEpochMilliseconds(it) },
 )

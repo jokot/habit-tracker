@@ -392,6 +392,7 @@ private class FixedCountHabitRepo(
     override suspend fun markSynced(id: String, syncedAt: kotlinx.datetime.Instant) = error("unused")
     override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
     override suspend fun mergePulled(row: com.habittracker.domain.model.Habit) = error("unused")
+    override suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: kotlinx.datetime.Instant) = error("unused")
 }
 
 private fun LocalDate.minusDays(d: Int): LocalDate =

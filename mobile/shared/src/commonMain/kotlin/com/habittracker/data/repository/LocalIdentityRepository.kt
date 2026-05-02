@@ -132,7 +132,14 @@ class LocalIdentityRepository(
 
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {
         val now = Clock.System.now().toEpochMilliseconds()
-        identityIds.forEach { q.upsertHabitIdentity(habitId = habitId, identityId = it, addedAt = now) }
+        identityIds.forEach {
+            q.upsertHabitIdentity(
+                habitId = habitId,
+                identityId = it,
+                addedAt = now,
+                effectiveFrom = now,
+            )
+        }
     }
 
     override suspend fun clearHabitIdentitiesForUser(userId: String) {
@@ -146,6 +153,8 @@ class LocalIdentityRepository(
                 identityId = it.identityId,
                 addedAt = Instant.fromEpochMilliseconds(it.addedAt),
                 syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
+                effectiveFrom = it.effectiveFrom?.let(Instant::fromEpochMilliseconds),
+                effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),
             )
         }
 
@@ -159,6 +168,8 @@ class LocalIdentityRepository(
             identityId = row.identityId,
             addedAt = row.addedAt.toEpochMilliseconds(),
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
+            effectiveFrom = row.effectiveFrom?.toEpochMilliseconds(),
+            effectiveTo = row.effectiveTo?.toEpochMilliseconds(),
         )
     }
 
@@ -180,4 +191,6 @@ private fun LocalHabit.toDomain(): Habit = Habit(
     createdAt = Instant.fromEpochMilliseconds(createdAt),
     updatedAt = Instant.fromEpochMilliseconds(updatedAt),
     syncedAt = syncedAt?.let { Instant.fromEpochMilliseconds(it) },
+    effectiveFrom = effectiveFrom?.let { Instant.fromEpochMilliseconds(it) },
+    effectiveTo = effectiveTo?.let { Instant.fromEpochMilliseconds(it) },
 )
