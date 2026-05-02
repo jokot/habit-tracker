@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS LocalHabit (
     dailyTarget INTEGER NOT NULL,
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL,
-    syncedAt INTEGER
+    syncedAt INTEGER,
+    effectiveFrom INTEGER,
+    effectiveTo INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS LocalIdentity (
@@ -55,6 +57,8 @@ CREATE TABLE IF NOT EXISTS LocalHabitIdentity (
     identityId TEXT NOT NULL,
     addedAt INTEGER NOT NULL,
     syncedAt INTEGER,
+    effectiveFrom INTEGER,
+    effectiveTo INTEGER,
     PRIMARY KEY (habitId, identityId)
 );
 
@@ -139,14 +143,17 @@ SELECT * FROM WantLog WHERE userId = ? AND deletedAt IS NULL ORDER BY loggedAt D
 
 -- LocalHabit queries
 upsertHabit:
-INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL);
+INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt, effectiveFrom, effectiveTo)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?);
 
 getHabitsForUser:
 SELECT * FROM LocalHabit WHERE userId = ?;
 
 deleteHabit:
 DELETE FROM LocalHabit WHERE id = ? AND userId = ?;
+
+markHabitDeleted:
+UPDATE LocalHabit SET effectiveTo = ?, syncedAt = NULL WHERE id = ? AND userId = ?;
 
 -- LocalIdentity queries
 upsertIdentity:
@@ -213,8 +220,8 @@ getWantActivitiesByIdForUser:
 SELECT * FROM LocalWantActivity WHERE userId = ? AND id IN ?;
 
 mergePulledHabit:
-INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, thresholdPerPoint, dailyTarget, createdAt, updatedAt, syncedAt, effectiveFrom, effectiveTo)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 mergePulledWantActivity:
 INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
@@ -264,12 +271,12 @@ SELECT * FROM LocalUserIdentity WHERE userId = ? AND identityId = ? LIMIT 1;
 
 -- LocalHabitIdentity queries
 upsertHabitIdentity:
-INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt)
-VALUES (?, ?, ?, NULL);
+INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
+VALUES (?, ?, ?, NULL, ?, NULL);
 
 mergePulledHabitIdentity:
-INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt)
-VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
+VALUES (?, ?, ?, ?, ?, ?);
 
 getHabitIdentities:
 SELECT * FROM LocalHabitIdentity WHERE habitId = ? ORDER BY addedAt ASC;
