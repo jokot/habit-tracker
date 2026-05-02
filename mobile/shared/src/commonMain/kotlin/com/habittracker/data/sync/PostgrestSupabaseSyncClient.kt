@@ -265,19 +265,28 @@ private data class UserIdentityDto(
     @SerialName("user_id") val userId: String,
     @SerialName("identity_id") val identityId: String,
     @SerialName("added_at") val addedAt: String,
+    @SerialName("is_pinned") val isPinned: Boolean = false,
+    @SerialName("why_text") val whyText: String? = null,
+    @SerialName("removed_at") val removedAt: String? = null,
 )
 
 private fun UserIdentityRow.toDto() = UserIdentityDto(
     userId = userId,
     identityId = identityId,
     addedAt = addedAt.toString(),
+    isPinned = isPinned,
+    whyText = whyText,
+    removedAt = removedAt?.toString(),
 )
 
 private fun UserIdentityDto.toDomain() = UserIdentityRow(
     userId = userId,
     identityId = identityId,
     addedAt = Instant.parse(addedAt),
-    syncedAt = Instant.parse(addedAt),
+    syncedAt = Instant.parse(addedAt), // server-derived; existing convention
+    isPinned = isPinned,
+    whyText = whyText,
+    removedAt = removedAt?.let { Instant.parse(it) },
 )
 
 @Serializable
