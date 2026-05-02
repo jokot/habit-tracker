@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -94,6 +95,20 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     val userIdentities: StateFlow<List<Identity>> =
         container.getUserIdentitiesUseCase.execute(container.currentUserId())
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _pinnedIdentityId = MutableStateFlow<String?>(null)
+    val pinnedIdentityId: StateFlow<String?> = _pinnedIdentityId.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observePinnedIdentity() {
+        viewModelScope.launch {
+            container.authState.flatMapLatest { auth ->
+                container.identityRepository.observeUserIdentities(auth.userId).map {
+                    container.identityRepository.getPinnedIdentityIdForUser(auth.userId)
+                }
+            }.collect { _pinnedIdentityId.value = it }
+        }
+    }
 
     /** habitId → pending tap batch. Drops to empty on commit or cancel. */
     private val _pending = MutableStateFlow<Map<String, PendingHabitLog>>(emptyMap())
@@ -223,6 +238,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     init {
         observeHomeUiState()
         observeStreaks()
+        observePinnedIdentity()
     }
 
     /** Tap handler: bump pending count for this habit and (re)start its 3s countdown. */

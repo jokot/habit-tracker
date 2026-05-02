@@ -20,6 +20,7 @@ fun IdentityStrip(
     identities: List<Identity>,
     onChipClick: (Identity) -> Unit,
     onMoreClick: () -> Unit,
+    pinnedIdentityId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     if (identities.isEmpty()) return
@@ -42,7 +43,13 @@ fun IdentityStrip(
                 .align(Alignment.CenterVertically),
             letterSpacing = 0.3.sp,
         )
-        visible.forEach { identity -> IdentityChip(identity, onClick = { onChipClick(identity) }) }
+        visible.forEach { identity ->
+            IdentityChip(
+                identity = identity,
+                onClick = { onChipClick(identity) },
+                isPinned = identity.id == pinnedIdentityId,
+            )
+        }
         if (extra > 0) IdentityMorePill(extra, onClick = onMoreClick)
     }
 }

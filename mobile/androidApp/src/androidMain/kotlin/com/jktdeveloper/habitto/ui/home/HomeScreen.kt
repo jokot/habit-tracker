@@ -178,10 +178,12 @@ fun HomeScreen(
                 // ── Identity strip ────────────────────────────────────────────
                 item {
                     val identities by viewModel.userIdentities.collectAsState()
+                    val pinnedIdentityId by viewModel.pinnedIdentityId.collectAsState()
                     IdentityStrip(
                         identities = identities,
                         onChipClick = { onIdentityClick(it.id) },
                         onMoreClick = onIdentitiesClick,
+                        pinnedIdentityId = pinnedIdentityId,
                     )
                 }
 
