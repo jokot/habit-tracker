@@ -230,7 +230,7 @@ INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt,
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 getUserIdentities:
-SELECT * FROM LocalUserIdentity WHERE userId = ? AND removedAt IS NULL ORDER BY addedAt ASC;
+SELECT * FROM LocalUserIdentity WHERE userId = ? AND removedAt IS NULL ORDER BY isPinned DESC, addedAt ASC;
 
 deleteUserIdentity:
 DELETE FROM LocalUserIdentity WHERE userId = ? AND identityId = ?;

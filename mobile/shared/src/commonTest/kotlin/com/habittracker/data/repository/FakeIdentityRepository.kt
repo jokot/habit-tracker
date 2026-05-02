@@ -35,7 +35,7 @@ class FakeIdentityRepository(
         combine(userIdentities, seedFlow) { rows, seeds ->
             val map = seeds.associateBy { it.id }
             rows.filter { it.userId == userId && it.removedAt == null }
-                .sortedBy { it.addedAt }
+                .sortedWith(compareByDescending<UserIdentityRow> { it.isPinned }.thenBy { it.addedAt })
                 .mapNotNull { map[it.identityId] }
         }
 

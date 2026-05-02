@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -66,28 +67,35 @@ class IdentityDetailViewModel private constructor(
         identityId = identityId,
     )
 
-    init { refresh() }
+    init { observe() }
 
-    fun refresh() {
+    private fun observe() {
         job?.cancel()
         job = viewModelScope.launch {
             val userId = userIdProvider()
-            val userIdentities = identityRepo.observeUserIdentities(userId).first()
-            val identity = userIdentities.firstOrNull { it.id == identityId }
-            if (identity == null) {
-                _state.value = IdentityDetailState.NotFound
-                return@launch
+            identityRepo.observeUserIdentities(userId).collect { userIdentities ->
+                val identity = userIdentities.firstOrNull { it.id == identityId }
+                if (identity == null) {
+                    _state.value = IdentityDetailState.NotFound
+                    return@collect
+                }
+                val row = identityRepo.getUserIdentityRow(userId, identityId)
+                val stats = statsUseCase.computeNow(userId, identityId)
+                val habits = identityRepo.observeHabitsForIdentity(userId, identityId).first()
+                // Preserve any in-progress edit state
+                val current = _state.value
+                val isEditing = (current as? IdentityDetailState.Loaded)?.isEditingWhy ?: false
+                val pendingDraft = (current as? IdentityDetailState.Loaded)?.pendingWhyDraft
+                _state.value = IdentityDetailState.Loaded(
+                    identity = identity,
+                    stats = stats,
+                    habits = habits,
+                    isPinned = row?.isPinned ?: false,
+                    whyText = row?.whyText,
+                    isEditingWhy = isEditing,
+                    pendingWhyDraft = pendingDraft,
+                )
             }
-            val row = identityRepo.getUserIdentityRow(userId, identityId)
-            val stats = statsUseCase.computeNow(userId, identityId)
-            val habits = identityRepo.observeHabitsForIdentity(userId, identityId).first()
-            _state.value = IdentityDetailState.Loaded(
-                identity = identity,
-                stats = stats,
-                habits = habits,
-                isPinned = row?.isPinned ?: false,
-                whyText = row?.whyText,
-            )
         }
     }
 
@@ -100,7 +108,7 @@ class IdentityDetailViewModel private constructor(
             } else {
                 pinUseCase.execute(userId, identityId)
             }
-            refresh()
+            // No explicit refresh needed — setPinForIdentity triggers observeUserIdentities re-emit
         }
     }
 
@@ -127,7 +135,7 @@ class IdentityDetailViewModel private constructor(
         viewModelScope.launch {
             val userId = userIdProvider()
             updateWhyUseCase.execute(userId, identityId, loaded.pendingWhyDraft)
-            refresh()
+            // No explicit refresh needed — updateWhyText triggers observeUserIdentities re-emit
         }
     }
 

@@ -264,7 +264,8 @@ fun AppNavigation(container: AppContainer) {
                     onClose = { navController.popBackStack() },
                     onCommitSuccess = {
                         navController.navigate(Screen.IdentityList.route) {
-                            popUpTo(Screen.IdentityList.route) { inclusive = false }
+                            popUpTo(Screen.IdentityList.route) { inclusive = true }
+                            launchSingleTop = true
                         }
                     },
                 )

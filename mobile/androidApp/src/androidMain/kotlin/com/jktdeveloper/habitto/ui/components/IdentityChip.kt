@@ -1,6 +1,7 @@
 package com.jktdeveloper.habitto.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -24,11 +25,14 @@ import com.habittracker.domain.model.Identity
 @Composable
 fun IdentityChip(identity: Identity, onClick: () -> Unit, isPinned: Boolean = false) {
     val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val isDark = isSystemInDarkTheme()
+    val hueTint = Color.hsl(hue, 0.60f, if (isDark) 0.65f else 0.40f)
+    val pinnedBg = if (isDark) Color.hsl(hue, 0.30f, 0.18f) else Color.hsl(hue, 0.30f, 0.92f)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = if (isPinned) pinnedBg else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, if (isPinned) hueTint else MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             modifier = Modifier.padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
