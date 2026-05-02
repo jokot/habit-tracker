@@ -132,10 +132,12 @@ class IdentityDetailViewModel private constructor(
 
     fun saveWhyText() {
         val loaded = _state.value as? IdentityDetailState.Loaded ?: return
+        // Flip out of edit mode immediately so the UI returns to display state.
+        // The Flow re-emit from updateWhyText will refresh whyText shortly after.
+        _state.value = loaded.copy(isEditingWhy = false, pendingWhyDraft = null)
         viewModelScope.launch {
             val userId = userIdProvider()
             updateWhyUseCase.execute(userId, identityId, loaded.pendingWhyDraft)
-            // No explicit refresh needed — updateWhyText triggers observeUserIdentities re-emit
         }
     }
 

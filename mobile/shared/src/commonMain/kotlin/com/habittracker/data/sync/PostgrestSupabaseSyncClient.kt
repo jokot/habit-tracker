@@ -90,17 +90,19 @@ class PostgrestSupabaseSyncClient(
         supabase.postgrest.from("habit_identities").upsert(row.toDto())
     }
 
-    override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> =
-        supabase.postgrest.from("user_identities")
+    override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> {
+        // user_identities mutate via UPDATE (pin / why / soft-remove) without
+        // changing added_at. Watermark by added_at would miss those updates.
+        // Volume per user is small (≤10 rows) — fetch all rows for the user.
+        @Suppress("UNUSED_PARAMETER") val _s = sinceMs
+        return supabase.postgrest.from("user_identities")
             .select {
-                filter {
-                    eq("user_id", userId)
-                    gt("added_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                }
+                filter { eq("user_id", userId) }
                 order("added_at", Order.ASCENDING)
             }
             .decodeList<UserIdentityDto>()
             .map { it.toDomain() }
+    }
 
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
         // RLS scopes to habits owned by current user; client-side userId arg is for parity
