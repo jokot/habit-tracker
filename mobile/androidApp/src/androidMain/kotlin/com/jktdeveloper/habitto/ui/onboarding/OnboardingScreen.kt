@@ -35,8 +35,17 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SmartDisplay
 import androidx.compose.material.icons.filled.SmokingRooms
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import com.jktdeveloper.habitto.ui.components.habitIcon
 import androidx.compose.material.icons.outlined.AccountCircle
+import com.jktdeveloper.habitto.ui.theme.StreakFrozen
+import com.jktdeveloper.habitto.ui.theme.StreakFrozenBg
+import com.jktdeveloper.habitto.ui.theme.StreakFrozenBgDark
+import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -271,25 +280,65 @@ private fun OnboardingBottomBar(
 // ── Step 1: Identity grid ─────────────────────────────────────────────────────
 
 @Composable
+private fun PickHint(modifier: Modifier = Modifier) {
+    val isDark = isSystemInDarkTheme()
+    val bg = if (isDark) StreakFrozenBgDark else StreakFrozenBg
+    val accent = if (isDark) StreakFrozenDark else StreakFrozen
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = bg,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Lightbulb,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = buildAnnotatedString {
+                    append("Most people pick ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("1–3") }
+                    append(" to start. You can add more later.")
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
 private fun IdentityStepBody(
     identities: List<Identity>,
     selectedIds: Set<String>,
     onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
     ) {
-        items(identities, key = { it.id }) { identity ->
-            IdentityGridCell(
-                identity = identity,
-                selected = identity.id in selectedIds,
-                onSelect = { onToggle(identity.id) },
-            )
+        PickHint(modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 0.dp, bottom = 96.dp),
+        ) {
+            items(identities, key = { it.id }) { identity ->
+                IdentityGridCell(
+                    identity = identity,
+                    selected = identity.id in selectedIds,
+                    onSelect = { onToggle(identity.id) },
+                )
+            }
         }
     }
 }
