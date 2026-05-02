@@ -74,8 +74,8 @@ private data class StepCopy(val title: String, val subtitle: String)
 
 private fun stepCopy(step: OnboardingStep) = when (step) {
     OnboardingStep.IDENTITY -> StepCopy(
-        title = "Who do you want to become?",
-        subtitle = "Choose an identity. Habitto suggests habits that support it.",
+        title = "Who are you becoming?",
+        subtitle = "Pick everyone that's true. You'll see habits for each.",
     )
     OnboardingStep.HABITS -> StepCopy(
         title = "Pick habits that prove it.",
