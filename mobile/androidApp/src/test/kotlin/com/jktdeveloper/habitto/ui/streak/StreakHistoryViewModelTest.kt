@@ -129,6 +129,7 @@ private class EmptyHabitRepo : HabitRepository {
     override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
     override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
     override suspend fun mergePulled(row: Habit) = error("unused")
+    override suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: Instant) = error("unused")
 }
 
 /** HabitLogRepository fake that ALSO returns logs for getAllActiveLogsForUser
