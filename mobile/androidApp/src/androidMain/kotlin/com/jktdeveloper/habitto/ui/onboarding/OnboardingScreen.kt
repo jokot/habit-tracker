@@ -350,7 +350,7 @@ private fun IdentityGridCell(
     onSelect: () -> Unit,
 ) {
     val hue = IdentityHue.forIdentityId(identity.name.lowercase())
-    val selectedBg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.92f)
+    val selectedBg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.94f)
     val selectedBorder = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.50f)
     // Selected bg is always light regardless of theme — use a dark fg for legibility
     val selectedTitleFg = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.18f)
