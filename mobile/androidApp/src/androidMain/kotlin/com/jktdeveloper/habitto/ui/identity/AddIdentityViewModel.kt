@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.HabitRepository
 import com.habittracker.data.repository.IdentityRepository
+import com.habittracker.data.sync.SyncReason
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.usecase.AddIdentityWithHabitsUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.sync.SyncTriggers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -43,6 +45,7 @@ class AddIdentityViewModel(
     private val templates: GetHabitTemplatesForIdentitiesUseCase,
     private val addUseCase: AddIdentityWithHabitsUseCase,
     private val userIdProvider: () -> String,
+    private val triggerSync: () -> Unit = {},
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AddIdentityUiState())
@@ -57,6 +60,7 @@ class AddIdentityViewModel(
         templates = container.getHabitTemplatesForIdentitiesUseCase,
         addUseCase = container.addIdentityWithHabitsUseCase,
         userIdProvider = { container.currentUserId() },
+        triggerSync = { SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG) },
     )
 
     init { loadCandidates() }
@@ -120,6 +124,7 @@ class AddIdentityViewModel(
             val userId = userIdProvider()
             runCatching { addUseCase.execute(userId, selected.id, selectedTemplateIds) }
                 .onSuccess {
+                    triggerSync()
                     _state.update { it.copy(isCommitting = false) }
                     _commitSuccess.tryEmit(Unit)
                 }

@@ -3,6 +3,7 @@ package com.jktdeveloper.habitto.ui.identity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.IdentityRepository
+import com.habittracker.data.sync.SyncReason
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.IdentityStats
@@ -12,6 +13,7 @@ import com.habittracker.domain.usecase.UnpinIdentityUseCase
 import com.habittracker.domain.usecase.RemoveIdentityUseCase
 import com.habittracker.domain.usecase.UpdateIdentityWhyUseCase
 import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.sync.SyncTriggers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +47,7 @@ class IdentityDetailViewModel private constructor(
     private val removeUseCase: RemoveIdentityUseCase,
     private val updateWhyUseCase: UpdateIdentityWhyUseCase,
     private val userIdProvider: () -> String,
+    private val triggerSync: () -> Unit,
     private val identityId: String,
 ) : ViewModel() {
 
@@ -64,6 +67,7 @@ class IdentityDetailViewModel private constructor(
         removeUseCase = container.removeIdentityUseCase,
         updateWhyUseCase = container.updateIdentityWhyUseCase,
         userIdProvider = { container.currentUserId() },
+        triggerSync = { SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG) },
         identityId = identityId,
     )
 
@@ -109,6 +113,7 @@ class IdentityDetailViewModel private constructor(
                 pinUseCase.execute(userId, identityId)
             }
             // No explicit refresh needed — setPinForIdentity triggers observeUserIdentities re-emit
+            triggerSync()
         }
     }
 
@@ -116,7 +121,10 @@ class IdentityDetailViewModel private constructor(
         viewModelScope.launch {
             val userId = userIdProvider()
             runCatching { removeUseCase.execute(userId, identityId) }
-                .onSuccess { _removeSuccess.tryEmit(Unit) }
+                .onSuccess {
+                    triggerSync()
+                    _removeSuccess.tryEmit(Unit)
+                }
         }
     }
 
@@ -138,6 +146,7 @@ class IdentityDetailViewModel private constructor(
         viewModelScope.launch {
             val userId = userIdProvider()
             updateWhyUseCase.execute(userId, identityId, loaded.pendingWhyDraft)
+            triggerSync()
         }
     }
 
@@ -156,9 +165,10 @@ class IdentityDetailViewModel private constructor(
             updateWhyUseCase: UpdateIdentityWhyUseCase,
             userIdProvider: () -> String,
             identityId: String,
+            triggerSync: () -> Unit = {},
         ) = IdentityDetailViewModel(
             identityRepo, statsUseCase, pinUseCase, unpinUseCase,
-            removeUseCase, updateWhyUseCase, userIdProvider, identityId,
+            removeUseCase, updateWhyUseCase, userIdProvider, triggerSync, identityId,
         )
     }
 }
