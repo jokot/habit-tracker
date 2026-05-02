@@ -94,7 +94,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     val userIdentities: StateFlow<List<Identity>> =
         container.getUserIdentitiesUseCase.execute(container.currentUserId())
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _pinnedIdentityId = MutableStateFlow<String?>(null)
     val pinnedIdentityId: StateFlow<String?> = _pinnedIdentityId.asStateFlow()
