@@ -234,6 +234,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
+                    onAddIdentityClick = { navController.navigate(Screen.AddIdentity.route) },
                 )
             }
 

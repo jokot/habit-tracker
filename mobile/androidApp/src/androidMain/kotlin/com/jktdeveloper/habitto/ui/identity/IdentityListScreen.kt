@@ -19,11 +19,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +64,7 @@ fun IdentityListScreen(
     viewModel: IdentityListViewModel,
     onBack: () -> Unit,
     onIdentityClick: (String) -> Unit,
+    onAddIdentityClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -87,7 +92,9 @@ fun IdentityListScreen(
         },
         contentWindowInsets = WindowInsets(0.dp),
     ) { padding ->
-        val items = (state as? IdentityListState.Loaded)?.items.orEmpty()
+        val loaded = state as? IdentityListState.Loaded
+        val items = loaded?.items.orEmpty()
+        val pinnedIdentityId = loaded?.pinnedIdentityId
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(bottom = 24.dp),
@@ -101,7 +108,15 @@ fun IdentityListScreen(
                 )
             }
             items(items, key = { it.identity.id }) { iws ->
-                IdentityCard(iws, onClick = { onIdentityClick(iws.identity.id) })
+                IdentityCard(
+                    iws = iws,
+                    isPinned = iws.identity.id == pinnedIdentityId,
+                    onClick = { onIdentityClick(iws.identity.id) },
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+            item {
+                AddIdentityCtaCard(onClick = onAddIdentityClick)
                 Spacer(Modifier.height(10.dp))
             }
         }
@@ -109,19 +124,23 @@ fun IdentityListScreen(
 }
 
 @Composable
-private fun IdentityCard(iws: IdentityWithStats, onClick: () -> Unit) {
+private fun IdentityCard(iws: IdentityWithStats, isPinned: Boolean, onClick: () -> Unit) {
     val identity = iws.identity
     val stats = iws.stats
     val hue = IdentityHue.forIdentityId(identity.name.lowercase())
     val isDark = isSystemInDarkTheme()
     val gradStart = if (isDark) Color.hsl(hue, 0.30f, 0.18f) else Color.hsl(hue, 0.30f, 0.92f)
     val gradEnd = MaterialTheme.colorScheme.surface
+    val hueTint = Color.hsl(hue, 0.60f, if (isDark) 0.65f else 0.40f)
 
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isPinned) hueTint else MaterialTheme.colorScheme.outlineVariant,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
@@ -138,7 +157,20 @@ private fun IdentityCard(iws: IdentityWithStats, onClick: () -> Unit) {
             ) {
                 HabitGlyph(icon = identityIcon(identity.name), hue = hue, size = 48.dp)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(identity.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(identity.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (isPinned) {
+                            Icon(
+                                imageVector = Icons.Filled.PushPin,
+                                contentDescription = "Pinned",
+                                tint = hueTint,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
                     Text(
                         identity.description,
                         style = MaterialTheme.typography.bodySmall,
@@ -154,6 +186,52 @@ private fun IdentityCard(iws: IdentityWithStats, onClick: () -> Unit) {
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddIdentityCtaCard(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Transparent,
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column {
+                Text(
+                    text = "Add identity",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Pick from suggestions or define your own.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

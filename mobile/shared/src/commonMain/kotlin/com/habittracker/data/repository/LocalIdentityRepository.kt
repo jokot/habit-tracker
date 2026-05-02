@@ -112,6 +112,9 @@ class LocalIdentityRepository(
         }
     }
 
+    override suspend fun getPinnedIdentityIdForUser(userId: String): String? =
+        q.getPinnedIdentityIdForUser(userId).executeAsOneOrNull()
+
     // ── habit identities ─────────────────────────────────────────────────
 
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {

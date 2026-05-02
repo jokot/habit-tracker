@@ -256,6 +256,9 @@ UPDATE LocalUserIdentity SET whyText = ?, syncedAt = NULL WHERE userId = ? AND i
 markUserIdentityRemoved:
 UPDATE LocalUserIdentity SET removedAt = ?, isPinned = 0, syncedAt = NULL WHERE userId = ? AND identityId = ?;
 
+getPinnedIdentityIdForUser:
+SELECT identityId FROM LocalUserIdentity WHERE userId = ? AND isPinned = 1 AND removedAt IS NULL LIMIT 1;
+
 -- LocalHabitIdentity queries
 upsertHabitIdentity:
 INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt)
