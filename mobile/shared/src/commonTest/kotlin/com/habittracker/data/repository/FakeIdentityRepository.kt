@@ -34,7 +34,7 @@ class FakeIdentityRepository(
     override fun observeUserIdentities(userId: String): Flow<List<Identity>> =
         combine(userIdentities, seedFlow) { rows, seeds ->
             val map = seeds.associateBy { it.id }
-            rows.filter { it.userId == userId }
+            rows.filter { it.userId == userId && it.removedAt == null }
                 .sortedBy { it.addedAt }
                 .mapNotNull { map[it.identityId] }
         }
@@ -65,6 +65,41 @@ class FakeIdentityRepository(
 
     override suspend fun mergePulledUserIdentity(row: UserIdentityRow) {
         userIdentities.value = userIdentities.value.filterNot { it.userId == row.userId && it.identityId == row.identityId } + row
+    }
+
+    override suspend fun setPinForIdentity(userId: String, identityId: String, isPinned: Boolean) {
+        userIdentities.value = userIdentities.value.map {
+            if (it.userId == userId && it.identityId == identityId) {
+                it.copy(isPinned = isPinned, syncedAt = null)
+            } else it
+        }
+    }
+
+    override suspend fun clearPinForUser(userId: String) {
+        userIdentities.value = userIdentities.value.map {
+            if (it.userId == userId && it.isPinned) it.copy(isPinned = false, syncedAt = null) else it
+        }
+    }
+
+    override suspend fun updateWhyText(userId: String, identityId: String, whyText: String?) {
+        userIdentities.value = userIdentities.value.map {
+            if (it.userId == userId && it.identityId == identityId) {
+                it.copy(whyText = whyText, syncedAt = null)
+            } else it
+        }
+    }
+
+    override suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant) {
+        userIdentities.value = userIdentities.value.map {
+            if (it.userId == userId && it.identityId == identityId) {
+                it.copy(removedAt = removedAt, isPinned = false, syncedAt = null)
+            } else it
+        }
+    }
+
+    override suspend fun setPinAtomically(userId: String, identityId: String) {
+        clearPinForUser(userId)
+        setPinForIdentity(userId, identityId, isPinned = true)
     }
 
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {
@@ -102,4 +137,30 @@ class FakeIdentityRepository(
             val habitIds = his.filter { it.identityId == identityId }.map { it.habitId }.toSet()
             hs.filter { it.userId == userId && it.id in habitIds }
         }
+
+    fun seedUserIdentity(
+        userId: String,
+        identityId: String,
+        isPinned: Boolean = false,
+        whyText: String? = null,
+        removedAt: Instant? = null,
+    ) {
+        val row = UserIdentityRow(
+            userId = userId,
+            identityId = identityId,
+            addedAt = Clock.System.now(),
+            syncedAt = null,
+            isPinned = isPinned,
+            whyText = whyText,
+            removedAt = removedAt,
+        )
+        userIdentities.value = userIdentities.value
+            .filterNot { it.userId == userId && it.identityId == identityId } + row
+    }
+
+    fun isPinned(userId: String, identityId: String): Boolean =
+        userIdentities.value.any { it.userId == userId && it.identityId == identityId && it.isPinned }
+
+    fun getWhyText(userId: String, identityId: String): String? =
+        userIdentities.value.firstOrNull { it.userId == userId && it.identityId == identityId }?.whyText
 }
