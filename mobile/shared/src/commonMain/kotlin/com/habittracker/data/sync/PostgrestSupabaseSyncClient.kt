@@ -262,14 +262,19 @@ private fun WantLogDto.toDomain() = WantLog(
     syncedAt = syncedAt?.let { Instant.parse(it) },
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 private data class UserIdentityDto(
     @SerialName("user_id") val userId: String,
     @SerialName("identity_id") val identityId: String,
     @SerialName("added_at") val addedAt: String,
-    @SerialName("is_pinned") val isPinned: Boolean = false,
-    @SerialName("why_text") val whyText: String? = null,
-    @SerialName("removed_at") val removedAt: String? = null,
+    // @EncodeDefault forces these fields into the JSON payload even when they
+    // equal their default. Without it, kotlinx-serialization omits default-valued
+    // fields, and Postgrest upsert preserves the stale server value (e.g. unpin
+    // would never propagate because is_pinned=false matched the default).
+    @kotlinx.serialization.EncodeDefault @SerialName("is_pinned") val isPinned: Boolean = false,
+    @kotlinx.serialization.EncodeDefault @SerialName("why_text") val whyText: String? = null,
+    @kotlinx.serialization.EncodeDefault @SerialName("removed_at") val removedAt: String? = null,
 )
 
 private fun UserIdentityRow.toDto() = UserIdentityDto(
