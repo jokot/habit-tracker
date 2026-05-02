@@ -59,9 +59,7 @@ fun YouHubScreen(
         ) {
             item {
                 val identities by viewModel.userIdentities.collectAsState()
-                if (identities.isNotEmpty()) {
-                    IdentityHubCard(identities = identities, onClick = onOpenIdentities)
-                }
+                IdentityHubCard(identities = identities, onClick = onOpenIdentities)
             }
             item { SectionHeader("Account") }
             if (authState.isAuthenticated) {
