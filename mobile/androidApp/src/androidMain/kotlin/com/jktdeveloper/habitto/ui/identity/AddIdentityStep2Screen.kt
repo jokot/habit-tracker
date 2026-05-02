@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.habitIcon
 import com.jktdeveloper.habitto.ui.components.identityIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -255,7 +256,7 @@ private fun HabitChoiceCard(
 
             // Habit glyph
             HabitGlyph(
-                icon = identityIcon(habit.name),
+                icon = habitIcon(habit.name),
                 hue = hue,
                 size = 40.dp,
             )

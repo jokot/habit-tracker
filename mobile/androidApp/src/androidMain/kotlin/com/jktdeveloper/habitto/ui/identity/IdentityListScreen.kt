@@ -55,6 +55,7 @@ import com.habittracker.domain.model.IdentityWithStats
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
 import com.jktdeveloper.habitto.ui.components.IdentitySparkline
+import com.jktdeveloper.habitto.ui.components.dashedBorder
 import com.jktdeveloper.habitto.ui.components.identityIcon
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 
@@ -198,10 +199,16 @@ private fun AddIdentityCtaCard(onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = Color.Transparent,
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .dashedBorder(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(16.dp),
+                strokeWidth = 2.dp,
+                dashLength = 6.dp,
+                gapLength = 4.dp,
+            ),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),

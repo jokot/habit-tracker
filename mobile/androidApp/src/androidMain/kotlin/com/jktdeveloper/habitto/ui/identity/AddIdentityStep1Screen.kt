@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Identity
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.dashedBorder
 import com.jktdeveloper.habitto.ui.components.identityIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -266,11 +267,15 @@ private fun CustomIdentityTile(onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = Color.Transparent,
-        border = BorderStroke(
-            width = 2.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .dashedBorder(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(16.dp),
+                strokeWidth = 2.dp,
+                dashLength = 6.dp,
+                gapLength = 4.dp,
+            ),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
