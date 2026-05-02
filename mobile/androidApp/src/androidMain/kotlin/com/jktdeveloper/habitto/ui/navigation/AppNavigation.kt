@@ -253,6 +253,7 @@ fun AppNavigation(container: AppContainer) {
                 com.jktdeveloper.habitto.ui.identity.IdentityDetailScreen(
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
+                    onRemoveSuccess = { navController.popBackStack() },
                 )
             }
 
