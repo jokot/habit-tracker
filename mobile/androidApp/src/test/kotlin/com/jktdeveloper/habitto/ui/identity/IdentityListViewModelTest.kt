@@ -43,7 +43,7 @@ class IdentityListViewModelTest {
         repo.setUserIdentities("u1", setOf("a"))
         val statsUc = ComputeIdentityStatsUseCase(EmptyLogRepoForListVm(), repo)
         val aggregate = ObserveUserIdentitiesWithStatsUseCase(repo, statsUc)
-        val vm = IdentityListViewModel.forTest(aggregate, userIdProvider = { "u1" })
+        val vm = IdentityListViewModel.forTest(aggregate, identityRepo = repo, userIdProvider = { "u1" })
         advanceUntilIdle()
         val state = vm.state.value
         assertEquals(1, (state as? IdentityListState.Loaded)?.items?.size)
@@ -95,6 +95,13 @@ private class LocalFakeIdentityRepository(
     override suspend fun markHabitIdentitySynced(habitId: String, identityId: String, syncedAt: Instant) = error("unused")
     override suspend fun mergePulledHabitIdentity(row: HabitIdentityRow) = error("unused")
     override fun observeHabitsForIdentity(userId: String, identityId: String): Flow<List<Habit>> = flowOf(emptyList())
+    override suspend fun setPinForIdentity(userId: String, identityId: String, isPinned: Boolean) = Unit
+    override suspend fun clearPinForUser(userId: String) = Unit
+    override suspend fun updateWhyText(userId: String, identityId: String, whyText: String?) = Unit
+    override suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant) = Unit
+    override suspend fun setPinAtomically(userId: String, identityId: String) = Unit
+    override suspend fun getPinnedIdentityIdForUser(userId: String): String? = null
+    override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? = null
 }
 
 private class EmptyLogRepoForListVm : HabitLogRepository {
