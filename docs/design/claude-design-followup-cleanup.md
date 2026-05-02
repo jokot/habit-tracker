@@ -131,6 +131,26 @@ Today screen supports pull-to-refresh which triggers a manual sync. Currently no
 - Indicator should not visually conflict with the multi-identity chip strip below the top bar — design the indicator to overlay or push down.
 - Mark this in the Home artboard set as a separate state ("Today · refreshing") in light + dark.
 
+### 10. Empty-state entry point to AddIdentityFlow
+
+Surfaced during Phase 5c-2 smoke (2026-05-02): a user with **0 active identities** (e.g. skipped onboarding, or removed all identities) currently has NO designed empty state on Home or You hub. The Home identity strip and the You hub identity card both render only when at least one identity exists.
+
+Without an entry point, the user is locked out of `AddIdentityFlow` — they can't reach `IdentityList` because the You hub card is hidden, and no other surface offers a path.
+
+Design these empty-state variants explicitly:
+
+- **Home identity strip — empty.** Replace the strip with a single tappable CTA row "Pick your first identity" + small avatar/icon, hue-neutral. Tap → `AddIdentityFlow`.
+- **You hub identity card — empty.** Replace the stacked-avatars + sentence card with an empty-state card: "Pick your identities · Tap to choose who you want to become." with a `Person` or `Add` icon at the avatar slot. Tap → `IdentityList` (which itself shows the Add CTA) OR directly → `AddIdentityFlow`.
+- **IdentityList — empty.** When 0 active identities, the list shows ONLY the dashed "Add identity" CTA card (currently designed). Confirm this state is documented and labeled as the empty state.
+
+Empty-state copy must work for two distinct cases:
+1. New user who skipped onboarding (never had an identity).
+2. Existing user who removed all identities (had identities, removed them all).
+
+Single copy that fits both is fine — "Pick your identities" / "Tap to choose who you want to become" works for both.
+
+Add empty-state variants to the canvas for: Home (Today · empty identity), You hub (You · empty identities), IdentityList (Identity list · empty).
+
 ---
 
 ## Deliverables
