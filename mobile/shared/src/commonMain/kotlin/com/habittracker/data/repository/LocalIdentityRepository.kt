@@ -67,6 +67,9 @@ class LocalIdentityRepository(
                 identityId = it.identityId,
                 addedAt = Instant.fromEpochMilliseconds(it.addedAt),
                 syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
+                isPinned = it.isPinned == 1L,
+                whyText = it.whyText,
+                removedAt = it.removedAt?.let(Instant::fromEpochMilliseconds),
             )
         }
 
@@ -80,8 +83,50 @@ class LocalIdentityRepository(
             identityId = row.identityId,
             addedAt = row.addedAt.toEpochMilliseconds(),
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
+            isPinned = if (row.isPinned) 1L else 0L,
+            whyText = row.whyText,
+            removedAt = row.removedAt?.toEpochMilliseconds(),
         )
     }
+
+    override suspend fun setPinForIdentity(userId: String, identityId: String, isPinned: Boolean) {
+        q.setPinForIdentity(isPinned = if (isPinned) 1L else 0L, userId = userId, identityId = identityId)
+    }
+
+    override suspend fun clearPinForUser(userId: String) {
+        q.clearPinForUser(userId)
+    }
+
+    override suspend fun updateWhyText(userId: String, identityId: String, whyText: String?) {
+        q.updateWhyText(whyText = whyText, userId = userId, identityId = identityId)
+    }
+
+    override suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant) {
+        q.markUserIdentityRemoved(removedAt = removedAt.toEpochMilliseconds(), userId = userId, identityId = identityId)
+    }
+
+    override suspend fun setPinAtomically(userId: String, identityId: String) {
+        q.transaction {
+            q.clearPinForUser(userId)
+            q.setPinForIdentity(isPinned = 1L, userId = userId, identityId = identityId)
+        }
+    }
+
+    override suspend fun getPinnedIdentityIdForUser(userId: String): String? =
+        q.getPinnedIdentityIdForUser(userId).executeAsOneOrNull()
+
+    override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? =
+        q.getUserIdentityRow(userId, identityId).executeAsOneOrNull()?.let {
+            UserIdentityRow(
+                userId = it.userId,
+                identityId = it.identityId,
+                addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
+                isPinned = it.isPinned == 1L,
+                whyText = it.whyText,
+                removedAt = it.removedAt?.let(Instant::fromEpochMilliseconds),
+            )
+        }
 
     // ── habit identities ─────────────────────────────────────────────────
 

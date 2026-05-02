@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS LocalUserIdentity (
     identityId TEXT NOT NULL,
     addedAt INTEGER NOT NULL,
     syncedAt INTEGER,
+    isPinned INTEGER NOT NULL DEFAULT 0,
+    whyText TEXT,
+    removedAt INTEGER,
     PRIMARY KEY (userId, identityId)
 );
 
@@ -219,15 +222,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 -- LocalUserIdentity queries
 upsertUserIdentity:
-INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt)
-VALUES (?, ?, ?, NULL);
+INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt, isPinned, whyText, removedAt)
+VALUES (?, ?, ?, NULL, 0, NULL, NULL);
 
 mergePulledUserIdentity:
-INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt)
-VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalUserIdentity (userId, identityId, addedAt, syncedAt, isPinned, whyText, removedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 getUserIdentities:
-SELECT * FROM LocalUserIdentity WHERE userId = ? ORDER BY addedAt ASC;
+SELECT * FROM LocalUserIdentity WHERE userId = ? AND removedAt IS NULL ORDER BY isPinned DESC, addedAt ASC;
 
 deleteUserIdentity:
 DELETE FROM LocalUserIdentity WHERE userId = ? AND identityId = ?;
@@ -240,6 +243,24 @@ SELECT * FROM LocalUserIdentity WHERE userId = ? AND syncedAt IS NULL;
 
 markUserIdentitySynced:
 UPDATE LocalUserIdentity SET syncedAt = ? WHERE userId = ? AND identityId = ?;
+
+setPinForIdentity:
+UPDATE LocalUserIdentity SET isPinned = ?, syncedAt = NULL WHERE userId = ? AND identityId = ?;
+
+clearPinForUser:
+UPDATE LocalUserIdentity SET isPinned = 0, syncedAt = NULL WHERE userId = ? AND isPinned = 1;
+
+updateWhyText:
+UPDATE LocalUserIdentity SET whyText = ?, syncedAt = NULL WHERE userId = ? AND identityId = ?;
+
+markUserIdentityRemoved:
+UPDATE LocalUserIdentity SET removedAt = ?, isPinned = 0, syncedAt = NULL WHERE userId = ? AND identityId = ?;
+
+getPinnedIdentityIdForUser:
+SELECT identityId FROM LocalUserIdentity WHERE userId = ? AND isPinned = 1 AND removedAt IS NULL LIMIT 1;
+
+getUserIdentityRow:
+SELECT * FROM LocalUserIdentity WHERE userId = ? AND identityId = ? LIMIT 1;
 
 -- LocalHabitIdentity queries
 upsertHabitIdentity:

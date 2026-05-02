@@ -1,0 +1,7 @@
+-- Migrate HabitTrackerDatabase from version 1 → 2
+-- Adds isPinned (NOT NULL, default 0), whyText (nullable), removedAt (nullable)
+-- to LocalUserIdentity for Phase 5c-2 identity CRUD.
+
+ALTER TABLE LocalUserIdentity ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE LocalUserIdentity ADD COLUMN whyText TEXT;
+ALTER TABLE LocalUserIdentity ADD COLUMN removedAt INTEGER;

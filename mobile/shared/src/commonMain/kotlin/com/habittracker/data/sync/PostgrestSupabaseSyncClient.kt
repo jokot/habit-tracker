@@ -90,17 +90,19 @@ class PostgrestSupabaseSyncClient(
         supabase.postgrest.from("habit_identities").upsert(row.toDto())
     }
 
-    override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> =
-        supabase.postgrest.from("user_identities")
+    override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> {
+        // user_identities mutate via UPDATE (pin / why / soft-remove) without
+        // changing added_at. Watermark by added_at would miss those updates.
+        // Volume per user is small (≤10 rows) — fetch all rows for the user.
+        @Suppress("UNUSED_PARAMETER") val _s = sinceMs
+        return supabase.postgrest.from("user_identities")
             .select {
-                filter {
-                    eq("user_id", userId)
-                    gt("added_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                }
+                filter { eq("user_id", userId) }
                 order("added_at", Order.ASCENDING)
             }
             .decodeList<UserIdentityDto>()
             .map { it.toDomain() }
+    }
 
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
         // RLS scopes to habits owned by current user; client-side userId arg is for parity
@@ -260,24 +262,38 @@ private fun WantLogDto.toDomain() = WantLog(
     syncedAt = syncedAt?.let { Instant.parse(it) },
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 private data class UserIdentityDto(
     @SerialName("user_id") val userId: String,
     @SerialName("identity_id") val identityId: String,
     @SerialName("added_at") val addedAt: String,
+    // @EncodeDefault forces these fields into the JSON payload even when they
+    // equal their default. Without it, kotlinx-serialization omits default-valued
+    // fields, and Postgrest upsert preserves the stale server value (e.g. unpin
+    // would never propagate because is_pinned=false matched the default).
+    @kotlinx.serialization.EncodeDefault @SerialName("is_pinned") val isPinned: Boolean = false,
+    @kotlinx.serialization.EncodeDefault @SerialName("why_text") val whyText: String? = null,
+    @kotlinx.serialization.EncodeDefault @SerialName("removed_at") val removedAt: String? = null,
 )
 
 private fun UserIdentityRow.toDto() = UserIdentityDto(
     userId = userId,
     identityId = identityId,
     addedAt = addedAt.toString(),
+    isPinned = isPinned,
+    whyText = whyText,
+    removedAt = removedAt?.toString(),
 )
 
 private fun UserIdentityDto.toDomain() = UserIdentityRow(
     userId = userId,
     identityId = identityId,
     addedAt = Instant.parse(addedAt),
-    syncedAt = Instant.parse(addedAt),
+    syncedAt = Instant.parse(addedAt), // server-derived; existing convention
+    isPinned = isPinned,
+    whyText = whyText,
+    removedAt = removedAt?.let { Instant.parse(it) },
 )
 
 @Serializable

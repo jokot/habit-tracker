@@ -26,6 +26,8 @@ import com.jktdeveloper.habitto.ui.auth.AuthScreen
 import com.jktdeveloper.habitto.ui.auth.AuthViewModel
 import com.jktdeveloper.habitto.ui.home.HomeScreen
 import com.jktdeveloper.habitto.ui.home.HomeViewModel
+import com.jktdeveloper.habitto.ui.identity.AddIdentityScreen
+import com.jktdeveloper.habitto.ui.identity.AddIdentityViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
 import com.habittracker.data.sync.SyncReason
@@ -43,6 +45,7 @@ sealed class Screen(val route: String) {
         const val ARG_ID = "identityId"
         fun route(id: String) = "identity_detail/$id"
     }
+    object AddIdentity : Screen("add_identity")
 }
 
 @Composable
@@ -231,6 +234,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
+                    onAddIdentityClick = { navController.navigate(Screen.AddIdentity.route) },
                 )
             }
 
@@ -249,6 +253,21 @@ fun AppNavigation(container: AppContainer) {
                 com.jktdeveloper.habitto.ui.identity.IdentityDetailScreen(
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
+                    onRemoveSuccess = { navController.popBackStack() },
+                )
+            }
+
+            composable(Screen.AddIdentity.route) {
+                val vm = viewModel { AddIdentityViewModel(container) }
+                AddIdentityScreen(
+                    viewModel = vm,
+                    onClose = { navController.popBackStack() },
+                    onCommitSuccess = {
+                        navController.navigate(Screen.IdentityList.route) {
+                            popUpTo(Screen.IdentityList.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
         }

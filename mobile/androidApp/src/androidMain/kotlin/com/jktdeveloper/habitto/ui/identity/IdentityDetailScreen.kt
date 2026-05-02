@@ -15,35 +15,44 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.habittracker.domain.model.Habit
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHeatGrid
@@ -57,15 +66,12 @@ import com.jktdeveloper.habitto.ui.theme.NumeralStyle
 fun IdentityDetailScreen(
     viewModel: IdentityDetailViewModel,
     onBack: () -> Unit,
+    onRemoveSuccess: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+
+    LaunchedEffect(Unit) {
+        viewModel.removeSuccess.collect { onRemoveSuccess() }
     }
 
     Scaffold(
@@ -88,13 +94,17 @@ fun IdentityDetailScreen(
             IdentityDetailState.NotFound -> Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Identity not found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is IdentityDetailState.Loaded -> Body(s, padding)
+            is IdentityDetailState.Loaded -> Body(s, padding, viewModel)
         }
     }
 }
 
 @Composable
-private fun Body(state: IdentityDetailState.Loaded, padding: PaddingValues) {
+private fun Body(
+    state: IdentityDetailState.Loaded,
+    padding: PaddingValues,
+    viewModel: IdentityDetailViewModel,
+) {
     val identity = state.identity
     val stats = state.stats
     val hue = IdentityHue.forIdentityId(identity.name.lowercase())
@@ -191,6 +201,139 @@ private fun Body(state: IdentityDetailState.Loaded, padding: PaddingValues) {
                 }
             }
         }
+        item {
+            WhyCard(
+                whyText = state.whyText,
+                isEditing = state.isEditingWhy,
+                pendingDraft = state.pendingWhyDraft.orEmpty(),
+                onStartEditing = viewModel::startEditingWhy,
+                onUpdateDraft = viewModel::updateWhyDraft,
+                onSave = viewModel::saveWhyText,
+                onCancel = viewModel::cancelEditingWhy,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+        item {
+            ManageActions(
+                isPinned = state.isPinned,
+                onTogglePin = viewModel::togglePin,
+                onRemove = viewModel::removeIdentity,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WhyCard(
+    whyText: String?,
+    isEditing: Boolean,
+    pendingDraft: String,
+    onStartEditing: () -> Unit,
+    onUpdateDraft: (String) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            "Why this identity",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        if (isEditing) {
+            OutlinedTextField(
+                value = pendingDraft,
+                onValueChange = onUpdateDraft,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 6,
+                placeholder = { Text("Why does this identity matter to you?") },
+            )
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onCancel) { Text("Cancel") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = onSave) { Text("Save") }
+            }
+        } else {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = whyText?.let { "\"$it\"" } ?: "Tap edit to add a reflection.",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+            TextButton(
+                onClick = onStartEditing,
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Edit", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ManageActions(
+    isPinned: Boolean,
+    onTogglePin: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilledTonalButton(
+            onClick = onTogglePin,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp),
+        ) {
+            Icon(
+                if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(if (isPinned) "Unpin from Home" else "Pin to Home")
+        }
+        TextButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) {
+            Icon(
+                Icons.Outlined.Delete,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Remove identity")
+        }
+        Text(
+            "Removing keeps your habits — they stay associated with the identities they support.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

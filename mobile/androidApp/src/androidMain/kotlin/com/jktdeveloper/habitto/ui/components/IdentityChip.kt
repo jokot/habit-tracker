@@ -1,28 +1,38 @@
 package com.jktdeveloper.habitto.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Identity
 
 @Composable
-fun IdentityChip(identity: Identity, onClick: () -> Unit) {
+fun IdentityChip(identity: Identity, onClick: () -> Unit, isPinned: Boolean = false) {
+    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val isDark = isSystemInDarkTheme()
+    val hueTint = Color.hsl(hue, 0.60f, if (isDark) 0.65f else 0.40f)
+    val pinnedBg = if (isDark) Color.hsl(hue, 0.30f, 0.18f) else Color.hsl(hue, 0.30f, 0.92f)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = if (isPinned) pinnedBg else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, if (isPinned) hueTint else MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             modifier = Modifier.padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
@@ -31,7 +41,7 @@ fun IdentityChip(identity: Identity, onClick: () -> Unit) {
         ) {
             HabitGlyph(
                 icon = identityIcon(identity.name),
-                hue = IdentityHue.forIdentityId(identity.name.lowercase()),
+                hue = hue,
                 size = 22.dp,
             )
             Text(
@@ -40,6 +50,14 @@ fun IdentityChip(identity: Identity, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            if (isPinned) {
+                Icon(
+                    imageVector = Icons.Filled.PushPin,
+                    contentDescription = "Pinned",
+                    modifier = Modifier.size(11.dp),
+                    tint = Color.hsl(hue = hue, saturation = 0.50f, lightness = 0.32f),
+                )
+            }
         }
     }
 }

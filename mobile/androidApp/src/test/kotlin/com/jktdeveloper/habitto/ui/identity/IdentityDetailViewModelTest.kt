@@ -10,6 +10,10 @@ import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
+import com.habittracker.domain.usecase.PinIdentityUseCase
+import com.habittracker.domain.usecase.UnpinIdentityUseCase
+import com.habittracker.domain.usecase.RemoveIdentityUseCase
+import com.habittracker.domain.usecase.UpdateIdentityWhyUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +49,10 @@ class IdentityDetailViewModelTest {
         val vm = IdentityDetailViewModel.forTest(
             identityRepo = repo,
             statsUseCase = statsUc,
+            pinUseCase = PinIdentityUseCase(repo),
+            unpinUseCase = UnpinIdentityUseCase(repo),
+            removeUseCase = RemoveIdentityUseCase(repo),
+            updateWhyUseCase = UpdateIdentityWhyUseCase(repo),
             userIdProvider = { "u1" },
             identityId = "a",
         )
@@ -61,6 +69,10 @@ class IdentityDetailViewModelTest {
         val vm = IdentityDetailViewModel.forTest(
             identityRepo = repo,
             statsUseCase = statsUc,
+            pinUseCase = PinIdentityUseCase(repo),
+            unpinUseCase = UnpinIdentityUseCase(repo),
+            removeUseCase = RemoveIdentityUseCase(repo),
+            updateWhyUseCase = UpdateIdentityWhyUseCase(repo),
             userIdProvider = { "u1" },
             identityId = "z",
         )
@@ -114,6 +126,13 @@ private class FakeIdentityRepoForDetail(
     override suspend fun markHabitIdentitySynced(habitId: String, identityId: String, syncedAt: Instant) = error("unused")
     override suspend fun mergePulledHabitIdentity(row: HabitIdentityRow) = error("unused")
     override fun observeHabitsForIdentity(userId: String, identityId: String): Flow<List<Habit>> = flowOf(emptyList())
+    override suspend fun setPinForIdentity(userId: String, identityId: String, isPinned: Boolean) = Unit
+    override suspend fun clearPinForUser(userId: String) = Unit
+    override suspend fun updateWhyText(userId: String, identityId: String, whyText: String?) = Unit
+    override suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant) = Unit
+    override suspend fun setPinAtomically(userId: String, identityId: String) = Unit
+    override suspend fun getPinnedIdentityIdForUser(userId: String): String? = null
+    override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? = null
 }
 
 private class EmptyLogRepoForDetailVm : HabitLogRepository {
