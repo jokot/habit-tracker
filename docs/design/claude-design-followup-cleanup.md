@@ -163,12 +163,21 @@ Add empty-state variants to the canvas for: Home (Today · empty identity), You 
 6. **Home (revised)** — without freeze chip, without exchange-rate banner, without per-habit streak chip. Just the streak number + 7-day heatmap + KPI row + identity strip + habits + wants + bottom nav.
 7. **Today refresh states** — pulling / released / syncing / success / error variants of Today, light + dark.
 8. **Microcopy delta** for any labels that changed (drop "Wants" tab label, add "Manage wants" inside You hub, etc.).
-9. **Sort the canvas sections** in this order:
-   - **Design system** first (tokens, primitives, component library)
-   - **Existing-surface redesigns** next, in user-flow order: Onboarding → Auth → Today → Streak history → You hub → Settings
-   - **Future surfaces** after, in conceptually related groupings: Identity (list, detail, add) → Habit (detail, CRUD) → Want (list, detail, CRUD) → Freezes → Want timer → Exchange rate → Widgets
-   - **Notifications + IA diagram** last as reference appendices
-   - Within each section: light variants before dark; primary state before edge states (empty / loading / error / pending)
+9. **Sort the canvas sections.** All meta / non-app-screen artboards (anything that isn't a literal screen the user sees) sit at the TOP of the canvas. App screens sit below. Order:
+
+   **Top (meta / reference, NOT user-facing screens):**
+   - **Design system** — tokens (colors, type scale, spacing, radius, motion), primitives (Switch, Card, ListItem, HeatCell, SyncChip), iconography sheet, component library
+   - **Information architecture** — IA diagram, sitemap, navigation graph, flow charts
+
+   **Middle (existing-surface redesigns — actual app screens that already ship):**
+   - In user-flow order: Onboarding → Auth → Today → Streak history → You hub → Settings
+
+   **Bottom (future surfaces — actual app screens not yet built):**
+   - In conceptually related groupings: Identity (list, detail, add) → Habit (detail, CRUD) → Want (list, detail, CRUD) → Freezes → Want timer → Exchange rate → Widgets → Notifications
+
+   **Within each section:** light variants before dark; primary state before edge states (empty / loading / error / pending).
+
+   **Rationale for top placement:** designers and engineers reference the design system + IA constantly while reviewing screens. Putting them at the top keeps them findable without scrolling past dozens of screen artboards. Notifications moved into "future surfaces" since notification visual examples ARE app-facing UI (system tray notifications appear to the user) — they're not meta reference.
 
 ---
 
