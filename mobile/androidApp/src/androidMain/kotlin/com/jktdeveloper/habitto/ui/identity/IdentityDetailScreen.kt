@@ -67,6 +67,7 @@ fun IdentityDetailScreen(
     viewModel: IdentityDetailViewModel,
     onBack: () -> Unit,
     onRemoveSuccess: () -> Unit = {},
+    onHabitClick: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -94,7 +95,7 @@ fun IdentityDetailScreen(
             IdentityDetailState.NotFound -> Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Identity not found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is IdentityDetailState.Loaded -> Body(s, padding, viewModel)
+            is IdentityDetailState.Loaded -> Body(s, padding, viewModel, onHabitClick)
         }
     }
 }
@@ -104,6 +105,7 @@ private fun Body(
     state: IdentityDetailState.Loaded,
     padding: PaddingValues,
     viewModel: IdentityDetailViewModel,
+    onHabitClick: (String) -> Unit,
 ) {
     val identity = state.identity
     val stats = state.stats
@@ -196,7 +198,9 @@ private fun Body(
                     )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.habits.forEach { habit -> HabitRow(habit, hue) }
+                        state.habits.forEach { habit ->
+                            HabitRow(habit, hue, onClick = { onHabitClick(habit.id) })
+                        }
                     }
                 }
             }
@@ -353,8 +357,9 @@ private fun HeroStat(value: Int, label: String, color: Color = MaterialTheme.col
 }
 
 @Composable
-private fun HabitRow(habit: Habit, hue: Float) {
+private fun HabitRow(habit: Habit, hue: Float, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         color = MaterialTheme.colorScheme.surface,

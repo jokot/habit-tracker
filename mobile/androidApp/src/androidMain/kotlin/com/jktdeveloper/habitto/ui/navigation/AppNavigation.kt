@@ -264,6 +264,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onRemoveSuccess = { navController.popBackStack() },
+                    onHabitClick = { hid -> navController.navigate(Screen.HabitDetail.route(hid)) },
                 )
             }
 
