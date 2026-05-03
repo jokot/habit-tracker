@@ -26,6 +26,10 @@ import com.jktdeveloper.habitto.ui.auth.AuthScreen
 import com.jktdeveloper.habitto.ui.auth.AuthViewModel
 import com.jktdeveloper.habitto.ui.home.HomeScreen
 import com.jktdeveloper.habitto.ui.home.HomeViewModel
+import com.jktdeveloper.habitto.ui.habit.HabitDetailScreen
+import com.jktdeveloper.habitto.ui.habit.HabitDetailViewModel
+import com.jktdeveloper.habitto.ui.habit.HabitListScreen
+import com.jktdeveloper.habitto.ui.habit.HabitListViewModel
 import com.jktdeveloper.habitto.ui.identity.AddIdentityScreen
 import com.jktdeveloper.habitto.ui.identity.AddIdentityViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
@@ -228,6 +232,7 @@ fun AppNavigation(container: AppContainer) {
                         }
                     },
                     onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
+                    onHabitsClick = { navController.navigate(Screen.HabitList.route) },
                 )
             }
 
@@ -274,6 +279,28 @@ fun AppNavigation(container: AppContainer) {
                         }
                     },
                 )
+            }
+
+            composable(Screen.HabitList.route) {
+                val vm = viewModel { HabitListViewModel(container) }
+                HabitListScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onHabitClick = { id -> navController.navigate(Screen.HabitDetail.route(id)) },
+                )
+            }
+
+            composable(
+                route = Screen.HabitDetail.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.HabitDetail.ARG_ID) {
+                        type = androidx.navigation.NavType.StringType
+                    },
+                ),
+            ) { entry ->
+                val habitId = entry.arguments?.getString(Screen.HabitDetail.ARG_ID).orEmpty()
+                val vm = viewModel { HabitDetailViewModel(container, habitId) }
+                HabitDetailScreen(viewModel = vm, onBack = { navController.popBackStack() })
             }
         }
     }
