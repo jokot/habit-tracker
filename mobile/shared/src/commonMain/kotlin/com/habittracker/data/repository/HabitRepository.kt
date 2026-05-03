@@ -15,4 +15,5 @@ interface HabitRepository {
     suspend fun markSynced(id: String, syncedAt: Instant)
     suspend fun getByIdsForUser(userId: String, ids: List<String>): List<Habit>
     suspend fun mergePulled(row: Habit)
+    suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: Instant)
 }

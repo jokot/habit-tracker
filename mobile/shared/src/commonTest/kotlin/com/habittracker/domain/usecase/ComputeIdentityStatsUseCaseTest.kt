@@ -7,16 +7,22 @@ import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.Identity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import com.habittracker.domain.model.StreakDayState
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class ComputeIdentityStatsUseCaseTest {
 
@@ -137,6 +143,45 @@ class ComputeIdentityStatsUseCaseTest {
         val out = sut.computeNow(userId, identityId)
         assertEquals(14, out.last14Heat.size)
         assertEquals(90, out.last90Heat.size)
+    }
+
+    @Test
+    fun `habit added mid-day is not required for that day's complete check`() = runTest {
+        // today's dayStart = 2026-05-01T00:00Z; newHabit.effectiveFrom = 2026-05-01T14:00Z
+        // so newHabit is NOT active at dayStart → only oldHabit is required today.
+        val todayDate = LocalDate(2026, 5, 1)
+        val testTz = TimeZone.UTC
+        val todayDayStart = todayDate.atStartOfDayIn(testTz)
+        val newHabitEffectiveFrom = todayDayStart.plus(14, DateTimeUnit.HOUR, testTz)
+        val fiveDaysAgoInstant = todayDate.minus(5, DateTimeUnit.DAY).atStartOfDayIn(testTz)
+
+        val repo = FakeIdentityRepository(seed = listOf(seedIdentity))
+        val oldHabit = makeHabit("h1").copy(effectiveFrom = fiveDaysAgoInstant)
+        val newHabit = makeHabit("h2").copy(effectiveFrom = newHabitEffectiveFrom)
+        repo.seedHabit(oldHabit)
+        repo.seedHabit(newHabit)
+        repo.linkHabitToIdentities(oldHabit.id, setOf(identityId))
+        repo.linkHabitToIdentities(newHabit.id, setOf(identityId))
+
+        // Only oldHabit is logged today
+        val logs = listOf(makeLog("h1", todayDate))
+        val fakeClock = object : Clock {
+            override fun now(): Instant = newHabitEffectiveFrom // clock at 14:00 today
+        }
+        val sut = ComputeIdentityStatsUseCase(
+            habitLogRepo = AllLogsRepo(logs),
+            identityRepo = repo,
+            timeZone = testTz,
+            clock = fakeClock,
+        )
+        val stats = sut.computeNow(userId, identityId)
+
+        // today's last14States entry should NOT be BROKEN — newHabit isn't active at dayStart
+        // so today is COMPLETE (oldHabit logged) rather than TODAY_PENDING/BROKEN.
+        assertNotEquals(StreakDayState.BROKEN, stats.last14States.last())
+        assertNotEquals(StreakDayState.BROKEN, stats.last90States.last())
+        // More precisely: today should be COMPLETE since the only active-at-dayStart habit was logged
+        assertEquals(StreakDayState.COMPLETE, stats.last14States.last())
     }
 
     private fun makeHabit(id: String, dailyTarget: Int = 1, threshold: Double = 1.0) =

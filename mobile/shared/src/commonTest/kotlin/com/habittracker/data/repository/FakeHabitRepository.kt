@@ -49,4 +49,12 @@ class FakeHabitRepository : HabitRepository {
     override suspend fun mergePulled(row: Habit) {
         _habits.value = _habits.value.filterNot { it.id == row.id } + row
     }
+
+    override suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: Instant) {
+        _habits.value = _habits.value.map {
+            if (it.id == habitId && it.userId == userId) {
+                it.copy(effectiveTo = effectiveTo, syncedAt = null)
+            } else it
+        }
+    }
 }

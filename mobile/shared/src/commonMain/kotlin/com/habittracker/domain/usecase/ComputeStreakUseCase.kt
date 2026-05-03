@@ -86,11 +86,10 @@ class ComputeStreakUseCase(
     ): StreakRangeResult {
         val today = todayLocal()
         val habits = habitRepository.getHabitsForUser(userId)
-        val habitCount = habits.size
         val pastLogs = logs.filter { it.loggedAt <= now() } // ignore future-dated
-        // Strict streak (option A): a day counts as COMPLETE only when ALL habits met
-        // their dailyTarget that day. Partial-log days do NOT continue the streak.
-        val completeDays: Set<LocalDate> = if (habitCount == 0) emptySet() else
+        // Strict streak (option A): a day counts as COMPLETE only when ALL habits active
+        // on that day met their dailyTarget. Partial-log days do NOT continue the streak.
+        val completeDays: Set<LocalDate> =
             pastLogs.map { it.loggedAt.toLocalDate() }.toSet()
                 .filter { allHabitsMetTargetOnDay(pastLogs, habits, it) }
                 .toSet()
@@ -118,10 +117,8 @@ class ComputeStreakUseCase(
             prev = state
             cursor = cursor.plus(1, DateTimeUnit.DAY)
         }
-        // Pre-compute target sum + per-(day,habit) points for heat bucketing.
-        // Uses CURRENT habit set as denominator. Stale-heat when habits change is deferred
-        // until Habit CRUD ships (per-log target snapshot column or habit-history rows).
-        val targetSum = habits.sumOf { it.dailyTarget }.coerceAtLeast(1)
+        // Pre-compute per-(day,habit) points for heat bucketing.
+        // Target sum and active habit count are now computed per-day based on effective window.
         val habitsById = habits.associateBy { it.id }
         val rawByDayHabit = mutableMapOf<Pair<LocalDate, String>, Int>()
         pastLogs.forEach { log ->
@@ -143,8 +140,12 @@ class ComputeStreakUseCase(
         while (d < range.endExclusive) {
             val state = perDay[d] ?: StreakDayState.EMPTY
             val allLogged = d in completeDays
-            val heat = if (state == StreakDayState.FUTURE || habitCount == 0) 0
-                       else bucketFor(pointsByDay[d] ?: 0, allLogged, habitCount, targetSum)
+            val dayStart = d.atStartOfDayIn(timeZone)
+            val activeHabitsToday = habits.filter { habitActiveOn(it, dayStart) }
+            val activeCount = activeHabitsToday.size
+            val activeTargetSum = activeHabitsToday.sumOf { it.dailyTarget }.coerceAtLeast(1)
+            val heat = if (state == StreakDayState.FUTURE || activeCount == 0) 0
+                       else bucketFor(pointsByDay[d] ?: 0, allLogged, activeCount, activeTargetSum)
             days += StreakDay(d, state, heat)
             d = d.plus(1, DateTimeUnit.DAY)
         }
@@ -174,19 +175,21 @@ class ComputeStreakUseCase(
         }
     }
 
-    /** Strict streak rule: every habit must have at least one log on [date].
+    /** Strict streak rule: every habit ACTIVE on [date] must have at least one log.
      *  (Quantity / dailyTarget irrelevant — just presence per habit.) */
     private fun allHabitsMetTargetOnDay(
         logs: List<HabitLog>,
         habits: List<Habit>,
         date: LocalDate,
     ): Boolean {
-        if (habits.isEmpty()) return false
+        val dayStart = date.atStartOfDayIn(timeZone)
+        val activeHabits = habits.filter { habitActiveOn(it, dayStart) }
+        if (activeHabits.isEmpty()) return false
         val loggedHabitIds = logs
             .filter { sameLocalDate(date, it.loggedAt) }
             .map { it.habitId }
             .toSet()
-        return habits.all { it.id in loggedHabitIds }
+        return activeHabits.all { it.id in loggedHabitIds }
     }
 
     private fun sameLocalDate(date: LocalDate, instant: Instant): Boolean =
@@ -256,5 +259,9 @@ class ComputeStreakUseCase(
     private fun Instant.toLocalDate(): LocalDate = toLocalDateTime(timeZone).date
 
     private fun LocalDate.minusOneDay(): LocalDate = this.plus(-1, DateTimeUnit.DAY)
+
+    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
+        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
+        (habit.effectiveTo?.let { it > dayStart } ?: true)
 
 }

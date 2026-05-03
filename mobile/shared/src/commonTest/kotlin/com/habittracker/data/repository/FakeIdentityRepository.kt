@@ -113,7 +113,13 @@ class FakeIdentityRepository(
         val keep = habitIdentities.value.filterNot { it.habitId == habitId && it.identityId !in identityIds }
         val existingIds = keep.filter { it.habitId == habitId }.map { it.identityId }.toSet()
         val add = (identityIds - existingIds).map {
-            HabitIdentityRow(habitId = habitId, identityId = it, addedAt = now, syncedAt = null)
+            HabitIdentityRow(
+                habitId = habitId,
+                identityId = it,
+                addedAt = now,
+                syncedAt = null,
+                effectiveFrom = now,
+            )
         }
         habitIdentities.value = keep + add
     }

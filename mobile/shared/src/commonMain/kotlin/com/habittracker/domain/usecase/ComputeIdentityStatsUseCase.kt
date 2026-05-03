@@ -11,8 +11,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
@@ -41,7 +43,6 @@ class ComputeIdentityStatsUseCase(
         val habitIds = habits.map { it.id }.toSet()
         val habitsById = habits.associateBy { it.id }
         val logsForIdentity = allLogs.filter { it.habitId in habitIds }
-        val targetSum = habits.sumOf { it.dailyTarget }.coerceAtLeast(1)
 
         // Per-(day,habit) point sum (capped per habit at dailyTarget when summed for day).
         val rawByDayHabit = mutableMapOf<Pair<LocalDate, String>, Int>()
@@ -66,8 +67,8 @@ class ComputeIdentityStatsUseCase(
         val firstActivity = loggedHabitsByDay.keys.minOrNull()
         val last14 = buildHeatList(today, 14, pointsByDay, loggedHabitsByDay, habits)
         val last90 = buildHeatList(today, 90, pointsByDay, loggedHabitsByDay, habits)
-        val last14States = buildStateList(today, 14, habitIds, loggedHabitsByDay, firstActivity)
-        val last90States = buildStateList(today, 90, habitIds, loggedHabitsByDay, firstActivity)
+        val last14States = buildStateList(today, 14, habitIds, loggedHabitsByDay, firstActivity, habits)
+        val last90States = buildStateList(today, 90, habitIds, loggedHabitsByDay, firstActivity, habits)
 
         return IdentityStats(
             identityId = identityId,
@@ -103,14 +104,20 @@ class ComputeIdentityStatsUseCase(
         loggedHabitsByDay: Map<LocalDate, Set<String>>,
         habits: List<Habit>,
     ): List<Int> {
-        val bareMin = habits.size
-        val full = habits.sumOf { it.dailyTarget }
         val list = ArrayList<Int>(length)
         var cursor = today.minus(length - 1, DateTimeUnit.DAY)
         while (list.size < length) {
+            // 5e-1: per-day filter by Habit.effectiveFrom/effectiveTo only.
+            // HabitIdentityRow.effectiveFrom/effectiveTo per-day filter is deferred —
+            // users who unlink/re-link habits to identities mid-history will see a
+            // minor inaccuracy in identity-scoped streak retro (rare). Add when needed.
+            val dayStart = cursor.atStartOfDayIn(timeZone)
+            val activeHabitsToday = habits.filter { habitActiveOn(it, dayStart) }
+            val bareMin = activeHabitsToday.size
+            val full = activeHabitsToday.sumOf { it.dailyTarget }.coerceAtLeast(1)
             val pts = pointsByDay[cursor] ?: 0
-            val logged = loggedHabitsByDay[cursor]?.size ?: 0
-            val allLogged = logged == habits.size
+            val logged = loggedHabitsByDay[cursor]?.count { id -> activeHabitsToday.any { it.id == id } } ?: 0
+            val allLogged = activeHabitsToday.isEmpty() || logged == activeHabitsToday.size
             list += bucketFor(pts, allLogged, bareMin, full)
             cursor = cursor.plus(1, DateTimeUnit.DAY)
         }
@@ -134,9 +141,16 @@ class ComputeIdentityStatsUseCase(
         habitIds: Set<String>,
         loggedHabitsByDay: Map<LocalDate, Set<String>>,
         firstActivity: LocalDate?,
+        habits: List<Habit>,
     ): List<StreakDayState> {
         val isComplete: (LocalDate) -> Boolean = { d ->
-            habitIds.isNotEmpty() && habitIds.all { it in loggedHabitsByDay[d].orEmpty() }
+            // 5e-1: per-day filter by Habit.effectiveFrom/effectiveTo only.
+            // HabitIdentityRow.effectiveFrom/effectiveTo per-day filter is deferred —
+            // users who unlink/re-link habits to identities mid-history will see a
+            // minor inaccuracy in identity-scoped streak retro (rare). Add when needed.
+            val dayStart = d.atStartOfDayIn(timeZone)
+            val activeIds = habits.filter { habitActiveOn(it, dayStart) }.map { it.id }.toSet()
+            activeIds.isNotEmpty() && activeIds.all { it in loggedHabitsByDay[d].orEmpty() }
         }
         // Walk from firstActivity (or rangeStart) up to today to know the carrying state
         // when rangeStart is reached. Then emit only the requested window.
@@ -169,6 +183,10 @@ class ComputeIdentityStatsUseCase(
         }
         return list
     }
+
+    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
+        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
+        (habit.effectiveTo?.let { it > dayStart } ?: true)
 
     /**
      * Heat bucket anchored at domain concepts:
