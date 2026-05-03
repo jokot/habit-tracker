@@ -20,6 +20,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -297,6 +298,112 @@ class ComputeStreakUseCaseTest {
         assertEquals(0, byDate[today.plusDays(2)]?.heatLevel)
     }
 
+    // --- effective window tests ---
+
+    @Test
+    fun `habit added today not required for today`() = runTest {
+        val today = LocalDate(2026, 5, 2)
+        val now = LocalDateTime(today, LocalTime(14, 0)).toInstant(tz)
+        val fakeClock = FixedClock(now)
+
+        val habitRepo = MutableInMemoryHabitRepo()
+        val logRepo = MutableInMemoryHabitLogRepo(tz)
+
+        // Habit existed 5 days before today
+        val fiveDaysAgo = LocalDateTime(today.minusDays(5), LocalTime(0, 0)).toInstant(tz)
+        val oldHabit = com.habittracker.domain.model.Habit(
+            id = "h1", userId = userId, templateId = "t1", name = "Read",
+            unit = "times", thresholdPerPoint = 1.0, dailyTarget = 1,
+            createdAt = fiveDaysAgo, updatedAt = fiveDaysAgo,
+            effectiveFrom = fiveDaysAgo,
+        )
+        // New habit added at 14:00 today — effectiveFrom = 14:00 > dayStart 00:00
+        val newHabit = oldHabit.copy(id = "h2", name = "Run", effectiveFrom = now)
+
+        habitRepo.saveHabit(oldHabit)
+        habitRepo.saveHabit(newHabit)
+
+        // Log only oldHabit at 10:00 today
+        val loggedAt = LocalDateTime(today, LocalTime(10, 0)).toInstant(tz)
+        logRepo.insertLog("l1", userId, "h1", 1.0, loggedAt)
+
+        val useCase = ComputeStreakUseCase(logRepo, habitRepo, tz, fakeClock)
+        val range = DateRange(start = today, endExclusive = today.plusDays(1))
+        val result = useCase.computeNow(userId, range)
+        // newHabit effectiveFrom = 14:00 > dayStart 00:00 → NOT active today
+        // Only oldHabit required → logged → COMPLETE
+        assertEquals(StreakDayState.COMPLETE, result.days.first().state)
+    }
+
+    @Test
+    fun `past day before habit existed does not require it`() = runTest {
+        val today = LocalDate(2026, 5, 10)
+        val now = LocalDateTime(today, LocalTime(12, 0)).toInstant(tz)
+        val fakeClock = FixedClock(now)
+
+        val habitRepo = MutableInMemoryHabitRepo()
+        val logRepo = MutableInMemoryHabitLogRepo(tz)
+
+        val pastDay = LocalDate(2026, 5, 1)
+        val pastDayStart = LocalDateTime(pastDay, LocalTime(0, 0)).toInstant(tz)
+
+        // newHabit created May 5 (after pastDay May 1)
+        val mayFifthStart = LocalDateTime(LocalDate(2026, 5, 5), LocalTime(0, 0)).toInstant(tz)
+        val newHabit = com.habittracker.domain.model.Habit(
+            id = "h1", userId = userId, templateId = "t1", name = "Run",
+            unit = "times", thresholdPerPoint = 1.0, dailyTarget = 1,
+            createdAt = mayFifthStart, updatedAt = mayFifthStart,
+            effectiveFrom = mayFifthStart,
+        )
+        val aprilFirstStart = LocalDateTime(LocalDate(2026, 4, 1), LocalTime(0, 0)).toInstant(tz)
+        val oldHabit = newHabit.copy(
+            id = "h2", name = "Read",
+            createdAt = aprilFirstStart, updatedAt = aprilFirstStart,
+            effectiveFrom = aprilFirstStart,
+        )
+        habitRepo.saveHabit(newHabit)
+        habitRepo.saveHabit(oldHabit)
+
+        // Log only oldHabit on pastDay at 10:00
+        val loggedAt = LocalDateTime(pastDay, LocalTime(10, 0)).toInstant(tz)
+        logRepo.insertLog("l1", userId, "h2", 1.0, loggedAt)
+
+        val useCase = ComputeStreakUseCase(logRepo, habitRepo, tz, fakeClock)
+        val range = DateRange(start = pastDay, endExclusive = pastDay.plusDays(1))
+        val result = useCase.computeNow(userId, range)
+        // pastDay: newHabit effectiveFrom = May 5 > May 1 dayStart → NOT active
+        // Only oldHabit required → logged → COMPLETE
+        assertEquals(StreakDayState.COMPLETE, result.days.first().state)
+    }
+
+    @Test
+    fun `habit deleted today still required for today`() = runTest {
+        val today = LocalDate(2026, 5, 2)
+        val now = LocalDateTime(today, LocalTime(14, 0)).toInstant(tz)
+        val fakeClock = FixedClock(now)
+
+        val habitRepo = MutableInMemoryHabitRepo()
+        val logRepo = MutableInMemoryHabitLogRepo(tz)
+
+        val fiveDaysAgo = LocalDateTime(today.minusDays(5), LocalTime(0, 0)).toInstant(tz)
+        val deletedHabit = com.habittracker.domain.model.Habit(
+            id = "h1", userId = userId, templateId = "t1", name = "Run",
+            unit = "times", thresholdPerPoint = 1.0, dailyTarget = 1,
+            createdAt = fiveDaysAgo, updatedAt = fiveDaysAgo,
+            effectiveFrom = fiveDaysAgo,
+            effectiveTo = now,  // deleted at 14:00 today
+        )
+        habitRepo.saveHabit(deletedHabit)
+        // No log today
+
+        val useCase = ComputeStreakUseCase(logRepo, habitRepo, tz, fakeClock)
+        val range = DateRange(start = today, endExclusive = today.plusDays(1))
+        val result = useCase.computeNow(userId, range)
+        // Habit effectiveFrom = 5 days ago, effectiveTo = 14:00 > dayStart 00:00 → ACTIVE today
+        // No log → NOT COMPLETE
+        assertNotEquals(StreakDayState.COMPLETE, result.days.first().state)
+    }
+
     @AfterTest
     fun teardown() = Unit
 }
@@ -392,6 +499,7 @@ private class FixedCountHabitRepo(
     override suspend fun markSynced(id: String, syncedAt: kotlinx.datetime.Instant) = error("unused")
     override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
     override suspend fun mergePulled(row: com.habittracker.domain.model.Habit) = error("unused")
+    override suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: kotlinx.datetime.Instant) = error("unused")
 }
 
 private fun LocalDate.minusDays(d: Int): LocalDate =
@@ -405,3 +513,82 @@ private fun LocalDate.plusDays(d: Int): LocalDate =
 
 private fun LocalDate.plusDays(d: Long): LocalDate =
     this.plus(d.toInt(), DateTimeUnit.DAY)
+
+/**
+ * Mutable HabitLogRepository for tests that need to insert logs at setup time.
+ */
+private class MutableInMemoryHabitLogRepo(
+    private val tz: TimeZone,
+) : com.habittracker.data.repository.HabitLogRepository {
+    private val logs = mutableListOf<HabitLog>()
+
+    override suspend fun insertLog(
+        id: String, userId: String, habitId: String, quantity: Double, loggedAt: Instant,
+    ): HabitLog {
+        val log = HabitLog(
+            id = id, userId = userId, habitId = habitId,
+            quantity = quantity, loggedAt = loggedAt,
+            deletedAt = null, syncedAt = null,
+        )
+        logs += log
+        return log
+    }
+
+    override fun observeActiveLogsBetween(
+        userId: String, startInclusive: Instant, endExclusive: Instant,
+    ): Flow<List<HabitLog>> = flowOf(
+        logs.filter {
+            it.userId == userId && it.deletedAt == null &&
+                it.loggedAt >= startInclusive && it.loggedAt < endExclusive
+        }.sortedBy { it.loggedAt }
+    )
+
+    override suspend fun countActiveLogsBetween(
+        userId: String, startInclusive: Instant, endExclusive: Instant,
+    ): Int = logs.count {
+        it.userId == userId && it.deletedAt == null &&
+            it.loggedAt >= startInclusive && it.loggedAt < endExclusive
+    }
+
+    override suspend fun firstActiveLogAt(userId: String): Instant? =
+        logs.filter { it.userId == userId && it.deletedAt == null }
+            .minByOrNull { it.loggedAt }?.loggedAt
+
+    override suspend fun softDelete(logId: String, userId: String) = error("unused")
+    override fun observeActiveLogsForHabitOnDay(userId: String, habitId: String, dayStart: Instant, dayEnd: Instant) =
+        error("unused")
+    override suspend fun getActiveLogsForHabitOnDay(userId: String, habitId: String, dayStart: Instant, dayEnd: Instant) =
+        error("unused")
+    override fun observeAllActiveLogsForUser(userId: String) = error("unused")
+    override suspend fun getAllActiveLogsForUser(userId: String) = error("unused")
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: Instant) = error("unused")
+    override suspend fun mergePulled(row: HabitLog) = error("unused")
+}
+
+/**
+ * Mutable HabitRepository for tests that need to inject specific Habit instances.
+ */
+private class MutableInMemoryHabitRepo : com.habittracker.data.repository.HabitRepository {
+    private val habits = mutableListOf<com.habittracker.domain.model.Habit>()
+
+    override suspend fun saveHabit(habit: com.habittracker.domain.model.Habit) {
+        habits.removeAll { it.id == habit.id }
+        habits += habit
+    }
+
+    override suspend fun getHabitsForUser(userId: String): List<com.habittracker.domain.model.Habit> =
+        habits.filter { it.userId == userId }
+
+    override fun observeHabitsForUser(userId: String) = error("unused")
+    override suspend fun deleteHabit(habitId: String, userId: String) = error("unused")
+    override suspend fun migrateUserId(oldUserId: String, newUserId: String) = error("unused")
+    override suspend fun clearForUser(userId: String) = error("unused")
+    override suspend fun getUnsyncedFor(userId: String) = error("unused")
+    override suspend fun markSynced(id: String, syncedAt: kotlinx.datetime.Instant) = error("unused")
+    override suspend fun getByIdsForUser(userId: String, ids: List<String>) = error("unused")
+    override suspend fun mergePulled(row: com.habittracker.domain.model.Habit) = error("unused")
+    override suspend fun markHabitDeleted(habitId: String, userId: String, effectiveTo: kotlinx.datetime.Instant) = error("unused")
+}

@@ -121,6 +121,7 @@ class PostgrestSupabaseSyncClient(
 
 // ---- DTOs ---------------------------------------------------------------
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 private data class HabitDto(
     val id: String,
@@ -132,6 +133,8 @@ private data class HabitDto(
     @SerialName("daily_target") val dailyTarget: Int,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
+    @kotlinx.serialization.EncodeDefault @SerialName("effective_from") val effectiveFrom: String? = null,
+    @kotlinx.serialization.EncodeDefault @SerialName("effective_to") val effectiveTo: String? = null,
 )
 
 private fun Habit.toDto() = HabitDto(
@@ -144,6 +147,8 @@ private fun Habit.toDto() = HabitDto(
     dailyTarget = dailyTarget,
     createdAt = createdAt.toString(),
     updatedAt = updatedAt.toString(),
+    effectiveFrom = effectiveFrom?.toString(),
+    effectiveTo = effectiveTo?.toString(),
 )
 
 private fun HabitDto.toDomain(): Habit = Habit(
@@ -157,6 +162,8 @@ private fun HabitDto.toDomain(): Habit = Habit(
     createdAt = Instant.parse(createdAt),
     updatedAt = Instant.parse(updatedAt),
     syncedAt = Instant.parse(updatedAt),
+    effectiveFrom = effectiveFrom?.let { Instant.parse(it) },
+    effectiveTo = effectiveTo?.let { Instant.parse(it) },
 )
 
 @Serializable
@@ -296,17 +303,22 @@ private fun UserIdentityDto.toDomain() = UserIdentityRow(
     removedAt = removedAt?.let { Instant.parse(it) },
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 private data class HabitIdentityDto(
     @SerialName("habit_id") val habitId: String,
     @SerialName("identity_id") val identityId: String,
     @SerialName("added_at") val addedAt: String,
+    @kotlinx.serialization.EncodeDefault @SerialName("effective_from") val effectiveFrom: String? = null,
+    @kotlinx.serialization.EncodeDefault @SerialName("effective_to") val effectiveTo: String? = null,
 )
 
 private fun HabitIdentityRow.toDto() = HabitIdentityDto(
     habitId = habitId,
     identityId = identityId,
     addedAt = addedAt.toString(),
+    effectiveFrom = effectiveFrom?.toString(),
+    effectiveTo = effectiveTo?.toString(),
 )
 
 private fun HabitIdentityDto.toDomain() = HabitIdentityRow(
@@ -314,4 +326,6 @@ private fun HabitIdentityDto.toDomain() = HabitIdentityRow(
     identityId = identityId,
     addedAt = Instant.parse(addedAt),
     syncedAt = Instant.parse(addedAt),
+    effectiveFrom = effectiveFrom?.let { Instant.parse(it) },
+    effectiveTo = effectiveTo?.let { Instant.parse(it) },
 )

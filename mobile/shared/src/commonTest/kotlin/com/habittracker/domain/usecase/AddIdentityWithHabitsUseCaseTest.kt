@@ -99,4 +99,26 @@ class AddIdentityWithHabitsUseCaseTest {
         assertEquals(1, athleteLinks.size)
         assertEquals("h-existing", athleteLinks.first().habitId)
     }
+
+    @Test
+    fun `new habit has effectiveFrom set to now`() = runTest {
+        val fixedNow = Clock.System.now()
+        val fixedClock = object : Clock { override fun now() = fixedNow }
+        val useCaseWithFixedClock = AddIdentityWithHabitsUseCase(
+            habitRepo = habitRepo,
+            identityRepo = identityRepo,
+            templates = templates,
+            clock = fixedClock,
+        )
+        val athleteTemplates = templates.execute(setOf(athleteId))
+            .filter { twi -> twi.recommendedBy.any { it.id == athleteId } }
+        require(athleteTemplates.isNotEmpty()) { "Need athlete templates seeded" }
+        val tplId = athleteTemplates.first().template.id
+
+        useCaseWithFixedClock.execute(userId, athleteId, selectedTemplateIds = setOf(tplId))
+
+        val habits = habitRepo.getHabitsForUser(userId)
+        assertEquals(1, habits.size)
+        assertEquals(fixedNow, habits.first().effectiveFrom)
+    }
 }

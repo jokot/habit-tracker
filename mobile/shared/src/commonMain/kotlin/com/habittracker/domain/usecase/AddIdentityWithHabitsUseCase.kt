@@ -58,6 +58,7 @@ class AddIdentityWithHabitsUseCase(
                 createdAt = now,
                 updatedAt = now,
                 syncedAt = null,
+                effectiveFrom = now,
             )
             habitRepo.saveHabit(habit)
             identityRepo.linkHabitToIdentities(habit.id, setOf(identityId))

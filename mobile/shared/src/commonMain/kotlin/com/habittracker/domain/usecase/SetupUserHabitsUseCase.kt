@@ -7,11 +7,14 @@ import kotlinx.datetime.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class SetupUserHabitsUseCase(private val habitRepository: HabitRepository) {
+class SetupUserHabitsUseCase(
+    private val habitRepository: HabitRepository,
+    private val clock: Clock = Clock.System,
+) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun execute(userId: String, templates: List<HabitTemplate>): Result<Map<String, String>> =
         runCatching {
-            val now = Clock.System.now()
+            val now = clock.now()
             val mapping = mutableMapOf<String, String>()
             templates.forEach { template ->
                 val habitId = Uuid.random().toString()
@@ -26,6 +29,7 @@ class SetupUserHabitsUseCase(private val habitRepository: HabitRepository) {
                         dailyTarget = template.defaultDailyTarget,
                         createdAt = now,
                         updatedAt = now,
+                        effectiveFrom = now,
                     )
                 )
                 mapping[template.id] = habitId

@@ -1,0 +1,19 @@
+-- Migrate HabitTrackerDatabase from version 2 → 3
+-- Adds effectiveFrom + effectiveTo to LocalHabit and LocalHabitIdentity for
+-- past-streak-stability when habits or identity links are added/removed.
+-- Backfill: earliest log date or createdAt for habits; addedAt for links.
+
+ALTER TABLE LocalHabit ADD COLUMN effectiveFrom INTEGER;
+ALTER TABLE LocalHabit ADD COLUMN effectiveTo INTEGER;
+ALTER TABLE LocalHabitIdentity ADD COLUMN effectiveFrom INTEGER;
+ALTER TABLE LocalHabitIdentity ADD COLUMN effectiveTo INTEGER;
+
+-- Backfill habits: earliest active log OR createdAt fallback.
+UPDATE LocalHabit SET effectiveFrom = COALESCE(
+    (SELECT MIN(loggedAt) FROM HabitLog
+     WHERE HabitLog.habitId = LocalHabit.id AND HabitLog.deletedAt IS NULL),
+    createdAt
+) WHERE effectiveFrom IS NULL;
+
+-- Backfill habit_identities: link's existing addedAt.
+UPDATE LocalHabitIdentity SET effectiveFrom = addedAt WHERE effectiveFrom IS NULL;

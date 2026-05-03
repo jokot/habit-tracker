@@ -13,4 +13,6 @@ data class Habit(
     val createdAt: Instant,
     val updatedAt: Instant,
     val syncedAt: Instant? = null,
+    val effectiveFrom: Instant? = null,
+    val effectiveTo: Instant? = null,
 )
