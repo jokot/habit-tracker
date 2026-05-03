@@ -1,6 +1,8 @@
 # Habitto — Design Cleanup & Gap Fills
 
-Update the existing design canvas in place: remove duplicate / superseded artboards, apply the choices below across every screen consistently, and fill the missing screens. Produce a single canonical version of each screen — no duplicates, no contradictions.
+Update the existing design canvas in place: remove duplicate / superseded artboards, apply the choices below across every screen consistently, fill the missing screens, and **re-sort the canvas so meta / reference artboards (Design System + Information Architecture) sit at the TOP**, then existing-surface redesigns, then future surfaces. See §9 for the full sort spec.
+
+Produce a single canonical version of each screen — no duplicates, no contradictions.
 
 Tone, design system, and component primitives stay as already defined in `tokens.css` and `shared.jsx`.
 
