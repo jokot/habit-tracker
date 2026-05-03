@@ -132,7 +132,10 @@ private fun LoadedContent(state: HabitDetailState.Loaded, contentPadding: Paddin
 @Composable
 private fun StatsGrid(state: HabitDetailState.Loaded, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             StatTile(
                 label = "Per-habit streak",
                 value = state.streak.currentStreak.toString(),
@@ -146,7 +149,10 @@ private fun StatsGrid(state: HabitDetailState.Loaded, modifier: Modifier = Modif
                 modifier = Modifier.weight(1f),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             StatTile(
                 label = "Longest streak",
                 value = state.streak.longestStreak.toString(),
@@ -221,7 +227,10 @@ private fun ThirtyDayCard(cells: List<PerHabitDayState>, hue: Float, modifier: M
         ) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 cells.chunked(10).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         row.forEach { cell ->
                             DayCell(state = cell.state, hue = hue, modifier = Modifier.weight(1f).aspectRatio(1f))
                         }
