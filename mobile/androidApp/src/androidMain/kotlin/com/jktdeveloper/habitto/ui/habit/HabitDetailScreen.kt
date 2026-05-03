@@ -245,14 +245,18 @@ private fun ThirtyDayCard(cells: List<PerHabitDayState>, hue: Float, modifier: M
 private fun DayCell(state: StreakDayState, hue: Float, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(4.dp)
     val primary = MaterialTheme.colorScheme.primary
+    // COMPLETE always uses FlameOrange — distinct from BROKEN's red, consistent
+    // with the "Per-habit streak" stat tile color across the screen. Identity
+    // hue isn't applied here to avoid red-Athlete cells looking like BROKEN.
     val (bg, accent) = when (state) {
-        StreakDayState.COMPLETE -> Color.hsl(hue, 0.55f, 0.50f) to null
+        StreakDayState.COMPLETE -> FlameOrange to null
         StreakDayState.FROZEN -> StreakFrozenBg to StreakFrozen
         StreakDayState.BROKEN -> StreakBrokenBg to StreakBroken
         StreakDayState.TODAY_PENDING -> Color.Transparent to primary
         StreakDayState.EMPTY -> MaterialTheme.colorScheme.surfaceContainerLow to null
         StreakDayState.FUTURE -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f) to null
     }
+    @Suppress("UNUSED_PARAMETER") val unusedHue = hue  // hue param kept for future heat-bucket use
     val baseModifier = modifier.clip(shape).background(bg)
     val finalModifier = if (state == StreakDayState.TODAY_PENDING && accent != null) {
         baseModifier.border(2.dp, accent, shape)
