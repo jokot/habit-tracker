@@ -23,6 +23,7 @@ import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.UserIdentityProvider
 import com.habittracker.domain.usecase.ComputeStreakUseCase
 import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
+import com.habittracker.domain.usecase.ComputePerHabitStreakUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetDayPointsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
@@ -130,6 +131,7 @@ class AppContainer(context: Context) {
         habitLogRepo = habitLogRepository,
         identityRepo = identityRepository,
     )
+    val computePerHabitStreakUseCase = ComputePerHabitStreakUseCase(habitLogRepository, habitRepository)
     val observeUserIdentitiesWithStatsUseCase = ObserveUserIdentitiesWithStatsUseCase(
         identityRepo = identityRepository,
         statsUseCase = computeIdentityStatsUseCase,

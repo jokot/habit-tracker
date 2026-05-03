@@ -46,6 +46,11 @@ sealed class Screen(val route: String) {
         fun route(id: String) = "identity_detail/$id"
     }
     object AddIdentity : Screen("add_identity")
+    object HabitList : Screen("habit_list")
+    object HabitDetail : Screen("habit_detail/{habitId}") {
+        const val ARG_ID = "habitId"
+        fun route(id: String) = "habit_detail/$id"
+    }
 }
 
 @Composable
