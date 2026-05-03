@@ -1,5 +1,6 @@
 package com.jktdeveloper.habitto.ui.habit
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -107,12 +108,14 @@ fun HabitListScreen(
                             .fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     ) {
-                        items(s.habits, key = { it.habit.id }) { row ->
+                        itemsIndexed(s.habits, key = { _, it -> it.habit.id }) { index, row ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    thickness = 1.dp,
+                                )
+                            }
                             HabitRow(row = row, onClick = { onHabitClick(row.habit.id) })
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                thickness = 1.dp,
-                            )
                         }
                     }
                 }
@@ -123,47 +126,43 @@ fun HabitListScreen(
 
 @Composable
 private fun HabitRow(row: HabitRowItem, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
-        ) {
-            val firstIdentityName = row.identityNames.firstOrNull()
-            val hue = if (firstIdentityName != null)
-                IdentityHue.forIdentityId(firstIdentityName.lowercase())
-            else 0f
-            HabitGlyph(
-                icon = habitIcon(row.habit.name),
-                hue = hue,
-                size = 40.dp,
+        val firstIdentityName = row.identityNames.firstOrNull()
+        val hue = if (firstIdentityName != null)
+            IdentityHue.forIdentityId(firstIdentityName.lowercase())
+        else 0f
+        HabitGlyph(
+            icon = habitIcon(row.habit.name),
+            hue = hue,
+            size = 40.dp,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = row.habit.name,
+                style = MaterialTheme.typography.titleSmall,
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = row.habit.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                val subtitle = buildString {
-                    append(row.identityNames.joinToString(" · ").ifBlank { "Unlinked" })
-                    append(" · target ")
-                    append(row.habit.dailyTarget)
-                }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            val subtitle = buildString {
+                append(row.identityNames.joinToString(" · ").ifBlank { "Unlinked" })
+                append(" · target ")
+                append(row.habit.dailyTarget)
             }
-            Icon(
-                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Icon(
+            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
