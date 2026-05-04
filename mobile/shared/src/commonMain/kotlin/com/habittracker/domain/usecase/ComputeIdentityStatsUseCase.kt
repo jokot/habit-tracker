@@ -190,50 +190,42 @@ class ComputeIdentityStatsUseCase(
     }
 
     /**
-     * Conditional grace per day for identity engine:
+     * Conditional grace per day for identity engine.
+     *
      * - PAST days: date-overlap (effectiveFrom < dayEnd). Past mid-day creations
      *   count active for their creation day so historical heat/streak is correct.
-     * - TODAY:
-     *   - if identity has any habit with effectiveFrom < dayStart (a "pre-existing"
-     *     habit relative to today): use INSTANT grace. Old habits required, mid-day
-     *     additions excluded for today. Adding a habit to an existing identity
-     *     mid-day doesn't reset today's heat.
-     *   - else (fresh identity — every habit was added today): date-overlap. All
-     *     habits required so logging them all paints today green.
      *
-     * This mirrors user-level hybrid grace but adapts to the "fresh identity"
-     * edge case where there's no prior heat to protect.
+     * - TODAY: use a "settled-baseline" subset to absorb mid-day adds:
+     *   - Find the newest habit's effectiveFrom.
+     *   - Habits strictly older than that newest are the "settled" subset.
+     *   - If settled is non-empty, today's COMPLETE check uses ONLY the settled
+     *     subset. The just-added newest habit is excluded for today, so adding
+     *     a habit to an identity that already had heat doesn't reset it.
+     *   - If settled is empty (all habits share the same effectiveFrom — fresh
+     *     identity batch or single-habit), fall back to date-overlap so logging
+     *     the whole batch paints today green.
+     *
+     * Stable wrt clock advancement: the rule depends on relative effectiveFroms,
+     * not on time-since-now, so the heat doesn't "decay" minutes after a change.
      */
     private fun activeHabitsOn(habits: List<Habit>, dayStart: Instant): List<Habit> {
         val today = clock.now().toLocalDateTime(timeZone).date
         val dayDate = dayStart.toLocalDateTime(timeZone).date
         val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
         val endOk = { h: Habit -> h.effectiveTo?.let { it > dayStart } ?: true }
-        return if (dayDate == today) {
-            // "Pre-existing" = active under instant grace today (effectiveFrom <= dayStart).
-            // Onboarding habits anchored at startOfDay (effectiveFrom == dayStart) count
-            // as pre-existing — they're not mid-day adds, just calendar-day-zero seeds.
-            val hasPreExisting = habits.any { h ->
-                (h.effectiveFrom?.let { it <= dayStart } ?: true) &&
-                    (h.effectiveTo?.let { it > dayStart } ?: true)
-            }
-            if (hasPreExisting) {
-                // Instant grace: only existing habits count today.
-                habits.filter { h ->
-                    (h.effectiveFrom?.let { it <= dayStart } ?: true) && endOk(h)
-                }
-            } else {
-                // Fresh identity: date-overlap so today's just-added habits count.
-                habits.filter { h ->
-                    (h.effectiveFrom?.let { it < dayEnd } ?: true) && endOk(h)
-                }
-            }
-        } else {
-            // Past day: date-overlap.
-            habits.filter { h ->
-                (h.effectiveFrom?.let { it < dayEnd } ?: true) && endOk(h)
-            }
+        val dateOverlap = { h: Habit ->
+            (h.effectiveFrom?.let { it < dayEnd } ?: true) && endOk(h)
         }
+        if (dayDate != today) {
+            return habits.filter(dateOverlap)
+        }
+        val newestEff = habits.mapNotNull { it.effectiveFrom }.maxOrNull()
+        val settled = if (newestEff != null) {
+            habits.filter { h ->
+                (h.effectiveFrom == null || h.effectiveFrom!! < newestEff) && endOk(h)
+            }
+        } else emptyList()
+        return if (settled.isNotEmpty()) settled else habits.filter(dateOverlap)
     }
 
     /**

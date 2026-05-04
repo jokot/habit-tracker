@@ -217,12 +217,13 @@ private fun IdentitiesSection(state: HabitFormState, onChange: (Set<String>) -> 
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun FlowChips(content: @Composable () -> Unit) {
-    // Simple wrap row — Material 3 has FlowRow but kept minimal here.
-    Row(
+    androidx.compose.foundation.layout.FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) { content() }
 }
 

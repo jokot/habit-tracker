@@ -184,19 +184,18 @@ class ComputeIdentityStatsUseCaseTest {
     }
 
     @Test
-    fun `fresh identity (all habits new today) requires all to be logged for today's heat`() = runTest {
-        // The other half of conditional grace: if the identity has NO pre-existing
-        // habits (every linked habit was added today — fresh identity), date-overlap
-        // applies and ALL habits must be logged for today to count COMPLETE.
+    fun `fresh identity batch (same effectiveFrom) requires all to be logged`() = runTest {
+        // Settled-baseline rule: when no habit predates the newest one, the
+        // identity is "fresh" and date-overlap applies — every linked habit
+        // must be logged for today to count COMPLETE.
         val todayDate = LocalDate(2026, 5, 1)
         val testTz = TimeZone.UTC
         val todayDayStart = todayDate.atStartOfDayIn(testTz)
-        val morning = todayDayStart.plus(9, DateTimeUnit.HOUR, testTz)
-        val afternoon = todayDayStart.plus(14, DateTimeUnit.HOUR, testTz)
+        val sameInstant = todayDayStart.plus(14, DateTimeUnit.HOUR, testTz)
 
         val repo = FakeIdentityRepository(seed = listOf(seedIdentity))
-        val h1 = makeHabit("h1").copy(effectiveFrom = morning)
-        val h2 = makeHabit("h2").copy(effectiveFrom = afternoon)
+        val h1 = makeHabit("h1").copy(effectiveFrom = sameInstant)
+        val h2 = makeHabit("h2").copy(effectiveFrom = sameInstant)
         repo.seedHabit(h1)
         repo.seedHabit(h2)
         repo.linkHabitToIdentities(h1.id, setOf(identityId))
@@ -204,7 +203,7 @@ class ComputeIdentityStatsUseCaseTest {
 
         // Log only h1
         val partialLogs = listOf(makeLog("h1", todayDate))
-        val fakeClock = object : Clock { override fun now(): Instant = afternoon }
+        val fakeClock = object : Clock { override fun now(): Instant = sameInstant }
         val partialSut = ComputeIdentityStatsUseCase(
             habitLogRepo = AllLogsRepo(partialLogs),
             identityRepo = repo,
@@ -223,6 +222,36 @@ class ComputeIdentityStatsUseCaseTest {
             clock = fakeClock,
         )
         assertEquals(StreakDayState.COMPLETE, fullSut.computeNow(userId, identityId).last14States.last())
+    }
+
+    @Test
+    fun `adding habit to fresh identity after logging keeps today green`() = runTest {
+        // Fresh identity: 2 habits at 14:00, both logged → green. Then user
+        // adds a 3rd habit at 16:00. The 14:00 batch is now the "settled
+        // baseline" (strictly older than 16:00), all logged → today stays
+        // COMPLETE without requiring the just-added 3rd habit.
+        val todayDate = LocalDate(2026, 5, 1)
+        val testTz = TimeZone.UTC
+        val todayDayStart = todayDate.atStartOfDayIn(testTz)
+        val twoPm = todayDayStart.plus(14, DateTimeUnit.HOUR, testTz)
+        val fourPm = todayDayStart.plus(16, DateTimeUnit.HOUR, testTz)
+
+        val repo = FakeIdentityRepository(seed = listOf(seedIdentity))
+        val h1 = makeHabit("h1").copy(effectiveFrom = twoPm)
+        val h2 = makeHabit("h2").copy(effectiveFrom = twoPm)
+        val h3 = makeHabit("h3").copy(effectiveFrom = fourPm)
+        listOf(h1, h2, h3).forEach { repo.seedHabit(it); repo.linkHabitToIdentities(it.id, setOf(identityId)) }
+
+        val logs = listOf(makeLog("h1", todayDate), makeLog("h2", todayDate))
+        val fakeClock = object : Clock { override fun now(): Instant = fourPm }
+        val sut = ComputeIdentityStatsUseCase(
+            habitLogRepo = AllLogsRepo(logs),
+            identityRepo = repo,
+            timeZone = testTz,
+            clock = fakeClock,
+        )
+        // h1 + h2 (settled baseline at 14:00) both logged → COMPLETE despite h3 unlogged
+        assertEquals(StreakDayState.COMPLETE, sut.computeNow(userId, identityId).last14States.last())
     }
 
     private fun makeHabit(id: String, dailyTarget: Int = 1, threshold: Double = 1.0) =
