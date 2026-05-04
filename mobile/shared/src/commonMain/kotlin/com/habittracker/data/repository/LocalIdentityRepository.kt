@@ -133,12 +133,17 @@ class LocalIdentityRepository(
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {
         val now = Clock.System.now().toEpochMilliseconds()
         identityIds.forEach {
-            q.upsertHabitIdentity(
+            // Insert if absent (preserves original addedAt/effectiveFrom on existing rows),
+            // then UPDATE clears effectiveTo/syncedAt to "resume" any soft-removed link.
+            // Two statements emulate UPSERT (ON CONFLICT DO UPDATE) since the dialect targets
+            // SQLite 3.18 (API 26 ships pre-3.24) and full UPSERT syntax is unavailable.
+            q.insertHabitIdentityIfAbsent(
                 habitId = habitId,
                 identityId = it,
                 addedAt = now,
                 effectiveFrom = now,
             )
+            q.resumeHabitIdentity(habitId = habitId, identityId = it)
         }
     }
 

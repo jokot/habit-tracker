@@ -270,9 +270,14 @@ getUserIdentityRow:
 SELECT * FROM LocalUserIdentity WHERE userId = ? AND identityId = ? LIMIT 1;
 
 -- LocalHabitIdentity queries
-upsertHabitIdentity:
-INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
+insertHabitIdentityIfAbsent:
+INSERT OR IGNORE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
 VALUES (?, ?, ?, NULL, ?, NULL);
+
+resumeHabitIdentity:
+UPDATE LocalHabitIdentity
+SET syncedAt = NULL, effectiveTo = NULL
+WHERE habitId = ? AND identityId = ?;
 
 mergePulledHabitIdentity:
 INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
