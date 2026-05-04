@@ -45,6 +45,13 @@ class AddIdentityWithHabitsUseCase(
             .filter { twi -> twi.recommendedBy.any { it.id == identityId } }
             .associate { twi -> twi.template.id to twi.template }
 
+        // Capture clock.now() ONCE for the batch so every habit created in this
+        // call shares the same effectiveFrom. The settled-baseline rule in
+        // ComputeIdentityStatsUseCase uses strict inequality on effectiveFrom; if
+        // each habit got a slightly different microsecond timestamp here, the
+        // last-added one would become "newest" and the others would land in the
+        // settled baseline — incorrectly marking them as required for today.
+        val now = clock.now()
         for (templateId in selectedTemplateIds) {
             val existing = ownedByTemplate[templateId]
             if (existing != null) {
@@ -52,7 +59,6 @@ class AddIdentityWithHabitsUseCase(
                 continue
             }
             val tpl = tplsById[templateId] ?: continue
-            val now = clock.now()
             val habit = Habit(
                 id = Uuid.random().toString(),
                 userId = userId,

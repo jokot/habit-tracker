@@ -62,7 +62,7 @@ class ComputeIdentityStatsUseCase(
             pointsByDay[date] = (pointsByDay[date] ?: 0) + pts.coerceAtMost(target)
         }
 
-        val streak = computeStreak(today, habitIds, loggedHabitsByDay)
+        val streak = computeStreak(today, habits, loggedHabitsByDay)
         val daysActive = loggedHabitsByDay.keys.count { it <= today }
         val firstActivity = loggedHabitsByDay.keys.minOrNull()
         val last14 = buildHeatList(today, 14, pointsByDay, loggedHabitsByDay, habits)
@@ -82,10 +82,17 @@ class ComputeIdentityStatsUseCase(
         )
     }
 
-    private fun computeStreak(today: LocalDate, habitIds: Set<String>, loggedHabitsByDay: Map<LocalDate, Set<String>>): Int {
+    private fun computeStreak(today: LocalDate, habits: List<Habit>, loggedHabitsByDay: Map<LocalDate, Set<String>>): Int {
+        // Use the same settled-baseline rule as buildStateList so the streak
+        // counter agrees with the grid colors. Without this, the counter would
+        // require ALL habits logged regardless of effective windows, while the
+        // grid uses activeHabitsOn (settled-baseline) — they could disagree
+        // (e.g. grid green but counter 0).
         val isComplete: (LocalDate) -> Boolean = { d ->
+            val dayStart = d.atStartOfDayIn(timeZone)
+            val activeIds = activeHabitsOn(habits, dayStart).map { it.id }.toSet()
             val logged = loggedHabitsByDay[d].orEmpty()
-            habitIds.all { it in logged }
+            activeIds.isNotEmpty() && activeIds.all { it in logged }
         }
         var run = 0
         var cursor = today
