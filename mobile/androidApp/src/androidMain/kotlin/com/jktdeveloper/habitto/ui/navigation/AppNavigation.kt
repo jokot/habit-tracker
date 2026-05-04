@@ -343,7 +343,14 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onClose = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
-                    onDeleted = { navController.popBackStack() },
+                    onDeleted = {
+                        // Pop the form, then pop HabitDetail (which now shows
+                        // "Habit not found" since the row was just tombstoned).
+                        // Second pop is a no-op if HabitDetail wasn't on the
+                        // stack (e.g. delete from a non-detail entry).
+                        navController.popBackStack()
+                        navController.popBackStack(Screen.HabitDetail.route, inclusive = true)
+                    },
                 )
             }
         }
