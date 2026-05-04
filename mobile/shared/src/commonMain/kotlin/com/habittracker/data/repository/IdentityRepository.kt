@@ -54,6 +54,7 @@ data class HabitIdentityRow(
     val habitId: String,
     val identityId: String,
     val addedAt: Instant,
+    val updatedAt: Instant,
     val syncedAt: Instant?,
     val effectiveFrom: Instant? = null,
     val effectiveTo: Instant? = null,

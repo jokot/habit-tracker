@@ -141,9 +141,10 @@ class LocalIdentityRepository(
                 habitId = habitId,
                 identityId = it,
                 addedAt = now,
+                updatedAt = now,
                 effectiveFrom = now,
             )
-            q.resumeHabitIdentity(habitId = habitId, identityId = it)
+            q.resumeHabitIdentity(updatedAt = now, habitId = habitId, identityId = it)
         }
     }
 
@@ -157,6 +158,7 @@ class LocalIdentityRepository(
                 habitId = it.habitId,
                 identityId = it.identityId,
                 addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                updatedAt = Instant.fromEpochMilliseconds(it.updatedAt),
                 syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
                 effectiveFrom = it.effectiveFrom?.let(Instant::fromEpochMilliseconds),
                 effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),
@@ -172,6 +174,7 @@ class LocalIdentityRepository(
             habitId = row.habitId,
             identityId = row.identityId,
             addedAt = row.addedAt.toEpochMilliseconds(),
+            updatedAt = row.updatedAt.toEpochMilliseconds(),
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
             effectiveFrom = row.effectiveFrom?.toEpochMilliseconds(),
             effectiveTo = row.effectiveTo?.toEpochMilliseconds(),
@@ -190,6 +193,7 @@ class LocalIdentityRepository(
                 habitId = it.habitId,
                 identityId = it.identityId,
                 addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                updatedAt = Instant.fromEpochMilliseconds(it.updatedAt),
                 syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
                 effectiveFrom = it.effectiveFrom?.let(Instant::fromEpochMilliseconds),
                 effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),

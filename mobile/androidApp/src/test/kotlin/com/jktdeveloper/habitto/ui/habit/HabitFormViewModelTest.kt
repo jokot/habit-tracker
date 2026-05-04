@@ -181,6 +181,7 @@ private fun makeLink(habitId: String, identityId: String, effectiveTo: Instant?)
         habitId = habitId,
         identityId = identityId,
         addedAt = Instant.fromEpochSeconds(0),
+        updatedAt = Instant.fromEpochSeconds(0),
         syncedAt = null,
         effectiveFrom = null,
         effectiveTo = effectiveTo,

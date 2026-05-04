@@ -110,9 +110,9 @@ class PostgrestSupabaseSyncClient(
         return supabase.postgrest.from("habit_identities")
             .select {
                 filter {
-                    gt("added_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                    gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
                 }
-                order("added_at", Order.ASCENDING)
+                order("updated_at", Order.ASCENDING)
             }
             .decodeList<HabitIdentityDto>()
             .map { it.toDomain() }
@@ -309,6 +309,7 @@ private data class HabitIdentityDto(
     @SerialName("habit_id") val habitId: String,
     @SerialName("identity_id") val identityId: String,
     @SerialName("added_at") val addedAt: String,
+    @SerialName("updated_at") val updatedAt: String,
     @kotlinx.serialization.EncodeDefault @SerialName("effective_from") val effectiveFrom: String? = null,
     @kotlinx.serialization.EncodeDefault @SerialName("effective_to") val effectiveTo: String? = null,
 )
@@ -317,6 +318,7 @@ private fun HabitIdentityRow.toDto() = HabitIdentityDto(
     habitId = habitId,
     identityId = identityId,
     addedAt = addedAt.toString(),
+    updatedAt = updatedAt.toString(),
     effectiveFrom = effectiveFrom?.toString(),
     effectiveTo = effectiveTo?.toString(),
 )
@@ -325,7 +327,8 @@ private fun HabitIdentityDto.toDomain() = HabitIdentityRow(
     habitId = habitId,
     identityId = identityId,
     addedAt = Instant.parse(addedAt),
-    syncedAt = Instant.parse(addedAt),
+    updatedAt = Instant.parse(updatedAt),
+    syncedAt = Instant.parse(updatedAt),
     effectiveFrom = effectiveFrom?.let { Instant.parse(it) },
     effectiveTo = effectiveTo?.let { Instant.parse(it) },
 )

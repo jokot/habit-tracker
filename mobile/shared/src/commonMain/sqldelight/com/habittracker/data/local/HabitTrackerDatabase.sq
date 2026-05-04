@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS LocalHabitIdentity (
     habitId TEXT NOT NULL,
     identityId TEXT NOT NULL,
     addedAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
     syncedAt INTEGER,
     effectiveFrom INTEGER,
     effectiveTo INTEGER,
@@ -153,7 +154,7 @@ deleteHabit:
 DELETE FROM LocalHabit WHERE id = ? AND userId = ?;
 
 markHabitDeleted:
-UPDATE LocalHabit SET effectiveTo = ?, syncedAt = NULL WHERE id = ? AND userId = ?;
+UPDATE LocalHabit SET effectiveTo = :effectiveTo, updatedAt = :effectiveTo, syncedAt = NULL WHERE id = :id AND userId = :userId;
 
 -- LocalIdentity queries
 upsertIdentity:
@@ -271,17 +272,17 @@ SELECT * FROM LocalUserIdentity WHERE userId = ? AND identityId = ? LIMIT 1;
 
 -- LocalHabitIdentity queries
 insertHabitIdentityIfAbsent:
-INSERT OR IGNORE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
-VALUES (?, ?, ?, NULL, ?, NULL);
+INSERT OR IGNORE INTO LocalHabitIdentity (habitId, identityId, addedAt, updatedAt, syncedAt, effectiveFrom, effectiveTo)
+VALUES (?, ?, ?, ?, NULL, ?, NULL);
 
 resumeHabitIdentity:
 UPDATE LocalHabitIdentity
-SET syncedAt = NULL, effectiveTo = NULL
+SET syncedAt = NULL, effectiveTo = NULL, updatedAt = ?
 WHERE habitId = ? AND identityId = ?;
 
 mergePulledHabitIdentity:
-INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, syncedAt, effectiveFrom, effectiveTo)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalHabitIdentity (habitId, identityId, addedAt, updatedAt, syncedAt, effectiveFrom, effectiveTo)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 getHabitIdentities:
 SELECT * FROM LocalHabitIdentity WHERE habitId = ? ORDER BY addedAt ASC;
@@ -310,7 +311,7 @@ UPDATE LocalHabitIdentity SET syncedAt = ? WHERE habitId = ? AND identityId = ?;
 
 markHabitIdentityRemoved:
 UPDATE LocalHabitIdentity
-SET effectiveTo = :effectiveTo, syncedAt = NULL
+SET effectiveTo = :effectiveTo, updatedAt = :effectiveTo, syncedAt = NULL
 WHERE habitId = :habitId AND identityId = :identityId;
 
 getHabitsForIdentity:

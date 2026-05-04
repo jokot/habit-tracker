@@ -57,7 +57,7 @@ class HabitDetailViewModelTest {
             createdAt = now, updatedAt = now, effectiveFrom = now,
         )
         val athlete = Identity(id = "athlete", name = "Athlete", description = "", icon = "")
-        val link = HabitIdentityRow(habitId = "h1", identityId = "athlete", addedAt = now, syncedAt = null, effectiveFrom = now)
+        val link = HabitIdentityRow(habitId = "h1", identityId = "athlete", addedAt = now, updatedAt = now, syncedAt = null, effectiveFrom = now)
         val habitRepo = FakeHabitRepoForDetail(listOf(habit))
         val identityRepo = FakeIdentityRepoForDetail(seed = listOf(athlete), userIdentities = listOf(athlete.id), links = listOf(link))
         val logRepo = FakeHabitLogRepoForDetail(emptyList())

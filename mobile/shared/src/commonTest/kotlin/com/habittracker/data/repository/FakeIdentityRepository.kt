@@ -117,13 +117,14 @@ class FakeIdentityRepository(
             if (idx >= 0) {
                 // Upsert: matches `INSERT OR REPLACE` in LocalIdentityRepository — resets effectiveTo to null
                 // so re-linking a previously soft-removed identity resumes it.
-                current[idx] = current[idx].copy(effectiveTo = null, syncedAt = null)
+                current[idx] = current[idx].copy(effectiveTo = null, updatedAt = now, syncedAt = null)
             } else {
                 current.add(
                     HabitIdentityRow(
                         habitId = habitId,
                         identityId = identityId,
                         addedAt = now,
+                        updatedAt = now,
                         syncedAt = null,
                         effectiveFrom = now,
                         effectiveTo = null,
@@ -176,7 +177,7 @@ class FakeIdentityRepository(
         val links = habitIdentities.value.toMutableList()
         val idx = links.indexOfFirst { it.habitId == habitId && it.identityId == identityId }
         if (idx >= 0) {
-            links[idx] = links[idx].copy(effectiveTo = effectiveTo, syncedAt = null)
+            links[idx] = links[idx].copy(effectiveTo = effectiveTo, updatedAt = effectiveTo, syncedAt = null)
             habitIdentities.value = links
         }
     }

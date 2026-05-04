@@ -1,0 +1,26 @@
+-- LocalHabitIdentity gains updatedAt for cross-device sync watermark.
+-- Soft-unlinks (markHabitIdentityRemoved) need a watermark column so other
+-- devices can pull them via WHERE updated_at > since. addedAt does not
+-- advance on UPDATE, so it cannot serve as the watermark.
+-- SQLite cannot ADD COLUMN ... NOT NULL without DEFAULT, so rebuild the table.
+
+CREATE TABLE LocalHabitIdentity_new (
+    habitId TEXT NOT NULL,
+    identityId TEXT NOT NULL,
+    addedAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER,
+    effectiveFrom INTEGER,
+    effectiveTo INTEGER,
+    PRIMARY KEY (habitId, identityId)
+);
+
+INSERT INTO LocalHabitIdentity_new (habitId, identityId, addedAt, updatedAt, syncedAt, effectiveFrom, effectiveTo)
+    SELECT habitId, identityId, addedAt, addedAt, syncedAt, effectiveFrom, effectiveTo
+    FROM LocalHabitIdentity;
+
+DROP TABLE LocalHabitIdentity;
+
+ALTER TABLE LocalHabitIdentity_new RENAME TO LocalHabitIdentity;
+
+CREATE INDEX IF NOT EXISTS idx_habit_identity_identity ON LocalHabitIdentity(identityId);
