@@ -160,7 +160,7 @@ class FakeIdentityRepository(
             val habitIds = his.filter { it.identityId == identityId && it.effectiveTo == null }
                 .map { it.habitId }
                 .toSet()
-            hs.filter { it.userId == userId && it.id in habitIds }
+            hs.filter { it.userId == userId && it.id in habitIds && it.effectiveTo == null }
         }
 
     override suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow> {

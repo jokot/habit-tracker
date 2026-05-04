@@ -318,4 +318,6 @@ getHabitsForIdentity:
 SELECT h.*
 FROM LocalHabit h
 INNER JOIN LocalHabitIdentity li ON li.habitId = h.id
-WHERE h.userId = ? AND li.identityId = ? AND li.effectiveTo IS NULL;
+WHERE h.userId = ? AND li.identityId = ?
+  AND li.effectiveTo IS NULL
+  AND h.effectiveTo IS NULL;
