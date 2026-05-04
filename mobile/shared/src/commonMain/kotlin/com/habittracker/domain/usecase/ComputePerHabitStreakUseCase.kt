@@ -116,9 +116,16 @@ class ComputePerHabitStreakUseCase(
         }
     }
 
-    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
-        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
+    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean {
+        // Per-habit uses date-overlap (effectiveFrom < dayEnd), unlike user-level
+        // and identity engines which use the 5c-2 instant grace (effectiveFrom <=
+        // dayStart). Reason: per-habit grid must show today's log as COMPLETE for
+        // a habit created today. The grace only applies to multi-habit aggregates
+        // — a single habit logged today is COMPLETE for itself by definition.
+        val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
+        return (habit.effectiveFrom?.let { it < dayEnd } ?: true) &&
             (habit.effectiveTo?.let { it > dayStart } ?: true)
+    }
 
     private fun Instant.toLocalDate(): LocalDate = toLocalDateTime(timeZone).date
 

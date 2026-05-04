@@ -117,8 +117,13 @@ class ComputeIdentityStatsUseCase(
             val full = activeHabitsToday.sumOf { it.dailyTarget }.coerceAtLeast(1)
             val pts = pointsByDay[cursor] ?: 0
             val logged = loggedHabitsByDay[cursor]?.count { id -> activeHabitsToday.any { it.id == id } } ?: 0
-            val allLogged = activeHabitsToday.isEmpty() || logged == activeHabitsToday.size
-            list += bucketFor(pts, allLogged, bareMin, full)
+            // Mirror user-level engine (ComputeStreakUseCase line ~147): when the
+            // identity has no active habits on a day, heat is 0. Without this,
+            // an empty active set makes `allLogged` vacuously true and any stray
+            // log paints the cell green — wrong for newly-added identities whose
+            // habits aren't active until the next day under 5c-2 grace.
+            val allLogged = activeHabitsToday.isNotEmpty() && logged == activeHabitsToday.size
+            list += if (activeHabitsToday.isEmpty()) 0 else bucketFor(pts, allLogged, bareMin, full)
             cursor = cursor.plus(1, DateTimeUnit.DAY)
         }
         return list
@@ -184,9 +189,18 @@ class ComputeIdentityStatsUseCase(
         return list
     }
 
-    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
-        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
-        (habit.effectiveTo?.let { it > dayStart } ?: true)
+    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean {
+        // Identity engine uses date-overlap (effectiveFrom < dayEnd), same as
+        // per-habit engine. 5c-2 grace at identity level is unnecessary: a
+        // newly-added identity has no prior streak to protect, and an existing
+        // identity gaining a new habit needs that habit reflected in today's
+        // heat once logged. User-level engine (ComputeStreakUseCase) keeps the
+        // instant grace to protect the cross-identity streak when a single
+        // identity/habit is added mid-day.
+        val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
+        return (habit.effectiveFrom?.let { it < dayEnd } ?: true) &&
+            (habit.effectiveTo?.let { it > dayStart } ?: true)
+    }
 
     /**
      * Heat bucket anchored at domain concepts:

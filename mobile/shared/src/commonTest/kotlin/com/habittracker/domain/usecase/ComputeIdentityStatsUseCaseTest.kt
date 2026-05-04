@@ -146,9 +146,10 @@ class ComputeIdentityStatsUseCaseTest {
     }
 
     @Test
-    fun `habit added mid-day is not required for that day's complete check`() = runTest {
-        // today's dayStart = 2026-05-01T00:00Z; newHabit.effectiveFrom = 2026-05-01T14:00Z
-        // so newHabit is NOT active at dayStart → only oldHabit is required today.
+    fun `habit added mid-day IS required for that day's complete check (date-overlap)`() = runTest {
+        // Identity engine uses date-overlap — habit created today at 14:00 IS active
+        // for today, so today is TODAY_PENDING (not COMPLETE) until BOTH habits are
+        // logged. The 5c-2 grace lives only at the user-level engine, not here.
         val todayDate = LocalDate(2026, 5, 1)
         val testTz = TimeZone.UTC
         val todayDayStart = todayDate.atStartOfDayIn(testTz)
@@ -176,12 +177,9 @@ class ComputeIdentityStatsUseCaseTest {
         )
         val stats = sut.computeNow(userId, identityId)
 
-        // today's last14States entry should NOT be BROKEN — newHabit isn't active at dayStart
-        // so today is COMPLETE (oldHabit logged) rather than TODAY_PENDING/BROKEN.
-        assertNotEquals(StreakDayState.BROKEN, stats.last14States.last())
-        assertNotEquals(StreakDayState.BROKEN, stats.last90States.last())
-        // More precisely: today should be COMPLETE since the only active-at-dayStart habit was logged
-        assertEquals(StreakDayState.COMPLETE, stats.last14States.last())
+        // newHabit is active today (date-overlap), and not logged → today is NOT COMPLETE
+        assertNotEquals(StreakDayState.COMPLETE, stats.last14States.last())
+        assertEquals(StreakDayState.TODAY_PENDING, stats.last14States.last())
     }
 
     private fun makeHabit(id: String, dailyTarget: Int = 1, threshold: Double = 1.0) =
