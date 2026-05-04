@@ -178,6 +178,18 @@ class LocalIdentityRepository(
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list -> list.map { it.toDomain() } }
+
+    override suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow> =
+        q.getHabitIdentitiesForUser(userId).executeAsList().map {
+            HabitIdentityRow(
+                habitId = it.habitId,
+                identityId = it.identityId,
+                addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
+                effectiveFrom = it.effectiveFrom?.let(Instant::fromEpochMilliseconds),
+                effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),
+            )
+        }
 }
 
 private fun LocalHabit.toDomain(): Habit = Habit(

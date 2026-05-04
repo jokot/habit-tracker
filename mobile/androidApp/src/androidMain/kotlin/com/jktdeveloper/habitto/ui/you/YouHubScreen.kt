@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -32,6 +33,7 @@ fun YouHubScreen(
     onSignIn: () -> Unit,
     onSignOutComplete: () -> Unit,
     onOpenIdentities: () -> Unit,
+    onHabitsClick: () -> Unit,
 ) {
     val authState by viewModel.authState.collectAsState()
     val isSigningOut by viewModel.isSigningOut.collectAsState()
@@ -60,6 +62,23 @@ fun YouHubScreen(
             item {
                 val identities by viewModel.userIdentities.collectAsState()
                 IdentityHubCard(identities = identities, onClick = onOpenIdentities)
+            }
+            item { SectionHeader("Tracking") }
+            item {
+                ListItem(
+                    modifier = Modifier.fillMaxWidth().clickable { onHabitsClick() },
+                    leadingContent = {
+                        Icon(
+                            Icons.Outlined.TaskAlt,
+                            contentDescription = null,
+                        )
+                    },
+                    headlineContent = { Text("Habits") },
+                    supportingContent = { Text("Manage what you track") },
+                    trailingContent = {
+                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    },
+                )
             }
             item { SectionHeader("Account") }
             if (authState.isAuthenticated) {

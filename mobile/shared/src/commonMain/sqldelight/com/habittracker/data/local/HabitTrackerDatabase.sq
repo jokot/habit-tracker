@@ -288,6 +288,12 @@ clearHabitIdentitiesForUser:
 DELETE FROM LocalHabitIdentity
 WHERE habitId IN (SELECT id FROM LocalHabit WHERE userId = ?);
 
+getHabitIdentitiesForUser:
+SELECT li.*
+FROM LocalHabitIdentity li
+INNER JOIN LocalHabit h ON h.id = li.habitId
+WHERE h.userId = ?;
+
 getUnsyncedHabitIdentitiesForUser:
 SELECT li.*
 FROM LocalHabitIdentity li

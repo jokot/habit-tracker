@@ -126,6 +126,7 @@ private class FakeIdentityRepoForDetail(
     override suspend fun markHabitIdentitySynced(habitId: String, identityId: String, syncedAt: Instant) = error("unused")
     override suspend fun mergePulledHabitIdentity(row: HabitIdentityRow) = error("unused")
     override fun observeHabitsForIdentity(userId: String, identityId: String): Flow<List<Habit>> = flowOf(emptyList())
+    override suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow> = emptyList()
     override suspend fun setPinForIdentity(userId: String, identityId: String, isPinned: Boolean) = Unit
     override suspend fun clearPinForUser(userId: String) = Unit
     override suspend fun updateWhyText(userId: String, identityId: String, whyText: String?) = Unit

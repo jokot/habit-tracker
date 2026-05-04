@@ -150,6 +150,11 @@ class FakeIdentityRepository(
             hs.filter { it.userId == userId && it.id in habitIds }
         }
 
+    override suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow> {
+        val userHabitIds = habits.value.filter { it.userId == userId }.map { it.id }.toSet()
+        return habitIdentities.value.filter { it.habitId in userHabitIds }
+    }
+
     fun seedUserIdentity(
         userId: String,
         identityId: String,
