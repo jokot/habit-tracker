@@ -21,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +59,7 @@ import com.habittracker.domain.model.Habit
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHeatGrid
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.dashedBorder
 import com.jktdeveloper.habitto.ui.components.identityIcon
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.NumeralStyle
@@ -68,11 +71,30 @@ fun IdentityDetailScreen(
     onBack: () -> Unit,
     onRemoveSuccess: () -> Unit = {},
     onHabitClick: (String) -> Unit = {},
+    onAddHabit: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    val showRemoveDialog by viewModel.showRemoveDialog.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.removeSuccess.collect { onRemoveSuccess() }
+    }
+
+    if (showRemoveDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRemoveDialog,
+            title = { Text("Remove identity?") },
+            text = { Text("Removing keeps your habits — they stay associated with the identities they support.") },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmRemove,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Remove") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRemoveDialog) { Text("Cancel") }
+            },
+        )
     }
 
     Scaffold(
@@ -95,7 +117,7 @@ fun IdentityDetailScreen(
             IdentityDetailState.NotFound -> Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Identity not found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is IdentityDetailState.Loaded -> Body(s, padding, viewModel, onHabitClick)
+            is IdentityDetailState.Loaded -> Body(s, padding, viewModel, onHabitClick, onAddHabit)
         }
     }
 }
@@ -106,6 +128,7 @@ private fun Body(
     padding: PaddingValues,
     viewModel: IdentityDetailViewModel,
     onHabitClick: (String) -> Unit,
+    onAddHabit: () -> Unit,
 ) {
     val identity = state.identity
     val stats = state.stats
@@ -190,18 +213,11 @@ private fun Body(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
-                if (state.habits.isEmpty()) {
-                    Text(
-                        "No habits linked yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.habits.forEach { habit ->
-                            HabitRow(habit, hue, onClick = { onHabitClick(habit.id) })
-                        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.habits.forEach { habit ->
+                        HabitRow(habit, hue, onClick = { onHabitClick(habit.id) })
                     }
+                    AddHabitRow(onClick = onAddHabit)
                 }
             }
         }
@@ -221,7 +237,7 @@ private fun Body(
             ManageActions(
                 isPinned = state.isPinned,
                 onTogglePin = viewModel::togglePin,
-                onRemove = viewModel::removeIdentity,
+                onRemove = viewModel::beginRemove,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
@@ -353,6 +369,42 @@ private fun HeroStat(value: Int, label: String, color: Color = MaterialTheme.col
             letterSpacing = 0.4.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun AddHabitRow(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = Color.Transparent,
+        modifier = Modifier
+            .fillMaxWidth()
+            .dashedBorder(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(14.dp),
+                strokeWidth = 1.dp,
+                dashLength = 6.dp,
+                gapLength = 4.dp,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                "Add habit",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 

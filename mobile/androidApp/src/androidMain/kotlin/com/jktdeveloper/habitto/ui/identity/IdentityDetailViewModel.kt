@@ -57,6 +57,9 @@ class IdentityDetailViewModel private constructor(
     private val _removeSuccess = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val removeSuccess: SharedFlow<Unit> = _removeSuccess.asSharedFlow()
 
+    private val _showRemoveDialog = MutableStateFlow(false)
+    val showRemoveDialog: StateFlow<Boolean> = _showRemoveDialog.asStateFlow()
+
     private var job: Job? = null
 
     constructor(container: AppContainer, identityId: String) : this(
@@ -126,6 +129,15 @@ class IdentityDetailViewModel private constructor(
                     _removeSuccess.tryEmit(Unit)
                 }
         }
+    }
+
+    fun beginRemove() { _showRemoveDialog.value = true }
+
+    fun dismissRemoveDialog() { _showRemoveDialog.value = false }
+
+    fun confirmRemove() {
+        _showRemoveDialog.value = false
+        removeIdentity()
     }
 
     fun startEditingWhy() {
