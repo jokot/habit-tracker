@@ -299,6 +299,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onHabitClick = { id -> navController.navigate(Screen.HabitDetail.route(id)) },
+                    onAddHabit = { navController.navigate(Screen.HabitForm.route()) },
                 )
             }
 
