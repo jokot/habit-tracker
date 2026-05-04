@@ -5,7 +5,8 @@ import kotlinx.datetime.Instant
 data class Habit(
     val id: String,
     val userId: String,
-    val templateId: String,
+    /** Null for custom (free-form) habits not derived from a curated template. */
+    val templateId: String?,
     val name: String,
     val unit: String,
     val thresholdPerPoint: Double,

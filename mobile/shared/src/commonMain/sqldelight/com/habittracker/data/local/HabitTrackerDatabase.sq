@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS WantLog (
 CREATE TABLE IF NOT EXISTS LocalHabit (
     id TEXT NOT NULL PRIMARY KEY,
     userId TEXT NOT NULL,
-    templateId TEXT NOT NULL,
+    templateId TEXT,
     name TEXT NOT NULL,
     unit TEXT NOT NULL,
     thresholdPerPoint REAL NOT NULL,

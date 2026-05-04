@@ -126,7 +126,7 @@ class PostgrestSupabaseSyncClient(
 private data class HabitDto(
     val id: String,
     @SerialName("user_id") val userId: String,
-    @SerialName("template_id") val templateId: String,
+    @SerialName("template_id") val templateId: String?,
     val name: String,
     val unit: String,
     @SerialName("threshold_per_point") val thresholdPerPoint: Double,

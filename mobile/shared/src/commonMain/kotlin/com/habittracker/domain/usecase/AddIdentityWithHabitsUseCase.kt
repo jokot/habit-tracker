@@ -30,8 +30,11 @@ class AddIdentityWithHabitsUseCase(
         identityRepo.setUserIdentities(userId, currentlyActive + identityId)
 
         // 2. For each selected template, link existing habit OR create + link.
+        // Custom habits (templateId=null) cannot match any selectedTemplateId, so exclude them.
         val ownedByTemplate: Map<String, Habit> =
-            habitRepo.getHabitsForUser(userId).associateBy { it.templateId }
+            habitRepo.getHabitsForUser(userId)
+                .mapNotNull { h -> h.templateId?.let { tid -> tid to h } }
+                .toMap()
 
         // GetHabitTemplatesForIdentitiesUseCase returns List<TemplateWithIdentities>.
         // Build a map of templateId -> HabitTemplate for the given identity.
