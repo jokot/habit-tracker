@@ -17,7 +17,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +47,7 @@ fun HabitListScreen(
     viewModel: HabitListViewModel,
     onBack: () -> Unit,
     onHabitClick: (String) -> Unit,
+    onAddHabit: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     Scaffold(
@@ -64,6 +67,13 @@ fun HabitListScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 windowInsets = WindowInsets(0.dp),
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onAddHabit,
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text("New habit") },
             )
         },
         contentWindowInsets = WindowInsets(0.dp),

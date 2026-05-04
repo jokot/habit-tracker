@@ -133,12 +133,18 @@ class LocalIdentityRepository(
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {
         val now = Clock.System.now().toEpochMilliseconds()
         identityIds.forEach {
-            q.upsertHabitIdentity(
+            // Insert if absent (preserves original addedAt/effectiveFrom on existing rows),
+            // then UPDATE clears effectiveTo/syncedAt to "resume" any soft-removed link.
+            // Two statements emulate UPSERT (ON CONFLICT DO UPDATE) since the dialect targets
+            // SQLite 3.18 (API 26 ships pre-3.24) and full UPSERT syntax is unavailable.
+            q.insertHabitIdentityIfAbsent(
                 habitId = habitId,
                 identityId = it,
                 addedAt = now,
+                updatedAt = now,
                 effectiveFrom = now,
             )
+            q.resumeHabitIdentity(updatedAt = now, habitId = habitId, identityId = it)
         }
     }
 
@@ -152,6 +158,7 @@ class LocalIdentityRepository(
                 habitId = it.habitId,
                 identityId = it.identityId,
                 addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                updatedAt = Instant.fromEpochMilliseconds(it.updatedAt),
                 syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
                 effectiveFrom = it.effectiveFrom?.let(Instant::fromEpochMilliseconds),
                 effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),
@@ -167,6 +174,7 @@ class LocalIdentityRepository(
             habitId = row.habitId,
             identityId = row.identityId,
             addedAt = row.addedAt.toEpochMilliseconds(),
+            updatedAt = row.updatedAt.toEpochMilliseconds(),
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
             effectiveFrom = row.effectiveFrom?.toEpochMilliseconds(),
             effectiveTo = row.effectiveTo?.toEpochMilliseconds(),
@@ -185,11 +193,24 @@ class LocalIdentityRepository(
                 habitId = it.habitId,
                 identityId = it.identityId,
                 addedAt = Instant.fromEpochMilliseconds(it.addedAt),
+                updatedAt = Instant.fromEpochMilliseconds(it.updatedAt),
                 syncedAt = it.syncedAt?.let(Instant::fromEpochMilliseconds),
                 effectiveFrom = it.effectiveFrom?.let(Instant::fromEpochMilliseconds),
                 effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),
             )
         }
+
+    override suspend fun markHabitIdentityRemoved(
+        habitId: String,
+        identityId: String,
+        effectiveTo: Instant,
+    ) {
+        q.markHabitIdentityRemoved(
+            effectiveTo = effectiveTo.toEpochMilliseconds(),
+            habitId = habitId,
+            identityId = identityId,
+        )
+    }
 }
 
 private fun LocalHabit.toDomain(): Habit = Habit(

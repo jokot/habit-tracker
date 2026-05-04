@@ -56,11 +56,17 @@ class ComputePerHabitStreakUseCase(
                 currentStreak = 0,
                 longestStreak = 0,
                 firstLogDate = null,
-                last30Days = thirtyDayWindow(today, emptyMap()),
+                last30Days = thirtyDayWindow(today, emptyMap(), emptyMap(), habit.dailyTarget),
             )
         }
 
         val loggedDays: Set<LocalDate> = logs.map { it.loggedAt.toLocalDate() }.toSet()
+        // Per-day capped points: cap at dailyTarget so heat bucket maxes out at full.
+        val pointsByDay: Map<LocalDate, Int> = logs.groupBy { it.loggedAt.toLocalDate() }
+            .mapValues { (_, dayLogs) ->
+                dayLogs.sumOf { PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint) }
+                    .coerceAtMost(habit.dailyTarget)
+            }
 
         val perDay = mutableMapOf<LocalDate, StreakDayState>()
         var prev: StreakDayState? = null
@@ -101,24 +107,55 @@ class ComputePerHabitStreakUseCase(
             currentStreak = run,
             longestStreak = longest,
             firstLogDate = firstLogDate,
-            last30Days = thirtyDayWindow(today, perDay),
+            last30Days = thirtyDayWindow(today, perDay, pointsByDay, habit.dailyTarget),
         )
     }
 
     private fun thirtyDayWindow(
         today: LocalDate,
         perDay: Map<LocalDate, StreakDayState>,
+        pointsByDay: Map<LocalDate, Int>,
+        dailyTarget: Int,
     ): List<PerHabitDayState> {
         val start = today.minus(29, DateTimeUnit.DAY)
         return (0 until 30).map { offset ->
             val d = start.plus(offset, DateTimeUnit.DAY)
-            PerHabitDayState(d, perDay[d] ?: StreakDayState.EMPTY)
+            val state = perDay[d] ?: StreakDayState.EMPTY
+            val level = if (state == StreakDayState.COMPLETE) {
+                bucketFor(pointsByDay[d] ?: 0, bareMin = 1, full = dailyTarget.coerceAtLeast(1))
+            } else 0
+            PerHabitDayState(d, state, level)
         }
     }
 
-    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
-        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
+    /**
+     * Heat bucket — mirrors ComputeIdentityStatsUseCase.bucketFor but scoped to a
+     * single habit (bareMin = 1 log, full = dailyTarget).
+     */
+    private fun bucketFor(pointsCapped: Int, bareMin: Int, full: Int): Int {
+        if (pointsCapped <= 0) return 0
+        val span = (full - bareMin).coerceAtLeast(0)
+        val third = span / 3
+        val mid1 = bareMin + third
+        val mid2 = bareMin + 2 * third
+        return when {
+            pointsCapped < mid1 -> 1
+            pointsCapped < mid2 -> 2
+            pointsCapped < full -> 3
+            else -> 4
+        }
+    }
+
+    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean {
+        // Per-habit uses date-overlap (effectiveFrom < dayEnd), unlike user-level
+        // and identity engines which use the 5c-2 instant grace (effectiveFrom <=
+        // dayStart). Reason: per-habit grid must show today's log as COMPLETE for
+        // a habit created today. The grace only applies to multi-habit aggregates
+        // — a single habit logged today is COMPLETE for itself by definition.
+        val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
+        return (habit.effectiveFrom?.let { it < dayEnd } ?: true) &&
             (habit.effectiveTo?.let { it > dayStart } ?: true)
+    }
 
     private fun Instant.toLocalDate(): LocalDate = toLocalDateTime(timeZone).date
 

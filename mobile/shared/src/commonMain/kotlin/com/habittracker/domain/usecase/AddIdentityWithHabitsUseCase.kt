@@ -30,8 +30,14 @@ class AddIdentityWithHabitsUseCase(
         identityRepo.setUserIdentities(userId, currentlyActive + identityId)
 
         // 2. For each selected template, link existing habit OR create + link.
+        // Custom habits (templateId=null) cannot match any selectedTemplateId, so exclude them.
+        // Soft-deleted habits (effectiveTo != null) are tombstones — re-add must create a fresh row,
+        // not relink the deleted one.
         val ownedByTemplate: Map<String, Habit> =
-            habitRepo.getHabitsForUser(userId).associateBy { it.templateId }
+            habitRepo.getHabitsForUser(userId)
+                .filter { it.effectiveTo == null }
+                .mapNotNull { h -> h.templateId?.let { tid -> tid to h } }
+                .toMap()
 
         // GetHabitTemplatesForIdentitiesUseCase returns List<TemplateWithIdentities>.
         // Build a map of templateId -> HabitTemplate for the given identity.
@@ -39,6 +45,13 @@ class AddIdentityWithHabitsUseCase(
             .filter { twi -> twi.recommendedBy.any { it.id == identityId } }
             .associate { twi -> twi.template.id to twi.template }
 
+        // Capture clock.now() ONCE for the batch so every habit created in this
+        // call shares the same effectiveFrom. The settled-baseline rule in
+        // ComputeIdentityStatsUseCase uses strict inequality on effectiveFrom; if
+        // each habit got a slightly different microsecond timestamp here, the
+        // last-added one would become "newest" and the others would land in the
+        // settled baseline — incorrectly marking them as required for today.
+        val now = clock.now()
         for (templateId in selectedTemplateIds) {
             val existing = ownedByTemplate[templateId]
             if (existing != null) {
@@ -46,7 +59,6 @@ class AddIdentityWithHabitsUseCase(
                 continue
             }
             val tpl = tplsById[templateId] ?: continue
-            val now = clock.now()
             val habit = Habit(
                 id = Uuid.random().toString(),
                 userId = userId,

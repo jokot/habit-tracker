@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -31,6 +32,8 @@ sealed class IdentityDetailState {
         val identity: Identity,
         val stats: IdentityStats,
         val habits: List<Habit>,
+        /** Identities (excluding current) each habit also belongs to. Empty list ⇒ habit is exclusive. */
+        val otherIdentitiesByHabit: Map<String, List<Identity>> = emptyMap(),
         val isPinned: Boolean = false,
         val whyText: String? = null,
         val isEditingWhy: Boolean = false,
@@ -57,6 +60,9 @@ class IdentityDetailViewModel private constructor(
     private val _removeSuccess = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val removeSuccess: SharedFlow<Unit> = _removeSuccess.asSharedFlow()
 
+    private val _showRemoveDialog = MutableStateFlow(false)
+    val showRemoveDialog: StateFlow<Boolean> = _showRemoveDialog.asStateFlow()
+
     private var job: Job? = null
 
     constructor(container: AppContainer, identityId: String) : this(
@@ -77,29 +83,45 @@ class IdentityDetailViewModel private constructor(
         job?.cancel()
         job = viewModelScope.launch {
             val userId = userIdProvider()
-            identityRepo.observeUserIdentities(userId).collect { userIdentities ->
-                val identity = userIdentities.firstOrNull { it.id == identityId }
-                if (identity == null) {
-                    _state.value = IdentityDetailState.NotFound
-                    return@collect
+            // Combine identity list + habits-for-identity so the screen re-emits when either
+            // changes (e.g. user adds a new habit from "+ Add habit" and pops back here).
+            combine(
+                identityRepo.observeUserIdentities(userId),
+                identityRepo.observeHabitsForIdentity(userId, identityId),
+            ) { userIdentities, habits -> userIdentities to habits }
+                .collect { (userIdentities, habits) ->
+                    val identity = userIdentities.firstOrNull { it.id == identityId }
+                    if (identity == null) {
+                        _state.value = IdentityDetailState.NotFound
+                        return@collect
+                    }
+                    val row = identityRepo.getUserIdentityRow(userId, identityId)
+                    val stats = statsUseCase.computeNow(userId, identityId)
+                    // Compute "other identities" each habit also belongs to (active links only).
+                    val identityById = userIdentities.associateBy { it.id }
+                    val activeLinks = identityRepo.getHabitIdentityLinksForUser(userId)
+                        .filter { it.effectiveTo == null }
+                    val otherIdentitiesByHabit: Map<String, List<Identity>> = habits.associate { h ->
+                        h.id to activeLinks.asSequence()
+                            .filter { it.habitId == h.id && it.identityId != identityId }
+                            .mapNotNull { identityById[it.identityId] }
+                            .toList()
+                    }
+                    // Preserve any in-progress edit state
+                    val current = _state.value
+                    val isEditing = (current as? IdentityDetailState.Loaded)?.isEditingWhy ?: false
+                    val pendingDraft = (current as? IdentityDetailState.Loaded)?.pendingWhyDraft
+                    _state.value = IdentityDetailState.Loaded(
+                        identity = identity,
+                        stats = stats,
+                        habits = habits,
+                        otherIdentitiesByHabit = otherIdentitiesByHabit,
+                        isPinned = row?.isPinned ?: false,
+                        whyText = row?.whyText,
+                        isEditingWhy = isEditing,
+                        pendingWhyDraft = pendingDraft,
+                    )
                 }
-                val row = identityRepo.getUserIdentityRow(userId, identityId)
-                val stats = statsUseCase.computeNow(userId, identityId)
-                val habits = identityRepo.observeHabitsForIdentity(userId, identityId).first()
-                // Preserve any in-progress edit state
-                val current = _state.value
-                val isEditing = (current as? IdentityDetailState.Loaded)?.isEditingWhy ?: false
-                val pendingDraft = (current as? IdentityDetailState.Loaded)?.pendingWhyDraft
-                _state.value = IdentityDetailState.Loaded(
-                    identity = identity,
-                    stats = stats,
-                    habits = habits,
-                    isPinned = row?.isPinned ?: false,
-                    whyText = row?.whyText,
-                    isEditingWhy = isEditing,
-                    pendingWhyDraft = pendingDraft,
-                )
-            }
         }
     }
 
@@ -126,6 +148,15 @@ class IdentityDetailViewModel private constructor(
                     _removeSuccess.tryEmit(Unit)
                 }
         }
+    }
+
+    fun beginRemove() { _showRemoveDialog.value = true }
+
+    fun dismissRemoveDialog() { _showRemoveDialog.value = false }
+
+    fun confirmRemove() {
+        _showRemoveDialog.value = false
+        removeIdentity()
     }
 
     fun startEditingWhy() {

@@ -11,6 +11,7 @@ import kotlinx.datetime.Instant
 
 class FakeIdentityRepository(
     private val seed: List<Identity> = emptyList(),
+    private val clock: Clock = Clock.System,
 ) : IdentityRepository {
 
     private val seedFlow = MutableStateFlow(seed)
@@ -40,7 +41,7 @@ class FakeIdentityRepository(
         }
 
     override suspend fun setUserIdentities(userId: String, identityIds: Set<String>) {
-        val now = Clock.System.now()
+        val now = clock.now()
         val existing = userIdentities.value.filter { it.userId == userId }
         val keep = existing.filter { it.identityId in identityIds }
         val add = (identityIds - keep.map { it.identityId }.toSet()).map {
@@ -109,19 +110,29 @@ class FakeIdentityRepository(
         userIdentities.value.firstOrNull { it.userId == userId && it.identityId == identityId }
 
     override suspend fun linkHabitToIdentities(habitId: String, identityIds: Set<String>) {
-        val now = Clock.System.now()
-        val keep = habitIdentities.value.filterNot { it.habitId == habitId && it.identityId !in identityIds }
-        val existingIds = keep.filter { it.habitId == habitId }.map { it.identityId }.toSet()
-        val add = (identityIds - existingIds).map {
-            HabitIdentityRow(
-                habitId = habitId,
-                identityId = it,
-                addedAt = now,
-                syncedAt = null,
-                effectiveFrom = now,
-            )
+        val now = clock.now()
+        val current = habitIdentities.value.toMutableList()
+        identityIds.forEach { identityId ->
+            val idx = current.indexOfFirst { it.habitId == habitId && it.identityId == identityId }
+            if (idx >= 0) {
+                // Upsert: matches `INSERT OR REPLACE` in LocalIdentityRepository — resets effectiveTo to null
+                // so re-linking a previously soft-removed identity resumes it.
+                current[idx] = current[idx].copy(effectiveTo = null, updatedAt = now, syncedAt = null)
+            } else {
+                current.add(
+                    HabitIdentityRow(
+                        habitId = habitId,
+                        identityId = identityId,
+                        addedAt = now,
+                        updatedAt = now,
+                        syncedAt = null,
+                        effectiveFrom = now,
+                        effectiveTo = null,
+                    )
+                )
+            }
         }
-        habitIdentities.value = keep + add
+        habitIdentities.value = current
     }
 
     override suspend fun clearHabitIdentitiesForUser(userId: String) {
@@ -146,13 +157,29 @@ class FakeIdentityRepository(
 
     override fun observeHabitsForIdentity(userId: String, identityId: String): Flow<List<Habit>> =
         combine(habits, habitIdentities) { hs, his ->
-            val habitIds = his.filter { it.identityId == identityId }.map { it.habitId }.toSet()
-            hs.filter { it.userId == userId && it.id in habitIds }
+            val habitIds = his.filter { it.identityId == identityId && it.effectiveTo == null }
+                .map { it.habitId }
+                .toSet()
+            hs.filter { it.userId == userId && it.id in habitIds && it.effectiveTo == null }
         }
 
     override suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow> {
+        val seededHabitIds = habits.value.map { it.id }.toSet()
         val userHabitIds = habits.value.filter { it.userId == userId }.map { it.id }.toSet()
-        return habitIdentities.value.filter { it.habitId in userHabitIds }
+        return habitIdentities.value.filter { it.habitId in userHabitIds || it.habitId !in seededHabitIds }
+    }
+
+    override suspend fun markHabitIdentityRemoved(
+        habitId: String,
+        identityId: String,
+        effectiveTo: Instant,
+    ) {
+        val links = habitIdentities.value.toMutableList()
+        val idx = links.indexOfFirst { it.habitId == habitId && it.identityId == identityId }
+        if (idx >= 0) {
+            links[idx] = links[idx].copy(effectiveTo = effectiveTo, updatedAt = effectiveTo, syncedAt = null)
+            habitIdentities.value = links
+        }
     }
 
     fun seedUserIdentity(
@@ -165,7 +192,7 @@ class FakeIdentityRepository(
         val row = UserIdentityRow(
             userId = userId,
             identityId = identityId,
-            addedAt = Clock.System.now(),
+            addedAt = clock.now(),
             syncedAt = null,
             isPinned = isPinned,
             whyText = whyText,

@@ -55,6 +55,17 @@ sealed class Screen(val route: String) {
         const val ARG_ID = "habitId"
         fun route(id: String) = "habit_detail/$id"
     }
+    object HabitForm : Screen("habit_form?habitId={habitId}&identityId={identityId}") {
+        const val ARG_HABIT_ID = "habitId"
+        const val ARG_IDENTITY_ID = "identityId"
+        fun route(habitId: String? = null, identityId: String? = null): String {
+            val params = buildList {
+                habitId?.let { add("habitId=$it") }
+                identityId?.let { add("identityId=$it") }
+            }.joinToString("&")
+            return if (params.isEmpty()) "habit_form" else "habit_form?$params"
+        }
+    }
 }
 
 @Composable
@@ -265,6 +276,7 @@ fun AppNavigation(container: AppContainer) {
                     onBack = { navController.popBackStack() },
                     onRemoveSuccess = { navController.popBackStack() },
                     onHabitClick = { hid -> navController.navigate(Screen.HabitDetail.route(hid)) },
+                    onAddHabit = { navController.navigate(Screen.HabitForm.route(identityId = id)) },
                 )
             }
 
@@ -288,6 +300,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onHabitClick = { id -> navController.navigate(Screen.HabitDetail.route(id)) },
+                    onAddHabit = { navController.navigate(Screen.HabitForm.route()) },
                 )
             }
 
@@ -301,7 +314,44 @@ fun AppNavigation(container: AppContainer) {
             ) { entry ->
                 val habitId = entry.arguments?.getString(Screen.HabitDetail.ARG_ID).orEmpty()
                 val vm = viewModel { HabitDetailViewModel(container, habitId) }
-                HabitDetailScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                HabitDetailScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onEdit = { id -> navController.navigate(Screen.HabitForm.route(habitId = id)) },
+                )
+            }
+
+            composable(
+                route = Screen.HabitForm.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.HabitForm.ARG_HABIT_ID) {
+                        type = androidx.navigation.NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    androidx.navigation.navArgument(Screen.HabitForm.ARG_IDENTITY_ID) {
+                        type = androidx.navigation.NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                val habitId = entry.arguments?.getString(Screen.HabitForm.ARG_HABIT_ID)
+                val identityId = entry.arguments?.getString(Screen.HabitForm.ARG_IDENTITY_ID)
+                val vm = viewModel { com.jktdeveloper.habitto.ui.habit.HabitFormViewModel(container, habitId = habitId, prefillIdentityId = identityId) }
+                com.jktdeveloper.habitto.ui.habit.HabitFormScreen(
+                    viewModel = vm,
+                    onClose = { navController.popBackStack() },
+                    onSaved = { navController.popBackStack() },
+                    onDeleted = {
+                        // Pop the form, then pop HabitDetail (which now shows
+                        // "Habit not found" since the row was just tombstoned).
+                        // Second pop is a no-op if HabitDetail wasn't on the
+                        // stack (e.g. delete from a non-detail entry).
+                        navController.popBackStack()
+                        navController.popBackStack(Screen.HabitDetail.route, inclusive = true)
+                    },
+                )
             }
         }
     }

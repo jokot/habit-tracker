@@ -62,7 +62,7 @@ class ComputeIdentityStatsUseCase(
             pointsByDay[date] = (pointsByDay[date] ?: 0) + pts.coerceAtMost(target)
         }
 
-        val streak = computeStreak(today, habitIds, loggedHabitsByDay)
+        val streak = computeStreak(today, habits, loggedHabitsByDay)
         val daysActive = loggedHabitsByDay.keys.count { it <= today }
         val firstActivity = loggedHabitsByDay.keys.minOrNull()
         val last14 = buildHeatList(today, 14, pointsByDay, loggedHabitsByDay, habits)
@@ -82,10 +82,17 @@ class ComputeIdentityStatsUseCase(
         )
     }
 
-    private fun computeStreak(today: LocalDate, habitIds: Set<String>, loggedHabitsByDay: Map<LocalDate, Set<String>>): Int {
+    private fun computeStreak(today: LocalDate, habits: List<Habit>, loggedHabitsByDay: Map<LocalDate, Set<String>>): Int {
+        // Use the same settled-baseline rule as buildStateList so the streak
+        // counter agrees with the grid colors. Without this, the counter would
+        // require ALL habits logged regardless of effective windows, while the
+        // grid uses activeHabitsOn (settled-baseline) — they could disagree
+        // (e.g. grid green but counter 0).
         val isComplete: (LocalDate) -> Boolean = { d ->
+            val dayStart = d.atStartOfDayIn(timeZone)
+            val activeIds = activeHabitsOn(habits, dayStart).map { it.id }.toSet()
             val logged = loggedHabitsByDay[d].orEmpty()
-            habitIds.all { it in logged }
+            activeIds.isNotEmpty() && activeIds.all { it in logged }
         }
         var run = 0
         var cursor = today
@@ -112,13 +119,18 @@ class ComputeIdentityStatsUseCase(
             // users who unlink/re-link habits to identities mid-history will see a
             // minor inaccuracy in identity-scoped streak retro (rare). Add when needed.
             val dayStart = cursor.atStartOfDayIn(timeZone)
-            val activeHabitsToday = habits.filter { habitActiveOn(it, dayStart) }
+            val activeHabitsToday = activeHabitsOn(habits, dayStart)
             val bareMin = activeHabitsToday.size
             val full = activeHabitsToday.sumOf { it.dailyTarget }.coerceAtLeast(1)
             val pts = pointsByDay[cursor] ?: 0
             val logged = loggedHabitsByDay[cursor]?.count { id -> activeHabitsToday.any { it.id == id } } ?: 0
-            val allLogged = activeHabitsToday.isEmpty() || logged == activeHabitsToday.size
-            list += bucketFor(pts, allLogged, bareMin, full)
+            // Mirror user-level engine (ComputeStreakUseCase line ~147): when the
+            // identity has no active habits on a day, heat is 0. Without this,
+            // an empty active set makes `allLogged` vacuously true and any stray
+            // log paints the cell green — wrong for newly-added identities whose
+            // habits aren't active until the next day under 5c-2 grace.
+            val allLogged = activeHabitsToday.isNotEmpty() && logged == activeHabitsToday.size
+            list += if (activeHabitsToday.isEmpty()) 0 else bucketFor(pts, allLogged, bareMin, full)
             cursor = cursor.plus(1, DateTimeUnit.DAY)
         }
         return list
@@ -149,7 +161,7 @@ class ComputeIdentityStatsUseCase(
             // users who unlink/re-link habits to identities mid-history will see a
             // minor inaccuracy in identity-scoped streak retro (rare). Add when needed.
             val dayStart = d.atStartOfDayIn(timeZone)
-            val activeIds = habits.filter { habitActiveOn(it, dayStart) }.map { it.id }.toSet()
+            val activeIds = activeHabitsOn(habits, dayStart).map { it.id }.toSet()
             activeIds.isNotEmpty() && activeIds.all { it in loggedHabitsByDay[d].orEmpty() }
         }
         // Walk from firstActivity (or rangeStart) up to today to know the carrying state
@@ -184,9 +196,44 @@ class ComputeIdentityStatsUseCase(
         return list
     }
 
-    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
-        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
-        (habit.effectiveTo?.let { it > dayStart } ?: true)
+    /**
+     * Conditional grace per day for identity engine.
+     *
+     * - PAST days: date-overlap (effectiveFrom < dayEnd). Past mid-day creations
+     *   count active for their creation day so historical heat/streak is correct.
+     *
+     * - TODAY: use a "settled-baseline" subset to absorb mid-day adds:
+     *   - Find the newest habit's effectiveFrom.
+     *   - Habits strictly older than that newest are the "settled" subset.
+     *   - If settled is non-empty, today's COMPLETE check uses ONLY the settled
+     *     subset. The just-added newest habit is excluded for today, so adding
+     *     a habit to an identity that already had heat doesn't reset it.
+     *   - If settled is empty (all habits share the same effectiveFrom — fresh
+     *     identity batch or single-habit), fall back to date-overlap so logging
+     *     the whole batch paints today green.
+     *
+     * Stable wrt clock advancement: the rule depends on relative effectiveFroms,
+     * not on time-since-now, so the heat doesn't "decay" minutes after a change.
+     */
+    private fun activeHabitsOn(habits: List<Habit>, dayStart: Instant): List<Habit> {
+        val today = clock.now().toLocalDateTime(timeZone).date
+        val dayDate = dayStart.toLocalDateTime(timeZone).date
+        val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
+        val endOk = { h: Habit -> h.effectiveTo?.let { it > dayStart } ?: true }
+        val dateOverlap = { h: Habit ->
+            (h.effectiveFrom?.let { it < dayEnd } ?: true) && endOk(h)
+        }
+        if (dayDate != today) {
+            return habits.filter(dateOverlap)
+        }
+        val newestEff = habits.mapNotNull { it.effectiveFrom }.maxOrNull()
+        val settled = if (newestEff != null) {
+            habits.filter { h ->
+                (h.effectiveFrom == null || h.effectiveFrom!! < newestEff) && endOk(h)
+            }
+        } else emptyList()
+        return if (settled.isNotEmpty()) settled else habits.filter(dateOverlap)
+    }
 
     /**
      * Heat bucket anchored at domain concepts:

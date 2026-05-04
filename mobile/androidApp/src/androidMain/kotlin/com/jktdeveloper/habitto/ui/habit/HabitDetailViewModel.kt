@@ -54,7 +54,8 @@ class HabitDetailViewModel private constructor(
             val userId = userIdProvider()
             streakUseCase.observe(userId, habitId).collect { streak ->
                 val habit = habitRepo.getHabitsForUser(userId).firstOrNull { it.id == habitId }
-                if (habit == null) {
+                if (habit == null || habit.effectiveTo != null) {
+                    // Soft-deleted habits should be treated as not-found from the UI's perspective.
                     _state.value = HabitDetailState.NotFound
                     return@collect
                 }

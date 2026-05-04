@@ -260,8 +260,23 @@ class ComputeStreakUseCase(
 
     private fun LocalDate.minusOneDay(): LocalDate = this.plus(-1, DateTimeUnit.DAY)
 
-    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean =
-        (habit.effectiveFrom?.let { it <= dayStart } ?: true) &&
-        (habit.effectiveTo?.let { it > dayStart } ?: true)
+    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean {
+        // Hybrid:
+        // - PAST days: date-overlap (effectiveFrom < dayEnd). A habit created
+        //   mid-day on a past day IS active for that creation day. Without this,
+        //   logs from that past day don't satisfy the "all habits logged" check
+        //   and the streak history shows the day as never-completed.
+        // - TODAY: instant grace (effectiveFrom <= dayStart). Adding a habit /
+        //   identity mid-day does NOT retroactively require it for today's
+        //   COMPLETE check (5c-2 grace — preserves the cross-identity streak).
+        val today = clock.now().toLocalDateTime(timeZone).date
+        val dayDate = dayStart.toLocalDateTime(timeZone).date
+        val startOk = habit.effectiveFrom?.let { eff ->
+            if (dayDate == today) eff <= dayStart
+            else eff < dayStart.plus(1, DateTimeUnit.DAY, timeZone)
+        } ?: true
+        val endOk = habit.effectiveTo?.let { it > dayStart } ?: true
+        return startOk && endOk
+    }
 
 }

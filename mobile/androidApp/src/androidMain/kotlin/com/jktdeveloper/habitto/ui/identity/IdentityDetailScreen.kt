@@ -21,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,9 +56,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Habit
+import com.habittracker.domain.model.Identity
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHeatGrid
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.dashedBorder
 import com.jktdeveloper.habitto.ui.components.identityIcon
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.NumeralStyle
@@ -68,11 +72,30 @@ fun IdentityDetailScreen(
     onBack: () -> Unit,
     onRemoveSuccess: () -> Unit = {},
     onHabitClick: (String) -> Unit = {},
+    onAddHabit: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    val showRemoveDialog by viewModel.showRemoveDialog.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.removeSuccess.collect { onRemoveSuccess() }
+    }
+
+    if (showRemoveDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRemoveDialog,
+            title = { Text("Remove identity?") },
+            text = { Text("Removing keeps your habits — they stay associated with the identities they support.") },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmRemove,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Remove") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRemoveDialog) { Text("Cancel") }
+            },
+        )
     }
 
     Scaffold(
@@ -95,7 +118,7 @@ fun IdentityDetailScreen(
             IdentityDetailState.NotFound -> Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Identity not found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is IdentityDetailState.Loaded -> Body(s, padding, viewModel, onHabitClick)
+            is IdentityDetailState.Loaded -> Body(s, padding, viewModel, onHabitClick, onAddHabit)
         }
     }
 }
@@ -106,6 +129,7 @@ private fun Body(
     padding: PaddingValues,
     viewModel: IdentityDetailViewModel,
     onHabitClick: (String) -> Unit,
+    onAddHabit: () -> Unit,
 ) {
     val identity = state.identity
     val stats = state.stats
@@ -190,18 +214,16 @@ private fun Body(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
-                if (state.habits.isEmpty()) {
-                    Text(
-                        "No habits linked yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.habits.forEach { habit ->
-                            HabitRow(habit, hue, onClick = { onHabitClick(habit.id) })
-                        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.habits.forEach { habit ->
+                        HabitRow(
+                            habit = habit,
+                            hue = hue,
+                            otherIdentities = state.otherIdentitiesByHabit[habit.id].orEmpty(),
+                            onClick = { onHabitClick(habit.id) },
+                        )
                     }
+                    AddHabitRow(onClick = onAddHabit)
                 }
             }
         }
@@ -221,7 +243,7 @@ private fun Body(
             ManageActions(
                 isPinned = state.isPinned,
                 onTogglePin = viewModel::togglePin,
-                onRemove = viewModel::removeIdentity,
+                onRemove = viewModel::beginRemove,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
@@ -357,7 +379,48 @@ private fun HeroStat(value: Int, label: String, color: Color = MaterialTheme.col
 }
 
 @Composable
-private fun HabitRow(habit: Habit, hue: Float, onClick: () -> Unit) {
+private fun AddHabitRow(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = Color.Transparent,
+        modifier = Modifier
+            .fillMaxWidth()
+            .dashedBorder(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(14.dp),
+                strokeWidth = 1.dp,
+                dashLength = 6.dp,
+                gapLength = 4.dp,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                "Add habit",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HabitRow(
+    habit: Habit,
+    hue: Float,
+    otherIdentities: List<Identity>,
+    onClick: () -> Unit,
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
@@ -373,17 +436,54 @@ private fun HabitRow(habit: Habit, hue: Float, onClick: () -> Unit) {
             HabitGlyph(icon = identityIcon(habit.name), hue = hue, size = 36.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(habit.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Only this identity",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (otherIdentities.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            "Also:",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        otherIdentities.forEach { other ->
+                            OtherIdentityPill(other)
+                        }
+                    }
+                }
             }
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OtherIdentityPill(identity: Identity) {
+    val isDark = isSystemInDarkTheme()
+    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val bg = if (isDark) Color.hsl(hue, 0.30f, 0.20f) else Color.hsl(hue, 0.50f, 0.94f)
+    val fg = if (isDark) Color.hsl(hue, 0.30f, 0.85f) else Color.hsl(hue, 0.50f, 0.30f)
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = bg,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 2.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            HabitGlyph(icon = identityIcon(identity.name), hue = hue, size = 14.dp)
+            Text(
+                text = identity.name.split(" ").first(),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = fg,
             )
         }
     }

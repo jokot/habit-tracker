@@ -1,0 +1,26 @@
+-- Habit.templateId becomes nullable (was NOT NULL).
+-- SQLite cannot DROP NOT NULL via ALTER; rebuild the table.
+-- Existing schema has no indexes on LocalHabit; none recreated here.
+CREATE TABLE LocalHabit_new (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    templateId TEXT,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    thresholdPerPoint REAL NOT NULL,
+    dailyTarget INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER,
+    effectiveFrom INTEGER,
+    effectiveTo INTEGER
+);
+
+INSERT INTO LocalHabit_new
+    SELECT id, userId, templateId, name, unit, thresholdPerPoint,
+           dailyTarget, createdAt, updatedAt, syncedAt, effectiveFrom, effectiveTo
+    FROM LocalHabit;
+
+DROP TABLE LocalHabit;
+
+ALTER TABLE LocalHabit_new RENAME TO LocalHabit;

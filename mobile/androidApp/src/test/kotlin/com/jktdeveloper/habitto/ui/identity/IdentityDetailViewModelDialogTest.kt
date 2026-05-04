@@ -11,13 +11,15 @@ import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
 import com.habittracker.domain.usecase.PinIdentityUseCase
-import com.habittracker.domain.usecase.UnpinIdentityUseCase
 import com.habittracker.domain.usecase.RemoveIdentityUseCase
+import com.habittracker.domain.usecase.UnpinIdentityUseCase
 import com.habittracker.domain.usecase.UpdateIdentityWhyUseCase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -27,25 +29,59 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.junit.After
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [33], application = Application::class)
-class IdentityDetailViewModelTest {
+class IdentityDetailViewModelDialogTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before fun setup() { Dispatchers.setMain(testDispatcher) }
     @After fun teardown() { Dispatchers.resetMain() }
 
-    @Test fun loadedStateForKnownIdentity_assertions() = runTest(testDispatcher) {
-        val repo = FakeIdentityRepoForDetail(seed = listOf(Identity("a", "A", "", "")))
-        repo.setUserIdentities("u1", setOf("a"))
-        val statsUc = ComputeIdentityStatsUseCase(EmptyLogRepoForDetailVm(), repo)
+    @Test fun beginRemove_showsDialog_withoutFiringRemove() = runTest(testDispatcher) {
+        val (vm, recorder) = makeVm()
+        vm.beginRemove()
+        advanceUntilIdle()
+        assertTrue(vm.showRemoveDialog.first())
+        assertFalse(recorder.called)
+    }
+
+    @Test fun dismissRemoveDialog_hides_withoutFiringRemove() = runTest(testDispatcher) {
+        val (vm, recorder) = makeVm()
+        vm.beginRemove()
+        vm.dismissRemoveDialog()
+        advanceUntilIdle()
+        assertFalse(vm.showRemoveDialog.first())
+        assertFalse(recorder.called)
+    }
+
+    @Test fun confirmRemove_firesUseCase_andDismissesDialog() = runTest(testDispatcher) {
+        val (vm, recorder) = makeVm()
+        vm.beginRemove()
+        vm.confirmRemove()
+        advanceUntilIdle()
+        assertTrue(recorder.called)
+        assertFalse(vm.showRemoveDialog.first())
+    }
+
+    private class Recorder { var called: Boolean = false }
+
+    private fun makeVm(): Pair<IdentityDetailViewModel, Recorder> {
+        val recorder = Recorder()
+        val repo = RecordingIdentityRepoForDialog(
+            seed = listOf(Identity("a", "A", "", "")),
+            onRemove = { recorder.called = true },
+        )
+        // Configure user → identity association so vm reaches Loaded state.
+        kotlinx.coroutines.runBlocking { repo.setUserIdentities("u1", setOf("a")) }
+        val statsUc = ComputeIdentityStatsUseCase(EmptyLogRepoForDialog(), repo)
         val vm = IdentityDetailViewModel.forTest(
             identityRepo = repo,
             statsUseCase = statsUc,
@@ -56,37 +92,16 @@ class IdentityDetailViewModelTest {
             userIdProvider = { "u1" },
             identityId = "a",
         )
-        advanceUntilIdle()
-        val state = vm.state.value
-        assertTrue(state is IdentityDetailState.Loaded)
-        assertEquals("a", (state as IdentityDetailState.Loaded).identity.id)
-    }
-
-    @Test fun unknownIdentityYieldsNotFound_assertions() = runTest(testDispatcher) {
-        val repo = FakeIdentityRepoForDetail(seed = listOf(Identity("a", "A", "", "")))
-        // No user identities set — "z" is not in the user's set
-        val statsUc = ComputeIdentityStatsUseCase(EmptyLogRepoForDetailVm(), repo)
-        val vm = IdentityDetailViewModel.forTest(
-            identityRepo = repo,
-            statsUseCase = statsUc,
-            pinUseCase = PinIdentityUseCase(repo),
-            unpinUseCase = UnpinIdentityUseCase(repo),
-            removeUseCase = RemoveIdentityUseCase(repo),
-            updateWhyUseCase = UpdateIdentityWhyUseCase(repo),
-            userIdProvider = { "u1" },
-            identityId = "z",
-        )
-        advanceUntilIdle()
-        assertTrue(vm.state.value is IdentityDetailState.NotFound)
+        return vm to recorder
     }
 }
 
-private class FakeIdentityRepoForDetail(
+private class RecordingIdentityRepoForDialog(
     private val seed: List<Identity> = emptyList(),
+    private val onRemove: () -> Unit = {},
 ) : IdentityRepository {
     private val seedFlow = MutableStateFlow(seed)
     private val userIdentities = MutableStateFlow<List<UserIdentityRow>>(emptyList())
-    private val habitIdentities = MutableStateFlow<List<HabitIdentityRow>>(emptyList())
 
     override suspend fun getAllIdentities(): List<Identity> = seedFlow.value
     override suspend fun upsertIdentities(identities: List<Identity>) {
@@ -130,14 +145,14 @@ private class FakeIdentityRepoForDetail(
     override suspend fun setPinForIdentity(userId: String, identityId: String, isPinned: Boolean) = Unit
     override suspend fun clearPinForUser(userId: String) = Unit
     override suspend fun updateWhyText(userId: String, identityId: String, whyText: String?) = Unit
-    override suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant) = Unit
+    override suspend fun markUserIdentityRemoved(userId: String, identityId: String, removedAt: Instant) { onRemove() }
     override suspend fun setPinAtomically(userId: String, identityId: String) = Unit
     override suspend fun getPinnedIdentityIdForUser(userId: String): String? = null
     override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? = null
     override suspend fun markHabitIdentityRemoved(habitId: String, identityId: String, effectiveTo: Instant) = Unit
 }
 
-private class EmptyLogRepoForDetailVm : HabitLogRepository {
+private class EmptyLogRepoForDialog : HabitLogRepository {
     override fun observeActiveLogsBetween(userId: String, startInclusive: Instant, endExclusive: Instant): Flow<List<HabitLog>> = flowOf(emptyList())
     override suspend fun countActiveLogsBetween(userId: String, startInclusive: Instant, endExclusive: Instant) = 0
     override suspend fun firstActiveLogAt(userId: String): Instant? = null

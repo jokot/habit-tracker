@@ -18,7 +18,7 @@ data class PerHabitStreakResult(
         fun emptyFor(habitId: String, today: LocalDate): PerHabitStreakResult {
             val start = today.minus(29, DateTimeUnit.DAY)
             val cells = (0 until 30).map { offset ->
-                PerHabitDayState(start.plus(offset, DateTimeUnit.DAY), StreakDayState.EMPTY)
+                PerHabitDayState(start.plus(offset, DateTimeUnit.DAY), StreakDayState.EMPTY, 0)
             }
             return PerHabitStreakResult(
                 habitId = habitId,
@@ -36,4 +36,6 @@ data class PerHabitStreakResult(
 data class PerHabitDayState(
     val date: LocalDate,
     val state: StreakDayState,
+    /** Heat bucket 0..4. 0 = no/partial logs; 1 = bare-min; 4 = ≥dailyTarget. */
+    val heatLevel: Int,
 )
