@@ -56,11 +56,17 @@ class ComputePerHabitStreakUseCase(
                 currentStreak = 0,
                 longestStreak = 0,
                 firstLogDate = null,
-                last30Days = thirtyDayWindow(today, emptyMap()),
+                last30Days = thirtyDayWindow(today, emptyMap(), emptyMap(), habit.dailyTarget),
             )
         }
 
         val loggedDays: Set<LocalDate> = logs.map { it.loggedAt.toLocalDate() }.toSet()
+        // Per-day capped points: cap at dailyTarget so heat bucket maxes out at full.
+        val pointsByDay: Map<LocalDate, Int> = logs.groupBy { it.loggedAt.toLocalDate() }
+            .mapValues { (_, dayLogs) ->
+                dayLogs.sumOf { PointCalculator.pointsEarned(it.quantity, habit.thresholdPerPoint) }
+                    .coerceAtMost(habit.dailyTarget)
+            }
 
         val perDay = mutableMapOf<LocalDate, StreakDayState>()
         var prev: StreakDayState? = null
@@ -101,18 +107,42 @@ class ComputePerHabitStreakUseCase(
             currentStreak = run,
             longestStreak = longest,
             firstLogDate = firstLogDate,
-            last30Days = thirtyDayWindow(today, perDay),
+            last30Days = thirtyDayWindow(today, perDay, pointsByDay, habit.dailyTarget),
         )
     }
 
     private fun thirtyDayWindow(
         today: LocalDate,
         perDay: Map<LocalDate, StreakDayState>,
+        pointsByDay: Map<LocalDate, Int>,
+        dailyTarget: Int,
     ): List<PerHabitDayState> {
         val start = today.minus(29, DateTimeUnit.DAY)
         return (0 until 30).map { offset ->
             val d = start.plus(offset, DateTimeUnit.DAY)
-            PerHabitDayState(d, perDay[d] ?: StreakDayState.EMPTY)
+            val state = perDay[d] ?: StreakDayState.EMPTY
+            val level = if (state == StreakDayState.COMPLETE) {
+                bucketFor(pointsByDay[d] ?: 0, bareMin = 1, full = dailyTarget.coerceAtLeast(1))
+            } else 0
+            PerHabitDayState(d, state, level)
+        }
+    }
+
+    /**
+     * Heat bucket — mirrors ComputeIdentityStatsUseCase.bucketFor but scoped to a
+     * single habit (bareMin = 1 log, full = dailyTarget).
+     */
+    private fun bucketFor(pointsCapped: Int, bareMin: Int, full: Int): Int {
+        if (pointsCapped <= 0) return 0
+        val span = (full - bareMin).coerceAtLeast(0)
+        val third = span / 3
+        val mid1 = bareMin + third
+        val mid2 = bareMin + 2 * third
+        return when {
+            pointsCapped < mid1 -> 1
+            pointsCapped < mid2 -> 2
+            pointsCapped < full -> 3
+            else -> 4
         }
     }
 

@@ -3,6 +3,7 @@ package com.jktdeveloper.habitto.ui.habit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,14 +44,9 @@ import com.habittracker.domain.model.PerHabitDayState
 import com.habittracker.domain.model.StreakDayState
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
+import com.jktdeveloper.habitto.ui.components.cellColor
 import com.jktdeveloper.habitto.ui.components.habitIcon
-import com.jktdeveloper.habitto.ui.streak.BrokenOverlay
-import com.jktdeveloper.habitto.ui.streak.FrozenOverlay
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
-import com.jktdeveloper.habitto.ui.theme.StreakBroken
-import com.jktdeveloper.habitto.ui.theme.StreakBrokenBg
-import com.jktdeveloper.habitto.ui.theme.StreakFrozen
-import com.jktdeveloper.habitto.ui.theme.StreakFrozenBg
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -245,7 +241,12 @@ private fun ThirtyDayCard(cells: List<PerHabitDayState>, hue: Float, modifier: M
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         row.forEach { cell ->
-                            DayCell(state = cell.state, hue = hue, modifier = Modifier.weight(1f).aspectRatio(1f))
+                            DayCell(
+                                state = cell.state,
+                                level = cell.heatLevel,
+                                hue = hue,
+                                modifier = Modifier.weight(1f).aspectRatio(1f),
+                            )
                         }
                     }
                 }
@@ -255,34 +256,23 @@ private fun ThirtyDayCard(cells: List<PerHabitDayState>, hue: Float, modifier: M
 }
 
 @Composable
-private fun DayCell(state: StreakDayState, hue: Float, modifier: Modifier = Modifier) {
+private fun DayCell(state: StreakDayState, level: Int, hue: Float, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(4.dp)
-    val primary = MaterialTheme.colorScheme.primary
-    // COMPLETE always uses FlameOrange — distinct from BROKEN's red, consistent
-    // with the "Per-habit streak" stat tile color across the screen. Identity
-    // hue isn't applied here to avoid red-Athlete cells looking like BROKEN.
-    val (bg, accent) = when (state) {
-        StreakDayState.COMPLETE -> FlameOrange to null
-        StreakDayState.FROZEN -> StreakFrozenBg to StreakFrozen
-        StreakDayState.BROKEN -> StreakBrokenBg to StreakBroken
-        StreakDayState.TODAY_PENDING -> Color.Transparent to primary
-        StreakDayState.EMPTY -> MaterialTheme.colorScheme.surfaceContainerLow to null
-        StreakDayState.FUTURE -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f) to null
-    }
-    @Suppress("UNUSED_PARAMETER") val unusedHue = hue  // hue param kept for future heat-bucket use
-    val baseModifier = modifier.clip(shape).background(bg)
-    val finalModifier = if (state == StreakDayState.TODAY_PENDING && accent != null) {
-        baseModifier.border(2.dp, accent, shape)
+    val isDark = isSystemInDarkTheme()
+    // Match identity heat grid palette (HeatL0..HeatL4 + StreakFrozen/StreakBroken
+    // solid fills). COMPLETE bucket reflects how much of dailyTarget was hit:
+    // bucket 1 = bare-min log, 4 = full target.
+    val bg = cellColor(level, state, isDark)
+    val baseModifier = modifier.clip(shape).background(
+        if (state == StreakDayState.FUTURE) bg.copy(alpha = 0.5f) else bg,
+    )
+    val finalModifier = if (state == StreakDayState.TODAY_PENDING) {
+        baseModifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
     } else {
         baseModifier
     }
-    Box(modifier = finalModifier, contentAlignment = Alignment.Center) {
-        when (state) {
-            StreakDayState.FROZEN -> if (accent != null) FrozenOverlay(color = accent)
-            StreakDayState.BROKEN -> if (accent != null) BrokenOverlay(color = accent)
-            else -> Unit
-        }
-    }
+    @Suppress("UNUSED_PARAMETER") val unusedHue = hue
+    Box(modifier = finalModifier)
 }
 
 private fun formatThreshold(value: Double): String =
