@@ -103,6 +103,7 @@ private class LocalFakeIdentityRepository(
     override suspend fun setPinAtomically(userId: String, identityId: String) = Unit
     override suspend fun getPinnedIdentityIdForUser(userId: String): String? = null
     override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? = null
+    override suspend fun markHabitIdentityRemoved(habitId: String, identityId: String, effectiveTo: Instant) = Unit
 }
 
 private class EmptyLogRepoForListVm : HabitLogRepository {

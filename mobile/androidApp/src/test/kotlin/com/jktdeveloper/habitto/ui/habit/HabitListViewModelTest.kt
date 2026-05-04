@@ -223,4 +223,9 @@ private class FakeIdentityRepoForList(
     override suspend fun setPinAtomically(userId: String, identityId: String) = Unit
     override suspend fun getPinnedIdentityIdForUser(userId: String): String? = null
     override suspend fun getUserIdentityRow(userId: String, identityId: String): UserIdentityRow? = null
+    override suspend fun markHabitIdentityRemoved(habitId: String, identityId: String, effectiveTo: Instant) {
+        habitIdentities.value = habitIdentities.value.map {
+            if (it.habitId == habitId && it.identityId == identityId) it.copy(effectiveTo = effectiveTo) else it
+        }
+    }
 }

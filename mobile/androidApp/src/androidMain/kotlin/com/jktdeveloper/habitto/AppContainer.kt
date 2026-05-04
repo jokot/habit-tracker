@@ -43,6 +43,8 @@ import com.habittracker.domain.usecase.UnpinIdentityUseCase
 import com.habittracker.domain.usecase.RemoveIdentityUseCase
 import com.habittracker.domain.usecase.UpdateIdentityWhyUseCase
 import com.habittracker.domain.usecase.AddIdentityWithHabitsUseCase
+import com.habittracker.domain.usecase.DeleteHabitUseCase
+import com.habittracker.domain.usecase.SaveHabitUseCase
 import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.habittracker.data.sync.SyncReason
@@ -147,6 +149,8 @@ class AppContainer(context: Context) {
         identityRepo = identityRepository,
         templates = getHabitTemplatesForIdentitiesUseCase,
     )
+    val saveHabitUseCase = SaveHabitUseCase(habitRepository, identityRepository)
+    val deleteHabitUseCase = DeleteHabitUseCase(habitRepository)
 
     private val _authState = MutableStateFlow(snapshotAuthState())
     val authState: StateFlow<AuthState> = _authState.asStateFlow()

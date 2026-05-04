@@ -8,13 +8,13 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
-class SaveHabitUseCase(
+open class SaveHabitUseCase(
     private val habitRepo: HabitRepository,
     private val identityRepo: IdentityRepository,
     private val clock: Clock = Clock.System,
 ) {
     /** Create a new habit. Returns the new habit's id. */
-    suspend fun create(
+    open suspend fun create(
         userId: String,
         name: String,
         unit: String,
@@ -47,7 +47,7 @@ class SaveHabitUseCase(
     }
 
     /** Update an existing habit. Diffs identity links: add new, soft-remove dropped, resume previously-removed. */
-    suspend fun update(
+    open suspend fun update(
         userId: String,
         habitId: String,
         name: String,
