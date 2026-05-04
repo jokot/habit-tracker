@@ -313,7 +313,11 @@ fun AppNavigation(container: AppContainer) {
             ) { entry ->
                 val habitId = entry.arguments?.getString(Screen.HabitDetail.ARG_ID).orEmpty()
                 val vm = viewModel { HabitDetailViewModel(container, habitId) }
-                HabitDetailScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                HabitDetailScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onEdit = { id -> navController.navigate(Screen.HabitForm.route(habitId = id)) },
+                )
             }
 
             composable(

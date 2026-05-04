@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +57,7 @@ import com.jktdeveloper.habitto.ui.theme.StreakFrozenBg
 fun HabitDetailScreen(
     viewModel: HabitDetailViewModel,
     onBack: () -> Unit,
+    onEdit: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     Scaffold(
@@ -65,6 +67,17 @@ fun HabitDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    val s = state
+                    if (s is HabitDetailState.Loaded) {
+                        IconButton(onClick = { onEdit(s.habit.id) }) {
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = "Edit habit",
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
