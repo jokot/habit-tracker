@@ -112,7 +112,7 @@ class ComputeIdentityStatsUseCase(
             // users who unlink/re-link habits to identities mid-history will see a
             // minor inaccuracy in identity-scoped streak retro (rare). Add when needed.
             val dayStart = cursor.atStartOfDayIn(timeZone)
-            val activeHabitsToday = habits.filter { habitActiveOn(it, dayStart) }
+            val activeHabitsToday = activeHabitsOn(habits, dayStart)
             val bareMin = activeHabitsToday.size
             val full = activeHabitsToday.sumOf { it.dailyTarget }.coerceAtLeast(1)
             val pts = pointsByDay[cursor] ?: 0
@@ -154,7 +154,7 @@ class ComputeIdentityStatsUseCase(
             // users who unlink/re-link habits to identities mid-history will see a
             // minor inaccuracy in identity-scoped streak retro (rare). Add when needed.
             val dayStart = d.atStartOfDayIn(timeZone)
-            val activeIds = habits.filter { habitActiveOn(it, dayStart) }.map { it.id }.toSet()
+            val activeIds = activeHabitsOn(habits, dayStart).map { it.id }.toSet()
             activeIds.isNotEmpty() && activeIds.all { it in loggedHabitsByDay[d].orEmpty() }
         }
         // Walk from firstActivity (or rangeStart) up to today to know the carrying state
@@ -189,17 +189,47 @@ class ComputeIdentityStatsUseCase(
         return list
     }
 
-    private fun habitActiveOn(habit: Habit, dayStart: Instant): Boolean {
-        // Identity engine uses date-overlap (effectiveFrom < dayEnd), same as
-        // per-habit engine. 5c-2 grace at identity level is unnecessary: a
-        // newly-added identity has no prior streak to protect, and an existing
-        // identity gaining a new habit needs that habit reflected in today's
-        // heat once logged. User-level engine (ComputeStreakUseCase) keeps the
-        // instant grace to protect the cross-identity streak when a single
-        // identity/habit is added mid-day.
+    /**
+     * Conditional grace per day for identity engine:
+     * - PAST days: date-overlap (effectiveFrom < dayEnd). Past mid-day creations
+     *   count active for their creation day so historical heat/streak is correct.
+     * - TODAY:
+     *   - if identity has any habit with effectiveFrom < dayStart (a "pre-existing"
+     *     habit relative to today): use INSTANT grace. Old habits required, mid-day
+     *     additions excluded for today. Adding a habit to an existing identity
+     *     mid-day doesn't reset today's heat.
+     *   - else (fresh identity — every habit was added today): date-overlap. All
+     *     habits required so logging them all paints today green.
+     *
+     * This mirrors user-level hybrid grace but adapts to the "fresh identity"
+     * edge case where there's no prior heat to protect.
+     */
+    private fun activeHabitsOn(habits: List<Habit>, dayStart: Instant): List<Habit> {
+        val today = clock.now().toLocalDateTime(timeZone).date
+        val dayDate = dayStart.toLocalDateTime(timeZone).date
         val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
-        return (habit.effectiveFrom?.let { it < dayEnd } ?: true) &&
-            (habit.effectiveTo?.let { it > dayStart } ?: true)
+        val endOk = { h: Habit -> h.effectiveTo?.let { it > dayStart } ?: true }
+        return if (dayDate == today) {
+            val hasPreExisting = habits.any { h ->
+                h.effectiveFrom != null && h.effectiveFrom!! < dayStart
+            }
+            if (hasPreExisting) {
+                // Instant grace: only existing habits count today.
+                habits.filter { h ->
+                    (h.effectiveFrom?.let { it <= dayStart } ?: true) && endOk(h)
+                }
+            } else {
+                // Fresh identity: date-overlap so today's just-added habits count.
+                habits.filter { h ->
+                    (h.effectiveFrom?.let { it < dayEnd } ?: true) && endOk(h)
+                }
+            }
+        } else {
+            // Past day: date-overlap.
+            habits.filter { h ->
+                (h.effectiveFrom?.let { it < dayEnd } ?: true) && endOk(h)
+            }
+        }
     }
 
     /**

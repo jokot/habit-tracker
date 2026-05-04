@@ -146,10 +146,12 @@ class ComputeIdentityStatsUseCaseTest {
     }
 
     @Test
-    fun `habit added mid-day IS required for that day's complete check (date-overlap)`() = runTest {
-        // Identity engine uses date-overlap — habit created today at 14:00 IS active
-        // for today, so today is TODAY_PENDING (not COMPLETE) until BOTH habits are
-        // logged. The 5c-2 grace lives only at the user-level engine, not here.
+    fun `habit added mid-day to existing identity does NOT reset today (conditional grace)`() = runTest {
+        // Conditional grace per Phase 5e-3 follow-up: if the identity has any
+        // pre-existing habit (effectiveFrom < dayStart), today's mid-day adds are
+        // excluded from the COMPLETE check. So adding a new habit at 14:00 to an
+        // identity that already had habits doesn't break today's heat —
+        // logging just the old habits keeps the day COMPLETE.
         val todayDate = LocalDate(2026, 5, 1)
         val testTz = TimeZone.UTC
         val todayDayStart = todayDate.atStartOfDayIn(testTz)
@@ -177,9 +179,50 @@ class ComputeIdentityStatsUseCaseTest {
         )
         val stats = sut.computeNow(userId, identityId)
 
-        // newHabit is active today (date-overlap), and not logged → today is NOT COMPLETE
-        assertNotEquals(StreakDayState.COMPLETE, stats.last14States.last())
-        assertEquals(StreakDayState.TODAY_PENDING, stats.last14States.last())
+        // pre-existing oldHabit → instant grace today → newHabit excluded → COMPLETE
+        assertEquals(StreakDayState.COMPLETE, stats.last14States.last())
+    }
+
+    @Test
+    fun `fresh identity (all habits new today) requires all to be logged for today's heat`() = runTest {
+        // The other half of conditional grace: if the identity has NO pre-existing
+        // habits (every linked habit was added today — fresh identity), date-overlap
+        // applies and ALL habits must be logged for today to count COMPLETE.
+        val todayDate = LocalDate(2026, 5, 1)
+        val testTz = TimeZone.UTC
+        val todayDayStart = todayDate.atStartOfDayIn(testTz)
+        val morning = todayDayStart.plus(9, DateTimeUnit.HOUR, testTz)
+        val afternoon = todayDayStart.plus(14, DateTimeUnit.HOUR, testTz)
+
+        val repo = FakeIdentityRepository(seed = listOf(seedIdentity))
+        val h1 = makeHabit("h1").copy(effectiveFrom = morning)
+        val h2 = makeHabit("h2").copy(effectiveFrom = afternoon)
+        repo.seedHabit(h1)
+        repo.seedHabit(h2)
+        repo.linkHabitToIdentities(h1.id, setOf(identityId))
+        repo.linkHabitToIdentities(h2.id, setOf(identityId))
+
+        // Log only h1
+        val partialLogs = listOf(makeLog("h1", todayDate))
+        val fakeClock = object : Clock { override fun now(): Instant = afternoon }
+        val partialSut = ComputeIdentityStatsUseCase(
+            habitLogRepo = AllLogsRepo(partialLogs),
+            identityRepo = repo,
+            timeZone = testTz,
+            clock = fakeClock,
+        )
+        // Fresh identity, only 1 of 2 logged → not COMPLETE
+        assertNotEquals(StreakDayState.COMPLETE, partialSut.computeNow(userId, identityId).last14States.last())
+
+        // Log both → COMPLETE
+        val fullLogs = listOf(makeLog("h1", todayDate), makeLog("h2", todayDate))
+        val fullSut = ComputeIdentityStatsUseCase(
+            habitLogRepo = AllLogsRepo(fullLogs),
+            identityRepo = repo,
+            timeZone = testTz,
+            clock = fakeClock,
+        )
+        assertEquals(StreakDayState.COMPLETE, fullSut.computeNow(userId, identityId).last14States.last())
     }
 
     private fun makeHabit(id: String, dailyTarget: Int = 1, threshold: Double = 1.0) =
