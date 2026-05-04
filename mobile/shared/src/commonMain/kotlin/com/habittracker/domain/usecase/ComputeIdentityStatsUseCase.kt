@@ -210,8 +210,12 @@ class ComputeIdentityStatsUseCase(
         val dayEnd = dayStart.plus(1, DateTimeUnit.DAY, timeZone)
         val endOk = { h: Habit -> h.effectiveTo?.let { it > dayStart } ?: true }
         return if (dayDate == today) {
+            // "Pre-existing" = active under instant grace today (effectiveFrom <= dayStart).
+            // Onboarding habits anchored at startOfDay (effectiveFrom == dayStart) count
+            // as pre-existing — they're not mid-day adds, just calendar-day-zero seeds.
             val hasPreExisting = habits.any { h ->
-                h.effectiveFrom != null && h.effectiveFrom!! < dayStart
+                (h.effectiveFrom?.let { it <= dayStart } ?: true) &&
+                    (h.effectiveTo?.let { it > dayStart } ?: true)
             }
             if (hasPreExisting) {
                 // Instant grace: only existing habits count today.

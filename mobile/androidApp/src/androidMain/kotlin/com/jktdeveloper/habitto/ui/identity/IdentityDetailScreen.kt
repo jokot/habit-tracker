@@ -436,14 +436,7 @@ private fun HabitRow(
             HabitGlyph(icon = identityIcon(habit.name), hue = hue, size = 36.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(habit.name, style = MaterialTheme.typography.titleSmall)
-                if (otherIdentities.isEmpty()) {
-                    Text(
-                        "Only this identity",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                } else {
+                if (otherIdentities.isNotEmpty()) {
                     Row(
                         modifier = Modifier.padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
