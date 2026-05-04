@@ -32,7 +32,7 @@ fun IdentityStrip(
             .padding(horizontal = 16.dp)
             .padding(bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             text = "I AM",
