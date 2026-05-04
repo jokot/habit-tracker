@@ -31,8 +31,11 @@ class AddIdentityWithHabitsUseCase(
 
         // 2. For each selected template, link existing habit OR create + link.
         // Custom habits (templateId=null) cannot match any selectedTemplateId, so exclude them.
+        // Soft-deleted habits (effectiveTo != null) are tombstones — re-add must create a fresh row,
+        // not relink the deleted one.
         val ownedByTemplate: Map<String, Habit> =
             habitRepo.getHabitsForUser(userId)
+                .filter { it.effectiveTo == null }
                 .mapNotNull { h -> h.templateId?.let { tid -> tid to h } }
                 .toMap()
 

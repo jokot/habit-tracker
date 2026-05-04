@@ -144,7 +144,9 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                             container.habitLogRepository.observeAllActiveLogsForUser(userId),
                             container.wantActivityRepository.observeWantActivities(userId),
                             container.wantLogRepository.observeAllActiveLogsForUser(userId),
-                        ) { habits, habitLogs, wants, wantLogs ->
+                        ) { habitsRaw, habitLogs, wants, wantLogs ->
+                            // Exclude soft-deleted habits — only currently active ones surface in UI / progress.
+                            val habits = habitsRaw.filter { it.effectiveTo == null }
                             val habitsById = habits.associateBy { it.id }
                             val habitsWithProgress = habits.map { habit ->
                                 val pointsToday = habitLogs

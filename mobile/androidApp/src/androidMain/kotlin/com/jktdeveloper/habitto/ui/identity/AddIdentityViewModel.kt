@@ -83,7 +83,10 @@ class AddIdentityViewModel(
         val selected = _state.value.selectedIdentity ?: return
         viewModelScope.launch {
             val userId = userIdProvider()
-            val ownedTemplateIds = habitRepo.getHabitsForUser(userId).map { it.templateId }.toSet()
+            val ownedTemplateIds = habitRepo.getHabitsForUser(userId)
+                .filter { it.effectiveTo == null }
+                .map { it.templateId }
+                .toSet()
             val tplsForIdentity = templates.execute(setOf(selected.id))
                 .filter { tw -> tw.recommendedBy.any { it.id == selected.id } }
                 .map { it.template }
