@@ -146,7 +146,9 @@ class FakeIdentityRepository(
 
     override fun observeHabitsForIdentity(userId: String, identityId: String): Flow<List<Habit>> =
         combine(habits, habitIdentities) { hs, his ->
-            val habitIds = his.filter { it.identityId == identityId }.map { it.habitId }.toSet()
+            val habitIds = his.filter { it.identityId == identityId && it.effectiveTo == null }
+                .map { it.habitId }
+                .toSet()
             hs.filter { it.userId == userId && it.id in habitIds }
         }
 
