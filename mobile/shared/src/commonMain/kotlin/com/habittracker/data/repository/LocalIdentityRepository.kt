@@ -190,6 +190,18 @@ class LocalIdentityRepository(
                 effectiveTo = it.effectiveTo?.let(Instant::fromEpochMilliseconds),
             )
         }
+
+    override suspend fun markHabitIdentityRemoved(
+        habitId: String,
+        identityId: String,
+        effectiveTo: Instant,
+    ) {
+        q.markHabitIdentityRemoved(
+            effectiveTo = effectiveTo.toEpochMilliseconds(),
+            habitId = habitId,
+            identityId = identityId,
+        )
+    }
 }
 
 private fun LocalHabit.toDomain(): Habit = Habit(

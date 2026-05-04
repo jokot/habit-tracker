@@ -151,8 +151,22 @@ class FakeIdentityRepository(
         }
 
     override suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow> {
+        val seededHabitIds = habits.value.map { it.id }.toSet()
         val userHabitIds = habits.value.filter { it.userId == userId }.map { it.id }.toSet()
-        return habitIdentities.value.filter { it.habitId in userHabitIds }
+        return habitIdentities.value.filter { it.habitId in userHabitIds || it.habitId !in seededHabitIds }
+    }
+
+    override suspend fun markHabitIdentityRemoved(
+        habitId: String,
+        identityId: String,
+        effectiveTo: Instant,
+    ) {
+        val links = habitIdentities.value.toMutableList()
+        val idx = links.indexOfFirst { it.habitId == habitId && it.identityId == identityId }
+        if (idx >= 0) {
+            links[idx] = links[idx].copy(effectiveTo = effectiveTo, syncedAt = null)
+            habitIdentities.value = links
+        }
     }
 
     fun seedUserIdentity(

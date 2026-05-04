@@ -303,6 +303,11 @@ WHERE h.userId = ? AND li.syncedAt IS NULL;
 markHabitIdentitySynced:
 UPDATE LocalHabitIdentity SET syncedAt = ? WHERE habitId = ? AND identityId = ?;
 
+markHabitIdentityRemoved:
+UPDATE LocalHabitIdentity
+SET effectiveTo = :effectiveTo, syncedAt = NULL
+WHERE habitId = :habitId AND identityId = :identityId;
+
 getHabitsForIdentity:
 SELECT h.*
 FROM LocalHabit h

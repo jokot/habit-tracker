@@ -37,6 +37,7 @@ interface IdentityRepository {
     suspend fun mergePulledHabitIdentity(row: HabitIdentityRow)
     fun observeHabitsForIdentity(userId: String, identityId: String): Flow<List<Habit>>
     suspend fun getHabitIdentityLinksForUser(userId: String): List<HabitIdentityRow>
+    suspend fun markHabitIdentityRemoved(habitId: String, identityId: String, effectiveTo: Instant)
 }
 
 data class UserIdentityRow(
