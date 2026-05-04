@@ -32,6 +32,8 @@ sealed class IdentityDetailState {
         val identity: Identity,
         val stats: IdentityStats,
         val habits: List<Habit>,
+        /** Identities (excluding current) each habit also belongs to. Empty list ⇒ habit is exclusive. */
+        val otherIdentitiesByHabit: Map<String, List<Identity>> = emptyMap(),
         val isPinned: Boolean = false,
         val whyText: String? = null,
         val isEditingWhy: Boolean = false,
@@ -95,6 +97,16 @@ class IdentityDetailViewModel private constructor(
                     }
                     val row = identityRepo.getUserIdentityRow(userId, identityId)
                     val stats = statsUseCase.computeNow(userId, identityId)
+                    // Compute "other identities" each habit also belongs to (active links only).
+                    val identityById = userIdentities.associateBy { it.id }
+                    val activeLinks = identityRepo.getHabitIdentityLinksForUser(userId)
+                        .filter { it.effectiveTo == null }
+                    val otherIdentitiesByHabit: Map<String, List<Identity>> = habits.associate { h ->
+                        h.id to activeLinks.asSequence()
+                            .filter { it.habitId == h.id && it.identityId != identityId }
+                            .mapNotNull { identityById[it.identityId] }
+                            .toList()
+                    }
                     // Preserve any in-progress edit state
                     val current = _state.value
                     val isEditing = (current as? IdentityDetailState.Loaded)?.isEditingWhy ?: false
@@ -103,6 +115,7 @@ class IdentityDetailViewModel private constructor(
                         identity = identity,
                         stats = stats,
                         habits = habits,
+                        otherIdentitiesByHabit = otherIdentitiesByHabit,
                         isPinned = row?.isPinned ?: false,
                         whyText = row?.whyText,
                         isEditingWhy = isEditing,

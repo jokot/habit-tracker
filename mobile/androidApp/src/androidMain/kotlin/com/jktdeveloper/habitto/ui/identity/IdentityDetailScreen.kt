@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Habit
+import com.habittracker.domain.model.Identity
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHeatGrid
 import com.jktdeveloper.habitto.ui.components.IdentityHue
@@ -215,7 +216,12 @@ private fun Body(
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.habits.forEach { habit ->
-                        HabitRow(habit, hue, onClick = { onHabitClick(habit.id) })
+                        HabitRow(
+                            habit = habit,
+                            hue = hue,
+                            otherIdentities = state.otherIdentitiesByHabit[habit.id].orEmpty(),
+                            onClick = { onHabitClick(habit.id) },
+                        )
                     }
                     AddHabitRow(onClick = onAddHabit)
                 }
@@ -409,7 +415,12 @@ private fun AddHabitRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun HabitRow(habit: Habit, hue: Float, onClick: () -> Unit) {
+private fun HabitRow(
+    habit: Habit,
+    hue: Float,
+    otherIdentities: List<Identity>,
+    onClick: () -> Unit,
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
@@ -425,17 +436,61 @@ private fun HabitRow(habit: Habit, hue: Float, onClick: () -> Unit) {
             HabitGlyph(icon = identityIcon(habit.name), hue = hue, size = 36.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(habit.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Only this identity",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (otherIdentities.isEmpty()) {
+                    Text(
+                        "Only this identity",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            "Also:",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        otherIdentities.forEach { other ->
+                            OtherIdentityPill(other)
+                        }
+                    }
+                }
             }
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OtherIdentityPill(identity: Identity) {
+    val isDark = isSystemInDarkTheme()
+    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val bg = if (isDark) Color.hsl(hue, 0.30f, 0.20f) else Color.hsl(hue, 0.50f, 0.94f)
+    val fg = if (isDark) Color.hsl(hue, 0.30f, 0.85f) else Color.hsl(hue, 0.50f, 0.30f)
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = bg,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 2.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            HabitGlyph(icon = identityIcon(identity.name), hue = hue, size = 14.dp)
+            Text(
+                text = identity.name.split(" ").first(),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = fg,
             )
         }
     }
