@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantActivity
 import com.jktdeveloper.habitto.AppContainer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -84,9 +86,10 @@ class DevToolsViewModel(
         }
         viewModelScope.launch {
             _state.value = s.copy(isLoading = true, validationError = null)
-            val today = clock.now().toLocalDateTime(timeZone).date
+            val now = clock.now()
+            val today = now.toLocalDateTime(timeZone).date
             val input = SeedInput(s.days, s.mode, s.constantLevel, s.freezeCount, s.brokenCount)
-            val planResult = DevSeeder.plan(input, today, Random(clock.now().toEpochMilliseconds()))
+            val planResult = DevSeeder.plan(input, today, Random(now.toEpochMilliseconds()))
             val plan = planResult.getOrElse {
                 _state.value = _state.value.copy(isLoading = false, validationError = it.message)
                 return@launch
@@ -136,24 +139,26 @@ class DevToolsViewModel(
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    private suspend fun runSeed(confirm: ConfirmPlan) {
+    private suspend fun runSeed(confirm: ConfirmPlan) = withContext(Dispatchers.IO) {
         val userId = container.currentUserId()
         val habits = container.habitRepository.getHabitsForUser(userId)
         val s = _state.value
+        val allHabitLogs = container.habitLogRepository.getAllActiveLogsForUser(userId)
+        val allWantLogs = if (s.seedWantSpends) {
+            container.wantLogRepository.getAllActiveLogsForUser(userId)
+        } else emptyList()
 
         for (slot in confirm.plan) {
             val dayStart = slot.date.atStartOfDayIn(timeZone)
             val dayEnd = slot.date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
 
-            val existingHabits = container.habitLogRepository.getAllActiveLogsForUser(userId)
-                .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
+            val existingHabits = allHabitLogs.filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
             for (log in existingHabits) {
                 container.habitLogRepository.softDelete(log.id, userId)
             }
 
             if (s.seedWantSpends) {
-                val existingWants = container.wantLogRepository.getAllActiveLogsForUser(userId)
-                    .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
+                val existingWants = allWantLogs.filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
                 for (log in existingWants) {
                     container.wantLogRepository.softDelete(log.id, userId)
                 }
