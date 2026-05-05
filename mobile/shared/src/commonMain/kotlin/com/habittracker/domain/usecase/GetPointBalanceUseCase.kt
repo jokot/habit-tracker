@@ -20,6 +20,12 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
+/**
+ * @param getUserStreakOnDayUseCase Phase 6 rate-at-log-day source. When `null`, [spentOnDay]
+ *   falls back to rate=1.0 (pre-Phase-6 parity). Production wiring in `AppContainer` MUST
+ *   pass a non-null instance; the nullable default exists only for back-compat in tests
+ *   that predate Phase 6 and don't exercise rate behavior.
+ */
 class GetPointBalanceUseCase(
     private val habitLogRepo: HabitLogRepository,
     private val wantLogRepo: WantLogRepository,
@@ -98,8 +104,6 @@ class GetPointBalanceUseCase(
     ): Int {
         val dayStart = day.atStartOfDayIn(timeZone)
         val nextDayStart = day.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
-        // Phase 6: rate-at-log-day. When `getUserStreakOnDayUseCase` is null (back-compat
-        // for callers not yet wired), rate=1.0 so behavior matches pre-Phase-6.
         val rate = getUserStreakOnDayUseCase?.let {
             ExchangeRateCalculator.rateFor(it.execute(userId, day))
         } ?: 1.0
