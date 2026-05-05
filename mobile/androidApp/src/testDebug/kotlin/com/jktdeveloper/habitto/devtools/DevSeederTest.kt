@@ -1,11 +1,11 @@
 package com.jktdeveloper.habitto.devtools
 
 import kotlinx.datetime.LocalDate
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class DevSeederTest {
     private val today = LocalDate(2026, 6, 1)
@@ -37,16 +37,16 @@ class DevSeederTest {
         // target=10 → bareMin=1, full=10, span=9, third=3, mid1=4, mid2=7
         // Bucket 2: pointsCapped in [mid1, mid2) = [4, 7).
         val qty = DevSeeder.quantityForLevel(2, target = 10)
-        assertTrue("qty $qty must be ≥ 4", qty >= 4)
-        assertTrue("qty $qty must be < 7", qty < 7)
+        assertTrue(qty >= 4, "qty $qty must be ≥ 4")
+        assertTrue(qty < 7, "qty $qty must be < 7")
     }
 
     @Test
     fun `quantityForLevel L3 lands inside bucket 3 when target permits`() {
         // target=10 → mid2=7, full=10. Bucket 3: pointsCapped in [7, 10).
         val qty = DevSeeder.quantityForLevel(3, target = 10)
-        assertTrue("qty $qty must be ≥ 7", qty >= 7)
-        assertTrue("qty $qty must be < 10", qty < 10)
+        assertTrue(qty >= 7, "qty $qty must be ≥ 7")
+        assertTrue(qty < 10, "qty $qty must be < 10")
     }
 
     @Test
@@ -110,7 +110,7 @@ class DevSeederTest {
             ).getOrThrow()
             for (slot in result) {
                 val complete = slot.kind as? DaySlotKind.Complete ?: continue
-                assertTrue("level ${complete.level} out of range", complete.level in 1..4)
+                assertTrue(complete.level in 1..4, "level ${complete.level} out of range")
             }
         }
     }

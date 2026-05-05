@@ -48,6 +48,10 @@ object DevSeeder {
     fun quantityForLevel(level: Int, target: Int): Int {
         require(level in 1..4) { "level must be 1..4, was $level" }
         require(target >= 1) { "target must be ≥ 1, was $target" }
+        // Bucket accuracy degrades for small targets (target < 7) because
+        // `third = (target - 1) / 3` integer-truncates to 0 or 1, collapsing
+        // buckets 1..3. e.g. target=4 with level=2 returns 3, which lands in
+        // bucket 3 not bucket 2. Acceptable for dev seeder smoke testing.
         if (target == 1) return 1
         val span = target - 1
         val third = span / 3
