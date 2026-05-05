@@ -75,4 +75,45 @@ class GetDayPointsUseCaseRateTest {
         assertEquals(6, day.spent)
         assertEquals(1, day.earned)  // earn unaffected by rate
     }
+
+    @Test
+    fun `earn is NOT rate-multiplied at non-trivial earn quantity`() = runTest {
+        val today = LocalDate(2026, 5, 30)
+        val now = LocalDateTime(today, LocalTime(20, 0)).toInstant(tz)
+        val clock = object : Clock { override fun now(): Instant = now }
+        val habitRepo = FakeHabitRepository()
+        val habitLogRepo = FakeHabitLogRepository()
+        val wantActivityRepo = FakeWantActivityRepository()
+        val wantLogRepo = FakeWantLogRepository()
+
+        val anchor = LocalDateTime(LocalDate(2026, 1, 1), LocalTime(0, 0)).toInstant(tz)
+        habitRepo.saveHabit(
+            Habit(
+                id = "h1", userId = userId, templateId = null, name = "h", unit = "x",
+                thresholdPerPoint = 1.0, dailyTarget = 100,
+                createdAt = anchor, updatedAt = anchor, effectiveFrom = anchor,
+            )
+        )
+        // 14 days of qty=3 logs each day to keep the day "complete" → streak=14 → rate 1.2
+        (0..13).forEach { offset ->
+            val d = today.minus(offset, DateTimeUnit.DAY)
+            habitLogRepo.insertLog(
+                id = "l-$d", userId = userId, habitId = "h1",
+                quantity = 3.0,
+                loggedAt = LocalDateTime(d, LocalTime(10, 0)).toInstant(tz),
+            )
+        }
+
+        val streak = ComputeStreakUseCase(habitLogRepo, habitRepo, tz, clock)
+        val streakOnDay = GetUserStreakOnDayUseCase(streak, tz)
+        val sut = GetDayPointsUseCase(
+            habitLogRepo, wantLogRepo, habitRepo, wantActivityRepo, tz, streakOnDay,
+        )
+
+        // Without rate-multiplication: pointsEarned(3.0, 1.0) = 3.
+        // If a regression rate-multiplied earn: ceil(3.0 × 1.2) = 4. Catches that case.
+        val day = sut.execute(userId, today).getOrThrow()
+        assertEquals(3, day.earned)
+        assertEquals(0, day.spent)
+    }
 }
