@@ -34,6 +34,7 @@ import com.jktdeveloper.habitto.ui.identity.AddIdentityScreen
 import com.jktdeveloper.habitto.ui.identity.AddIdentityViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
+import com.jktdeveloper.habitto.devtools.devToolsRoute
 import com.habittracker.data.sync.SyncReason
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -67,6 +68,7 @@ sealed class Screen(val route: String) {
         }
     }
     object ExchangeRate : Screen("exchange_rate")
+    object DevTools : Screen("dev_tools")
 }
 
 @Composable
@@ -215,6 +217,9 @@ fun AppNavigation(container: AppContainer) {
                     onSignOut = { vm.beginSignOut() },
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onBack = { navController.popBackStack() },
+                    onOpenDevTools = if (com.jktdeveloper.habitto.BuildConfig.DEBUG) {
+                        { navController.navigate(Screen.DevTools.route) }
+                    } else null,
                 )
             }
 
@@ -240,6 +245,12 @@ fun AppNavigation(container: AppContainer) {
                     onBack = { navController.popBackStack() },
                 )
             }
+
+            devToolsRoute(
+                container = container,
+                routePath = Screen.DevTools.route,
+                onBack = { navController.popBackStack() },
+            )
 
             composable(Screen.You.route) {
                 val vm = androidx.lifecycle.viewmodel.compose.viewModel {

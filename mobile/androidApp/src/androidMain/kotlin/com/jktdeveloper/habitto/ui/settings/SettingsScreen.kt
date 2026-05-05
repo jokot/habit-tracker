@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.*
@@ -41,6 +42,7 @@ fun SettingsScreen(
     onSignOut: () -> Unit,
     onSignIn: () -> Unit,
     onBack: () -> Unit,
+    onOpenDevTools: (() -> Unit)? = null,
 ) {
     val prefs by viewModel.prefs.collectAsState()
     val context = LocalContext.current
@@ -165,6 +167,18 @@ fun SettingsScreen(
                     supporting = "Local data stays put",
                     leading = Icons.AutoMirrored.Filled.Login,
                     onClick = onSignIn,
+                )
+            }
+        }
+
+        // ── Developer section (debug only) ────────────────────────────────────
+        if (onOpenDevTools != null) {
+            SettingsSection(title = "Developer") {
+                SettingsRow(
+                    title = "Dev tools",
+                    supporting = "Seed test data — debug builds only",
+                    leading = Icons.Default.Build,
+                    onClick = onOpenDevTools,
                 )
             }
         }
