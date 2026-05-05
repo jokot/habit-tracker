@@ -84,6 +84,7 @@ fun DailyStatusCard(
     balance: Int,
     onDayTap: (StreakDay) -> Unit,
     modifier: Modifier = Modifier,
+    onBalanceTap: () -> Unit = {},
 ) {
     val isDark = isSystemInDarkTheme()
     val state = streakDisplayState(range, currentStreak)
@@ -247,6 +248,7 @@ fun DailyStatusCard(
                     emphasized = true,
                     showLeftBorder = true,
                     modifier = Modifier.weight(1f),
+                    onClick = onBalanceTap,
                 )
             }
         }
@@ -263,9 +265,10 @@ private fun KpiCell(
     emphasized: Boolean,
     showLeftBorder: Boolean,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val outlineColor = MaterialTheme.colorScheme.outline
-    Row(modifier = modifier) {
+    Row(modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier) {
         if (showLeftBorder) {
             Box(
                 modifier = Modifier

@@ -84,6 +84,7 @@ fun HomeScreen(
     onOpenStreakHistory: () -> Unit,
     onIdentityClick: (String) -> Unit,
     onIdentitiesClick: () -> Unit,
+    onOpenExchangeRate: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
@@ -194,6 +195,7 @@ fun HomeScreen(
                             spent = uiState.pointBalance.spentToday,
                             balance = uiState.pointBalance.balance,
                             onDayTap = { onOpenStreakHistory() },
+                            onBalanceTap = onOpenExchangeRate,
                         )
                     }
                 }

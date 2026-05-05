@@ -172,6 +172,7 @@ fun AppNavigation(container: AppContainer) {
                     onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
                     onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
                     onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
+                    onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
                 )
             }
 
