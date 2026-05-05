@@ -124,7 +124,10 @@ class AppContainer(context: Context) {
         habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
     )
-    val getDayPointsUseCase = GetDayPointsUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
+    val getDayPointsUseCase = GetDayPointsUseCase(
+        habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository,
+        getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
     val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
     val logWantUseCase = LogWantUseCase(
         wantLogRepository = wantLogRepository,

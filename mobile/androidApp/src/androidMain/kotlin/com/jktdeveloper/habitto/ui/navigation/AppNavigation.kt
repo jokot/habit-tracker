@@ -66,6 +66,7 @@ sealed class Screen(val route: String) {
             return if (params.isEmpty()) "habit_form" else "habit_form?$params"
         }
     }
+    object ExchangeRate : Screen("exchange_rate")
 }
 
 @Composable
@@ -226,6 +227,16 @@ fun AppNavigation(container: AppContainer) {
                 }
                 com.jktdeveloper.habitto.ui.streak.StreakHistoryScreen(
                     viewModel = vm,
+                )
+            }
+
+            composable(Screen.ExchangeRate.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.exchange.ExchangeRateViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.exchange.ExchangeRateScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
 
