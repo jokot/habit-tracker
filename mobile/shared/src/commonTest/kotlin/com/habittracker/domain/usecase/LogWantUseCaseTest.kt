@@ -19,7 +19,9 @@ class LogWantUseCaseTest {
     private val habitRepo = FakeHabitRepository()
     private val habitLogRepo = FakeHabitLogRepository()
     private val balance = GetPointBalanceUseCase(habitLogRepo, wantLogRepo, habitRepo, activityRepo)
-    private val useCase = LogWantUseCase(wantLogRepo, activityRepo, balance)
+    private val streak = ComputeStreakUseCase(habitLogRepo, habitRepo)
+    private val streakOnDay = GetUserStreakOnDayUseCase(streak)
+    private val useCase = LogWantUseCase(wantLogRepo, activityRepo, balance, streakOnDay)
     private val userId = "user1"
 
     /** Earns `pts` points via a dummy habit log so spending can be tested. */
