@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ fun YouHubScreen(
     onSignOutComplete: () -> Unit,
     onOpenIdentities: () -> Unit,
     onHabitsClick: () -> Unit,
+    onOpenExchangeRate: () -> Unit,
 ) {
     val authState by viewModel.authState.collectAsState()
     val isSigningOut by viewModel.isSigningOut.collectAsState()
@@ -75,6 +77,25 @@ fun YouHubScreen(
                     },
                     headlineContent = { Text("Habits") },
                     supportingContent = { Text("Manage what you track") },
+                    trailingContent = {
+                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    },
+                )
+            }
+            item { SectionHeader("Earn & spend") }
+            item {
+                val rate by viewModel.currentRate.collectAsState()
+                val streak by viewModel.currentStreak.collectAsState()
+                ListItem(
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenExchangeRate() },
+                    leadingContent = {
+                        Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null)
+                    },
+                    headlineContent = { Text("Point exchange rate") },
+                    supportingContent = {
+                        val rateLabel = ((rate * 10).toInt() / 10.0).toString()
+                        Text("${rateLabel}× · earned by ${streak}-day streak")
+                    },
                     trailingContent = {
                         Icon(Icons.Default.ChevronRight, contentDescription = null)
                     },

@@ -255,6 +255,7 @@ fun AppNavigation(container: AppContainer) {
                     },
                     onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
                     onHabitsClick = { navController.navigate(Screen.HabitList.route) },
+                    onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
                 )
             }
 
