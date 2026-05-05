@@ -141,8 +141,23 @@ class DevToolsViewModel(
     @OptIn(ExperimentalUuidApi::class)
     private suspend fun runSeed(confirm: ConfirmPlan) = withContext(Dispatchers.IO) {
         val userId = container.currentUserId()
-        val habits = container.habitRepository.getHabitsForUser(userId)
+        val rawHabits = container.habitRepository.getHabitsForUser(userId)
         val s = _state.value
+
+        // Backdate effectiveFrom so seeded past-day logs pass habitActiveOn.
+        // Streak engine PAST-day filter: effectiveFrom < dayEnd. If habit was
+        // created today, all seeded days fail this check → empty heatmap.
+        val today = clock.now().toLocalDateTime(timeZone).date
+        val seedWindowStart = today.minus(s.days, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
+        val habits = rawHabits.map { habit ->
+            val current = habit.effectiveFrom
+            if (current == null || current > seedWindowStart) {
+                val updated = habit.copy(effectiveFrom = seedWindowStart)
+                container.habitRepository.saveHabit(updated)
+                updated
+            } else habit
+        }
+
         val allHabitLogs = container.habitLogRepository.getAllActiveLogsForUser(userId)
         val allWantLogs = if (s.seedWantSpends) {
             container.wantLogRepository.getAllActiveLogsForUser(userId)
