@@ -7,7 +7,6 @@ import com.habittracker.domain.model.WantLog
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.math.ceil
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -41,7 +40,7 @@ class LogWantUseCase(
         val today = now.toLocalDateTime(timeZone).date
         val streakOnDay = getUserStreakOnDayUseCase.execute(userId, today)
         val rate = ExchangeRateCalculator.rateFor(streakOnDay)
-        val points = pointsSpentWithRate(quantity, activity.costPerUnit, rate)
+        val points = PointCalculator.pointsSpentWithRate(quantity, activity.costPerUnit, rate)
 
         val balance = getPointBalanceUseCase.execute(userId).getOrThrow().balance
         if (points > balance) throw InsufficientPointsException(balance, points)
@@ -49,11 +48,5 @@ class LogWantUseCase(
         val id = Uuid.random().toString()
         val log = wantLogRepository.insertLog(id, userId, activityId, quantity, deviceMode, now)
         LogWantResult(log, points)
-    }
-
-    /** Cost × rate, rounded up, with `1pt` minimum if any quantity was consumed. */
-    internal fun pointsSpentWithRate(quantity: Double, costPerUnit: Double, rate: Double): Int {
-        if (quantity <= 0.0 || costPerUnit <= 0.0) return 0
-        return ceil(quantity * costPerUnit * rate).toInt().coerceAtLeast(1)
     }
 }

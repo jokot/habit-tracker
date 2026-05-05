@@ -27,6 +27,7 @@ class GetPointBalanceUseCase(
     private val wantActivityRepo: WantActivityRepository,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
     private val clock: Clock = Clock.System,
+    private val getUserStreakOnDayUseCase: GetUserStreakOnDayUseCase? = null,
 ) {
     suspend fun execute(userId: String): Result<PointBalance> = runCatching {
         val today = clock.now().toLocalDateTime(timeZone).date
@@ -51,7 +52,7 @@ class GetPointBalanceUseCase(
         var day = weekStartDate
         while (day <= today) {
             val earnedThisDay = earnedOnDay(day, habitLogs, habits)
-            val spentThisDay = spentOnDay(day, wantLogs, activities)
+            val spentThisDay = spentOnDay(userId, day, wantLogs, activities)
             if (day != weekStartDate) balance = minOf(balance, rolloverCap)
             balance = (balance + earnedThisDay - spentThisDay).coerceAtLeast(0)
             totalEarned += earnedThisDay
@@ -89,18 +90,24 @@ class GetPointBalanceUseCase(
         }
     }
 
-    private fun spentOnDay(
+    private suspend fun spentOnDay(
+        userId: String,
         day: LocalDate,
         weekWantLogs: List<WantLog>,
         activities: Map<String, WantActivity>,
     ): Int {
         val dayStart = day.atStartOfDayIn(timeZone)
         val nextDayStart = day.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
+        // Phase 6: rate-at-log-day. When `getUserStreakOnDayUseCase` is null (back-compat
+        // for callers not yet wired), rate=1.0 so behavior matches pre-Phase-6.
+        val rate = getUserStreakOnDayUseCase?.let {
+            ExchangeRateCalculator.rateFor(it.execute(userId, day))
+        } ?: 1.0
         return weekWantLogs
             .filter { it.loggedAt >= dayStart && it.loggedAt < nextDayStart }
             .sumOf { log ->
                 activities[log.activityId]?.let {
-                    PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
+                    PointCalculator.pointsSpentWithRate(log.quantity, it.costPerUnit, rate)
                 } ?: 0
             }
     }

@@ -119,10 +119,13 @@ class AppContainer(context: Context) {
 
     val userIdentityProvider = UserIdentityProvider(authRepository, localUserIdStore)
 
-    val getPointBalanceUseCase = GetPointBalanceUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
+    val getUserStreakOnDayUseCase = GetUserStreakOnDayUseCase(computeStreakUseCase)
+    val getPointBalanceUseCase = GetPointBalanceUseCase(
+        habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository,
+        getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
     val getDayPointsUseCase = GetDayPointsUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
     val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
-    val getUserStreakOnDayUseCase = GetUserStreakOnDayUseCase(computeStreakUseCase)
     val logWantUseCase = LogWantUseCase(
         wantLogRepository = wantLogRepository,
         wantActivityRepository = wantActivityRepository,
