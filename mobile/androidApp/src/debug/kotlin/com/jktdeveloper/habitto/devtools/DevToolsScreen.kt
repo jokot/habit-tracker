@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,8 +66,10 @@ fun DevToolsScreen(viewModel: DevToolsViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
 
-    state.toast?.let { msg ->
-        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    val toast = state.toast
+    LaunchedEffect(toast) {
+        toast ?: return@LaunchedEffect
+        Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
         viewModel.consumeToast()
     }
 
@@ -121,17 +127,23 @@ fun DevToolsScreen(viewModel: DevToolsViewModel, onBack: () -> Unit) {
             SectionLabel("Want spends")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = state.seedWantSpends, onCheckedChange = viewModel::onSeedWantsToggle)
-                Spacer(Modifier.size(12.dp))
+                Spacer(Modifier.width(12.dp))
                 Text("Also seed 1 want spend per complete day")
             }
             if (state.seedWantSpends) {
                 Spacer(Modifier.height(8.dp))
                 ActivityDropdown(state, viewModel::onActivitySelect)
                 Spacer(Modifier.height(8.dp))
+                val rawQty = remember(state.seedWantSpends) { mutableStateOf(state.wantQuantity.toString()) }
                 OutlinedTextField(
-                    value = state.wantQuantity.toString(),
-                    onValueChange = { viewModel.onWantQuantityChange(it.toDoubleOrNull() ?: 0.0) },
+                    value = rawQty.value,
+                    onValueChange = { input ->
+                        rawQty.value = input
+                        input.toDoubleOrNull()?.let(viewModel::onWantQuantityChange)
+                    },
                     label = { Text("Quantity") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -162,9 +174,12 @@ fun DevToolsScreen(viewModel: DevToolsViewModel, onBack: () -> Unit) {
         }
     }
 
+    val onConfirmSeed = remember(viewModel) { viewModel::confirmSeed }
+    val onDismissConfirm = remember(viewModel) { viewModel::dismissConfirm }
+
     state.pendingConfirm?.let { confirm ->
         AlertDialog(
-            onDismissRequest = viewModel::dismissConfirm,
+            onDismissRequest = onDismissConfirm,
             title = { Text("Confirm seed") },
             text = {
                 Column {
@@ -189,8 +204,8 @@ fun DevToolsScreen(viewModel: DevToolsViewModel, onBack: () -> Unit) {
                     )
                 }
             },
-            confirmButton = { Button(onClick = viewModel::confirmSeed) { Text("Seed") } },
-            dismissButton = { OutlinedButton(onClick = viewModel::dismissConfirm) { Text("Cancel") } },
+            confirmButton = { Button(onClick = onConfirmSeed) { Text("Seed") } },
+            dismissButton = { OutlinedButton(onClick = onDismissConfirm) { Text("Cancel") } },
         )
     }
 }
