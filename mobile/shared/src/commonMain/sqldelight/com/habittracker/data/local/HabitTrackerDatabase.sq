@@ -86,7 +86,7 @@ INSERT OR REPLACE INTO HabitLog (id, userId, habitId, quantity, loggedAt, delete
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 softDeleteHabitLog:
-UPDATE HabitLog SET deletedAt = ? WHERE id = ? AND userId = ?;
+UPDATE HabitLog SET deletedAt = ?, syncedAt = NULL WHERE id = ? AND userId = ?;
 
 markHabitLogSynced:
 UPDATE HabitLog SET syncedAt = ? WHERE id = ?;
@@ -131,7 +131,7 @@ INSERT OR REPLACE INTO WantLog (id, userId, activityId, quantity, deviceMode, lo
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 softDeleteWantLog:
-UPDATE WantLog SET deletedAt = ? WHERE id = ? AND userId = ?;
+UPDATE WantLog SET deletedAt = ?, syncedAt = NULL WHERE id = ? AND userId = ?;
 
 markWantLogSynced:
 UPDATE WantLog SET syncedAt = ? WHERE id = ?;
