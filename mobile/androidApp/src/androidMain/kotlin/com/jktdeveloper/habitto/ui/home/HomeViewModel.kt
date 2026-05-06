@@ -12,6 +12,7 @@ import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.usecase.ExchangeRateCalculator
 import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogHabitStatus
 import com.habittracker.domain.usecase.PointCalculator
@@ -85,6 +86,10 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         com.habittracker.domain.model.StreakSummary(0, 0, 0, null)
     )
     val streakSummary: StateFlow<com.habittracker.domain.model.StreakSummary> = _streakSummary.asStateFlow()
+
+    val currentRate: StateFlow<Double> = streakSummary
+        .map { ExchangeRateCalculator.rateFor(it.currentStreak) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0)
 
     private val _showLogoutDialog = MutableStateFlow(false)
     val showLogoutDialog: StateFlow<Boolean> = _showLogoutDialog.asStateFlow()
@@ -294,7 +299,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
     fun tapWant(activity: WantActivity) {
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
-        val perTap = PointCalculator.pointsSpent(1.0, activity.costPerUnit)
+        val perTap = PointCalculator.pointsSpentWithRate(1.0, activity.costPerUnit, currentRate.value)
         val projectedCost = newCount * perTap
         val balance = _uiState.value.pointBalance.balance
         if (projectedCost > balance) {

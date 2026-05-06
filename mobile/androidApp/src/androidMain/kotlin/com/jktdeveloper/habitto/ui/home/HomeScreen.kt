@@ -89,6 +89,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
     val pendingWantMap by viewModel.pendingWants.collectAsState()
+    val currentRate by viewModel.currentRate.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val showLogoutDialog by viewModel.showLogoutDialog.collectAsState()
     val logoutUnsyncedCount by viewModel.logoutUnsyncedCount.collectAsState()
@@ -275,7 +276,7 @@ fun HomeScreen(
                         }
                     }
                     items(uiState.wantActivities, key = { it.id }) { activity ->
-                        val canAfford = uiState.pointBalance.balance >= perTapCostInt(activity)
+                        val canAfford = uiState.pointBalance.balance >= perTapCostInt(activity, currentRate)
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = Spacing.xl)
@@ -286,6 +287,7 @@ fun HomeScreen(
                                 pending = pendingWantMap[activity.id],
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
+                                rate = currentRate,
                                 onTap = { viewModel.tapWant(activity) },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
                             )
@@ -454,6 +456,7 @@ private fun WantActivityCard(
     pending: PendingWantLog?,
     balance: Int,
     canAfford: Boolean,
+    rate: Double,
     onTap: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -528,7 +531,7 @@ private fun WantActivityCard(
                     // Subtitle
                     Spacer(Modifier.height(Spacing.xs))
                     if (pending != null) {
-                        val cost = perTapCostInt(activity)
+                        val cost = perTapCostInt(activity, rate)
                         val totalCost = cost * pending.count
                         val afterBalance = balance - totalCost
                         Row {
@@ -546,7 +549,7 @@ private fun WantActivityCard(
                     } else {
                         Row {
                             Text(
-                                text = "−${perTapCostInt(activity)} pt",
+                                text = "−${perTapCostInt(activity, rate)} pt",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -693,6 +696,6 @@ private fun wantIcon(name: String): ImageVector = when {
 
 // ── Point helpers ─────────────────────────────────────────────────────────────
 
-private fun perTapCostInt(activity: WantActivity): Int =
-    if (activity.costPerUnit >= 1.0) activity.costPerUnit.toInt()
-    else 1
+private fun perTapCostInt(activity: WantActivity, rate: Double): Int =
+    com.habittracker.domain.usecase.PointCalculator
+        .pointsSpentWithRate(1.0, activity.costPerUnit, rate)
