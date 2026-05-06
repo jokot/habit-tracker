@@ -55,8 +55,9 @@ class GetUserStreakOnDayUseCaseTest {
     }
 
     @Test
-    fun `gap in middle resets streak count`() = runTest {
-        // Mon-Wed COMPLETE, Thu missed, Fri-Sat COMPLETE → query Sat → 2; query Wed → 3
+    fun `single day gap is FROZEN and streak survives across it`() = runTest {
+        // Mon-Wed COMPLETE, Thu missed (FROZEN), Fri-Sat COMPLETE → query Sat → 5;
+        // query Wed → 3.
         val sat = LocalDate(2026, 5, 9)
         val mon = sat.minus(5, DateTimeUnit.DAY)
         val habits = listOf(makeHabit("h1"))
@@ -69,17 +70,37 @@ class GetUserStreakOnDayUseCaseTest {
         )
         val logs = days.map { log("h1", it) }
         val sut = makeSut(today = sat, habits, logs)
-        assertEquals(2, sut.execute(userId, sat))
+        assertEquals(5, sut.execute(userId, sat))
         assertEquals(3, sut.execute(userId, mon.plus(2, DateTimeUnit.DAY)))
     }
 
     @Test
-    fun `today not complete returns 0 even if yesterday was`() = runTest {
+    fun `two day gap is BROKEN and streak resets`() = runTest {
+        // Mon-Wed COMPLETE, Thu+Fri missed (BROKEN), Sat COMPLETE → query Sat → 1.
+        val sat = LocalDate(2026, 5, 9)
+        val mon = sat.minus(5, DateTimeUnit.DAY)
+        val habits = listOf(makeHabit("h1"))
+        val days = listOf(
+            mon,
+            mon.plus(1, DateTimeUnit.DAY),
+            mon.plus(2, DateTimeUnit.DAY),
+            mon.plus(5, DateTimeUnit.DAY),
+        )
+        val logs = days.map { log("h1", it) }
+        val sut = makeSut(today = sat, habits, logs)
+        assertEquals(1, sut.execute(userId, sat))
+        assertEquals(3, sut.execute(userId, mon.plus(2, DateTimeUnit.DAY)))
+    }
+
+    @Test
+    fun `today pending preserves yesterday's streak`() = runTest {
+        // Yesterday COMPLETE, today no log yet (TODAY_PENDING) → query today → 1
+        // (don't increment for today, but don't break either).
         val today = LocalDate(2026, 5, 5)
         val habits = listOf(makeHabit("h1"))
         val logs = listOf(log("h1", today.minus(1, DateTimeUnit.DAY)))
         val sut = makeSut(today, habits, logs)
-        assertEquals(0, sut.execute(userId, today))
+        assertEquals(1, sut.execute(userId, today))
         assertEquals(1, sut.execute(userId, today.minus(1, DateTimeUnit.DAY)))
     }
 

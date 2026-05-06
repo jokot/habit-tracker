@@ -9,12 +9,19 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 
 /**
- * Returns the user-level streak ending on `date` — count of consecutive COMPLETE
- * days going backward from `date` inclusive. Returns 0 if `date` itself is not
- * COMPLETE or the user has no relevant logs.
+ * Returns the user-level streak ending on `date`. Mirrors
+ * `ComputeStreakUseCase.computeSummaryNow`'s state machine while walking
+ * backward from `date`:
  *
- * Used by GetPointBalanceUseCase + GetDayPointsUseCase to apply rate-at-log-day
- * for past Want spends (Phase 6).
+ * - COMPLETE → +1, continue.
+ * - FROZEN → streak survives; don't increment, continue.
+ * - TODAY_PENDING → not yet logged today; don't increment, continue
+ *   (yesterday's run still stands so the rate matches what the user sees on
+ *   the ExchangeRate screen even before today is closed).
+ * - BROKEN / EMPTY / FUTURE / missing → break.
+ *
+ * Used by LogWantUseCase + GetPointBalanceUseCase + GetDayPointsUseCase to
+ * apply rate-at-log-day for Want spends (Phase 6).
  */
 class GetUserStreakOnDayUseCase(
     private val streakUseCase: ComputeStreakUseCase,
@@ -31,10 +38,12 @@ class GetUserStreakOnDayUseCase(
         var cursor = date
         while (true) {
             val state = byDate[cursor]?.state ?: break
-            if (state == StreakDayState.COMPLETE) {
-                run += 1
-                cursor = cursor.minus(1, DateTimeUnit.DAY)
-            } else break
+            when (state) {
+                StreakDayState.COMPLETE -> run += 1
+                StreakDayState.FROZEN, StreakDayState.TODAY_PENDING -> Unit
+                StreakDayState.BROKEN, StreakDayState.EMPTY, StreakDayState.FUTURE -> break
+            }
+            cursor = cursor.minus(1, DateTimeUnit.DAY)
         }
         return run
     }
