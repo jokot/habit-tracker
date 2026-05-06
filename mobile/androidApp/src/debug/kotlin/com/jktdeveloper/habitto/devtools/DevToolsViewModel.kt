@@ -184,12 +184,16 @@ class DevToolsViewModel(
 
             val noon = slot.date.atStartOfDayIn(timeZone).plus(12 * 3600L, DateTimeUnit.SECOND)
             for (habit in habits) {
-                val qty = DevSeeder.quantityForLevel(kind.level, habit.dailyTarget)
+                val qty = DevSeeder.logQuantityForLevel(
+                    level = kind.level,
+                    target = habit.dailyTarget,
+                    threshold = habit.thresholdPerPoint,
+                )
                 container.habitLogRepository.insertLog(
                     id = Uuid.random().toString(),
                     userId = userId,
                     habitId = habit.id,
-                    quantity = qty.toDouble(),
+                    quantity = qty,
                     loggedAt = noon,
                 )
             }

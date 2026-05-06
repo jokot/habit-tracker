@@ -27,31 +27,31 @@ data class DaySlot(val date: LocalDate, val kind: DaySlotKind)
 object DevSeeder {
 
     /**
-     * Map a heat level (1..4) to per-habit log quantity.
+     * Map a heat level (1..4) to per-habit POINTS goal.
      *
-     * The streak engine's `bucketFor` (in `ComputeStreakUseCase`) divides the day's
-     * pointsCapped sum into 4 buckets between bareMin (=active habit count) and
-     * full (=sum of dailyTargets). For a single-habit day with target T:
+     * Streak engine's `bucketFor` divides day's pointsCapped sum into buckets
+     * between bareMin (=active habit count) and full (=sum of dailyTargets).
+     * For a single-habit day with target T (in points):
      *   bareMin = 1, full = T, span = T - 1, third = (T - 1) / 3
      *   bucket 1: [1, 1 + third)
      *   bucket 2: [1 + third, 1 + 2*third)
      *   bucket 3: [1 + 2*third, T)
      *   bucket 4: [T, ...)
      *
-     * Per-habit qty is chosen so the day-total bucket roughly matches L. For
-     * L=2 we use `1 + third + 1` clamped below `target - 1` to land inside the
-     * bucket-2 range for typical targets ≥ 4.
+     * Returns the desired per-habit POINTS contribution. To convert into a
+     * log `quantity` (the field stored on `HabitLog`), multiply by the habit's
+     * `thresholdPerPoint`. Use `logQuantityForLevel(...)` for that.
+     *
+     * Bucket accuracy degrades for small targets (target < 7) because
+     * `third = (target - 1) / 3` integer-truncates to 0 or 1, collapsing
+     * buckets 1..3. Acceptable for dev seeder smoke testing.
      *
      * Degenerate case: target = 1 collapses (bareMin == full). All non-zero
-     * quantities yield bucket 4 in this case; we still return 1.
+     * point contributions yield bucket 4 in this case; we still return 1.
      */
-    fun quantityForLevel(level: Int, target: Int): Int {
+    fun pointsForLevel(level: Int, target: Int): Int {
         require(level in 1..4) { "level must be 1..4, was $level" }
         require(target >= 1) { "target must be ≥ 1, was $target" }
-        // Bucket accuracy degrades for small targets (target < 7) because
-        // `third = (target - 1) / 3` integer-truncates to 0 or 1, collapsing
-        // buckets 1..3. e.g. target=4 with level=2 returns 3, which lands in
-        // bucket 3 not bucket 2. Acceptable for dev seeder smoke testing.
         if (target == 1) return 1
         val span = target - 1
         val third = span / 3
@@ -62,6 +62,18 @@ object DevSeeder {
             4 -> target
             else -> error("unreachable")
         }
+    }
+
+    /**
+     * Per-habit log quantity for a target heat level.
+     *
+     * `pointsEarned(quantity, threshold) = floor(quantity / threshold)` in the
+     * production engine. To produce P points from a habit with `thresholdPerPoint`,
+     * we need `quantity = P * threshold`.
+     */
+    fun logQuantityForLevel(level: Int, target: Int, threshold: Double): Double {
+        require(threshold > 0.0) { "threshold must be > 0, was $threshold" }
+        return pointsForLevel(level, target) * threshold
     }
 
     /** Lookup helper for confirm-dialog UI. */

@@ -20,31 +20,31 @@ class DevSeederTest {
     ) = SeedInput(days, mode, constantLevel, freezeCount, brokenCount)
 
     @Test
-    fun `quantityForLevel L1 returns 1`() {
-        assertEquals(1, DevSeeder.quantityForLevel(1, target = 10))
-        assertEquals(1, DevSeeder.quantityForLevel(1, target = 1))
-        assertEquals(1, DevSeeder.quantityForLevel(1, target = 100))
+    fun `pointsForLevel L1 returns 1`() {
+        assertEquals(1, DevSeeder.pointsForLevel(1, target = 10))
+        assertEquals(1, DevSeeder.pointsForLevel(1, target = 1))
+        assertEquals(1, DevSeeder.pointsForLevel(1, target = 100))
     }
 
     @Test
-    fun `quantityForLevel L4 returns the full target`() {
-        assertEquals(10, DevSeeder.quantityForLevel(4, target = 10))
-        assertEquals(1, DevSeeder.quantityForLevel(4, target = 1))
+    fun `pointsForLevel L4 returns the full target`() {
+        assertEquals(10, DevSeeder.pointsForLevel(4, target = 10))
+        assertEquals(1, DevSeeder.pointsForLevel(4, target = 1))
     }
 
     @Test
-    fun `quantityForLevel L2 lands inside bucket 2 when target permits`() {
+    fun `pointsForLevel L2 lands inside bucket 2 when target permits`() {
         // target=10 → bareMin=1, full=10, span=9, third=3, mid1=4, mid2=7
         // Bucket 2: pointsCapped in [mid1, mid2) = [4, 7).
-        val qty = DevSeeder.quantityForLevel(2, target = 10)
+        val qty = DevSeeder.pointsForLevel(2, target = 10)
         assertTrue(qty >= 4, "qty $qty must be ≥ 4")
         assertTrue(qty < 7, "qty $qty must be < 7")
     }
 
     @Test
-    fun `quantityForLevel L3 lands inside bucket 3 when target permits`() {
+    fun `pointsForLevel L3 lands inside bucket 3 when target permits`() {
         // target=10 → mid2=7, full=10. Bucket 3: pointsCapped in [7, 10).
-        val qty = DevSeeder.quantityForLevel(3, target = 10)
+        val qty = DevSeeder.pointsForLevel(3, target = 10)
         assertTrue(qty >= 7, "qty $qty must be ≥ 7")
         assertTrue(qty < 10, "qty $qty must be < 10")
     }
