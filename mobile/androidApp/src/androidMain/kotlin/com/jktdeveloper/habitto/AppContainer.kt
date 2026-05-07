@@ -28,6 +28,7 @@ import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetDayPointsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
+import com.habittracker.domain.usecase.GetUserStreakOnDayUseCase
 import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
 import com.habittracker.domain.usecase.ObserveUserIdentitiesWithStatsUseCase
 import com.habittracker.domain.usecase.SetupUserIdentitiesUseCase
@@ -118,10 +119,22 @@ class AppContainer(context: Context) {
 
     val userIdentityProvider = UserIdentityProvider(authRepository, localUserIdStore)
 
-    val getPointBalanceUseCase = GetPointBalanceUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
-    val getDayPointsUseCase = GetDayPointsUseCase(habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository)
+    val getUserStreakOnDayUseCase = GetUserStreakOnDayUseCase(computeStreakUseCase)
+    val getPointBalanceUseCase = GetPointBalanceUseCase(
+        habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository,
+        getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
+    val getDayPointsUseCase = GetDayPointsUseCase(
+        habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository,
+        getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
     val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
-    val logWantUseCase = LogWantUseCase(wantLogRepository, wantActivityRepository, getPointBalanceUseCase)
+    val logWantUseCase = LogWantUseCase(
+        wantLogRepository = wantLogRepository,
+        wantActivityRepository = wantActivityRepository,
+        getPointBalanceUseCase = getPointBalanceUseCase,
+        getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
     val isOnboardedUseCase = IsOnboardedUseCase(habitRepository)

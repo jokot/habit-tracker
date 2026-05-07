@@ -56,4 +56,36 @@ class PointCalculatorTest {
     fun pointsSpent_scrollOneMinute_returnsOne() {
         assertEquals(1, PointCalculator.pointsSpent(quantity = 1.0, costPerUnit = 1.0))
     }
+
+    // ─── pointsSpentWithRate (Phase 6 exchange rate) ────────────────────────
+
+    @Test
+    fun `pointsSpentWithRate streak-0 rate-1 same as base`() {
+        assertEquals(10, PointCalculator.pointsSpentWithRate(10.0, 1.0, 1.0))
+    }
+
+    @Test
+    fun `pointsSpentWithRate rate 1_2 ceils up`() {
+        assertEquals(12, PointCalculator.pointsSpentWithRate(10.0, 1.0, 1.2))
+    }
+
+    @Test
+    fun `pointsSpentWithRate rate 1_4 ceils up`() {
+        assertEquals(14, PointCalculator.pointsSpentWithRate(10.0, 1.0, 1.4))
+    }
+
+    @Test
+    fun `pointsSpentWithRate fractional inputs ceil up to at least 1pt`() {
+        assertEquals(1, PointCalculator.pointsSpentWithRate(0.1, 0.1, 1.0))
+    }
+
+    @Test
+    fun `pointsSpentWithRate zero quantity returns 0`() {
+        assertEquals(0, PointCalculator.pointsSpentWithRate(0.0, 5.0, 1.4))
+    }
+
+    @Test
+    fun `pointsSpentWithRate zero cost returns 0`() {
+        assertEquals(0, PointCalculator.pointsSpentWithRate(5.0, 0.0, 1.4))
+    }
 }

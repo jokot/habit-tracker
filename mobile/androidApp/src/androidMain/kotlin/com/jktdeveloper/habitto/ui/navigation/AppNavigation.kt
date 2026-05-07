@@ -34,6 +34,7 @@ import com.jktdeveloper.habitto.ui.identity.AddIdentityScreen
 import com.jktdeveloper.habitto.ui.identity.AddIdentityViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
+import com.jktdeveloper.habitto.devtools.devToolsRoute
 import com.habittracker.data.sync.SyncReason
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -66,6 +67,8 @@ sealed class Screen(val route: String) {
             return if (params.isEmpty()) "habit_form" else "habit_form?$params"
         }
     }
+    object ExchangeRate : Screen("exchange_rate")
+    object DevTools : Screen("dev_tools")
 }
 
 @Composable
@@ -171,6 +174,7 @@ fun AppNavigation(container: AppContainer) {
                     onOpenStreakHistory = { navController.navigate(Screen.StreakHistory.route) },
                     onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
                     onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
+                    onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
                 )
             }
 
@@ -213,6 +217,9 @@ fun AppNavigation(container: AppContainer) {
                     onSignOut = { vm.beginSignOut() },
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onBack = { navController.popBackStack() },
+                    onOpenDevTools = if (com.jktdeveloper.habitto.BuildConfig.DEBUG) {
+                        { navController.navigate(Screen.DevTools.route) }
+                    } else null,
                 )
             }
 
@@ -229,6 +236,22 @@ fun AppNavigation(container: AppContainer) {
                 )
             }
 
+            composable(Screen.ExchangeRate.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.exchange.ExchangeRateViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.exchange.ExchangeRateScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            devToolsRoute(
+                container = container,
+                routePath = Screen.DevTools.route,
+                onBack = { navController.popBackStack() },
+            )
+
             composable(Screen.You.route) {
                 val vm = androidx.lifecycle.viewmodel.compose.viewModel {
                     com.jktdeveloper.habitto.ui.you.YouHubViewModel(container)
@@ -244,6 +267,7 @@ fun AppNavigation(container: AppContainer) {
                     },
                     onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
                     onHabitsClick = { navController.navigate(Screen.HabitList.route) },
+                    onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
                 )
             }
 

@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.googleid)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(kotlin("test-junit"))
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.androidx.test.core)
