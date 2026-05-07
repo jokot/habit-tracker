@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.RateTier
 import com.habittracker.domain.usecase.ExchangeRateCalculator
+import com.habittracker.domain.usecase.PointCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -227,6 +228,12 @@ private fun ComparisonHeader() {
 
 @Composable
 private fun ComparisonRowView(row: ComparisonRow) {
+    val basePerTap = PointCalculator.pointsSpent(1.0, row.baseCostPerUnit)
+    val rate = if (row.baseCostPerUnit > 0.0) row.currentCostPerUnit / row.baseCostPerUnit else 1.0
+    val currentPerTap = PointCalculator.pointsSpentWithRate(1.0, row.baseCostPerUnit, rate)
+    val isFree = row.baseCostPerUnit == 0.0
+    val showArrow = !isFree && basePerTap != currentPerTap
+
     Surface(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -245,32 +252,41 @@ private fun ComparisonRowView(row: ComparisonRow) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (row.baseCostPerUnit != row.currentCostPerUnit) {
-                    Text(
-                        formatNumber(row.baseCostPerUnit),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textDecoration = TextDecoration.LineThrough,
-                    )
-                    Text("→", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                }
+            if (isFree) {
                 Text(
-                    formatNumber(row.currentCostPerUnit),
-                    fontSize = 22.sp,
+                    "FREE",
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (row.currentCostPerUnit > row.baseCostPerUnit)
-                        MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    "pt",
-                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (showArrow) {
+                        Text(
+                            basePerTap.toString(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textDecoration = TextDecoration.LineThrough,
+                        )
+                        Text("→", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    Text(
+                        currentPerTap.toString(),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (currentPerTap > basePerTap)
+                            MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "pt / ${row.unit}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
