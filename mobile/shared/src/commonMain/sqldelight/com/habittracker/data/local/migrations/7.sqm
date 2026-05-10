@@ -1,6 +1,9 @@
 -- Phase 7 pivot: replace cost_per_unit (REAL) with units_per_point (INTEGER).
 -- Stamp pointsSpent on each WantLog. Wipe existing WantLogs (solo dev decision).
 
+-- Existing rows keep unitsPerPoint = 1 (the default). Old costPerUnit values are
+-- intentionally dropped when the table is rebuilt below; solo dev, low data volume,
+-- no per-row backfill needed (server-side migration handles seeded rows separately).
 ALTER TABLE LocalWantActivity ADD COLUMN unitsPerPoint INTEGER NOT NULL DEFAULT 1;
 -- SQLite cannot DROP COLUMN before 3.35; recreate the table to drop costPerUnit.
 CREATE TABLE LocalWantActivity_new (
