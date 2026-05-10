@@ -8,6 +8,14 @@ interface WantActivityRepository {
     fun observeWantActivities(userId: String): Flow<List<WantActivity>>
     suspend fun getWantActivities(userId: String): List<WantActivity>
     suspend fun getAllWantActivitiesForUser(userId: String): List<WantActivity>
+    /**
+     * Upsert a [WantActivity]. Callers MUST preserve `hiddenAt` from the existing
+     * row when editing — passing `hiddenAt = null` on a previously-hidden row will
+     * silently un-hide it without setting the sync-dirty flag. To toggle visibility
+     * use [hideWantActivity] / [unhideWantActivity] instead.
+     *
+     * Sync semantics: `syncedAt` is always cleared on local save (handled by SQL).
+     */
     suspend fun saveWantActivity(activity: WantActivity, userId: String)
     suspend fun hideWantActivity(id: String, userId: String, hiddenAt: Instant)
     suspend fun unhideWantActivity(id: String, userId: String)

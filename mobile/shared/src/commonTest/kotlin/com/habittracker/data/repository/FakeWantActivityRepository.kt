@@ -34,7 +34,7 @@ class FakeWantActivityRepository : WantActivityRepository {
     }
 
     override fun observeWantActivities(userId: String): Flow<List<WantActivity>> =
-        _activities.map { it }
+        _activities.map { list -> list.filter { it.hiddenAt == null } }
 
     override suspend fun getWantActivities(userId: String): List<WantActivity> =
         _activities.value.filter { it.hiddenAt == null }

@@ -51,6 +51,7 @@ class LocalWantActivityRepositoryTest {
         assertEquals(listOf("b"), visible.map { it.id })
 
         val all = repo.getAllWantActivitiesForUser(userId)
+        assertEquals(2, all.size)
         assertEquals(setOf("a", "b"), all.map { it.id }.toSet())
     }
 
