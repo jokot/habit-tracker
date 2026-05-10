@@ -191,9 +191,11 @@ class AppContainer(context: Context) {
         if (identityRepository.getAllIdentities().isEmpty()) {
             identityRepository.upsertIdentities(SeedData.identities)
         }
-        // Want activities are NOT auto-seeded — user picks their subset during
-        // onboarding's WantsStep, which writes only the selected rows scoped to
-        // currentUserId(). Home shows exactly what the user selected.
+        // Want activities: reconcile the canonical 14-item seed list on every app
+        // start so existing users gain newly-added seed rows automatically. The call
+        // is additive only — existing rows (including user-edited cost or hidden
+        // state) are untouched. Failure must not block app start.
+        runCatching { setupUserWantActivitiesUseCase.reconcile(currentUserId()) }
     }
 
     /**
