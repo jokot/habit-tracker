@@ -172,7 +172,7 @@ private data class WantActivityDto(
     @SerialName("user_id") val userId: String,
     val name: String,
     val unit: String,
-    @SerialName("cost_per_unit") val costPerUnit: Double,
+    @SerialName("units_per_point") val unitsPerPoint: Int,
     @SerialName("is_custom") val isCustom: Boolean,
     @SerialName("updated_at") val updatedAt: String,
     @SerialName("icon_key") val iconKey: String? = null,
@@ -184,7 +184,7 @@ private fun WantActivity.toDto(ownerUserId: String) = WantActivityDto(
     userId = ownerUserId,
     name = name,
     unit = unit,
-    costPerUnit = costPerUnit,
+    unitsPerPoint = unitsPerPoint,
     isCustom = isCustom,
     updatedAt = updatedAt.toString(),
     iconKey = iconKey,
@@ -195,7 +195,7 @@ private fun WantActivityDto.toDomain() = WantActivity(
     id = id,
     name = name,
     unit = unit,
-    costPerUnit = costPerUnit,
+    unitsPerPoint = unitsPerPoint,
     isCustom = isCustom,
     createdByUserId = userId,
     iconKey = iconKey,
@@ -241,6 +241,7 @@ private data class WantLogDto(
     @SerialName("user_id") val userId: String,
     @SerialName("activity_id") val activityId: String,
     val quantity: Double,
+    @SerialName("points_spent") val pointsSpent: Int = 1,
     @SerialName("device_mode") val deviceMode: String,
     @SerialName("logged_at") val loggedAt: String,
     @SerialName("deleted_at") val deletedAt: String?,
@@ -252,6 +253,7 @@ private fun WantLog.toDto() = WantLogDto(
     userId = userId,
     activityId = activityId,
     quantity = quantity,
+    pointsSpent = pointsSpent,
     deviceMode = when (deviceMode) {
         DeviceMode.THIS_DEVICE -> "this_device"
         DeviceMode.OTHER -> "other"
@@ -266,6 +268,7 @@ private fun WantLogDto.toDomain() = WantLog(
     userId = userId,
     activityId = activityId,
     quantity = quantity,
+    pointsSpent = pointsSpent,
     deviceMode = when (deviceMode) {
         "this_device" -> DeviceMode.THIS_DEVICE
         else -> DeviceMode.OTHER
