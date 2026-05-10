@@ -282,7 +282,7 @@ private fun WantRow(
                 if (muted) MaterialTheme.colorScheme.onSurfaceVariant
                 else MaterialTheme.colorScheme.error
             Text(
-                "−${formatCost(activity.costPerUnit)} pt / ${activity.unit}",
+                "${activity.unitsPerPoint} ${activity.unit} = −1 pt",
                 style = MaterialTheme.typography.bodySmall,
                 color = costColor.copy(alpha = mutedAlpha),
             )
@@ -351,8 +351,3 @@ private fun AddWantTile(onClick: () -> Unit) {
     }
 }
 
-private fun formatCost(cost: Double): String {
-    val rounded = ((cost * 1000).toLong()) / 1000.0
-    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString()
-    else rounded.toString()
-}

@@ -123,7 +123,7 @@ fun WantDetailScreen(
                 iconKey = want.iconKey,
                 name = want.name,
                 isSeeded = !want.isCustom,
-                costPerUnit = want.costPerUnit,
+                unitsPerPoint = want.unitsPerPoint,
                 unit = want.unit,
                 totalSpent = state.totalSpent7d,
                 timesLogged = state.timesLogged7d,
@@ -241,7 +241,7 @@ private fun HeroCard(
     iconKey: String?,
     name: String,
     isSeeded: Boolean,
-    costPerUnit: Double,
+    unitsPerPoint: Int,
     unit: String,
     totalSpent: Int,
     timesLogged: Int,
@@ -285,19 +285,11 @@ private fun HeroCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "−${formatCostDetail(costPerUnit)} pt",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                Text(
-                    " per $unit",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                "$unitsPerPoint $unit = −1 pt",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             Spacer(Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -406,12 +398,6 @@ private fun DayCard(dateLabel: String, items: List<TimedLog>, unit: String) {
             }
         }
     }
-}
-
-private fun formatCostDetail(cost: Double): String {
-    val rounded = ((cost * 1000).toLong()) / 1000.0
-    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString()
-    else rounded.toString()
 }
 
 private fun formatQty(qty: Double): String {

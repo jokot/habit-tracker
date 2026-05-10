@@ -40,7 +40,7 @@ class WantListViewModelTest {
 
     private fun seed(id: String, custom: Boolean = false, hiddenAt: Instant? = null) =
         WantActivity(
-            id = id, name = "n-$id", unit = "minutes", costPerUnit = 1.0,
+            id = id, name = "n-$id", unit = "minutes", unitsPerPoint = 1,
             isCustom = custom, hiddenAt = hiddenAt,
         )
 

@@ -5,9 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantLogRepository
 import com.habittracker.domain.model.WantActivity
-import com.habittracker.domain.usecase.ExchangeRateCalculator
-import com.habittracker.domain.usecase.GetUserStreakOnDayUseCase
-import com.habittracker.domain.usecase.PointCalculator
 import com.jktdeveloper.habitto.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +37,6 @@ class WantDetailViewModel private constructor(
     private val activityId: String,
     private val wantActivityRepo: WantActivityRepository,
     private val wantLogRepo: WantLogRepository,
-    private val getUserStreakOnDay: GetUserStreakOnDayUseCase,
     private val userIdProvider: () -> String,
     private val clock: Clock = Clock.System,
     private val tz: TimeZone = TimeZone.currentSystemDefault(),
@@ -53,7 +49,6 @@ class WantDetailViewModel private constructor(
         activityId = activityId,
         wantActivityRepo = container.wantActivityRepository,
         wantLogRepo = container.wantLogRepository,
-        getUserStreakOnDay = container.getUserStreakOnDayUseCase,
         userIdProvider = { container.currentUserId() },
     )
 
@@ -82,13 +77,10 @@ class WantDetailViewModel private constructor(
             val days = (0..6).map { offset ->
                 val d = today.minus(offset, DateTimeUnit.DAY)
                 val items = (byDate[d] ?: emptyList()).map { log ->
-                    val streak = getUserStreakOnDay.execute(userId, d)
-                    val rate = ExchangeRateCalculator.rateFor(streak)
-                    val points = PointCalculator.pointsSpentWithRate(log.quantity, want.costPerUnit, rate)
                     TimedLog(
                         time = log.loggedAt.toLocalDateTime(tz).time,
                         qty = log.quantity,
-                        pointsAtLog = points,
+                        pointsAtLog = log.pointsSpent,
                     )
                 }
                 DayLogs(date = d, items = items)
