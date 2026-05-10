@@ -63,19 +63,19 @@ object SeedData {
     )
 
     val wantActivities: List<WantActivity> = listOf(
-        WantActivity("20000000-0000-0000-0000-000000000001", "TikTok",          "minutes",  1.0, iconKey = "play_circle"),
-        WantActivity("20000000-0000-0000-0000-000000000002", "YouTube Shorts",  "minutes",  1.0, iconKey = "play_circle"),
-        WantActivity("20000000-0000-0000-0000-000000000003", "YouTube",         "minutes",  0.1, iconKey = "smart_display"),
-        WantActivity("20000000-0000-0000-0000-000000000004", "Netflix",         "minutes",  0.1, iconKey = "local_movies"),
-        WantActivity("20000000-0000-0000-0000-000000000005", "Twitter/X",       "minutes",  0.5, iconKey = "chat_bubble"),
-        WantActivity("20000000-0000-0000-0000-000000000006", "Instagram",       "minutes",  0.5, iconKey = "photo_camera"),
-        WantActivity("20000000-0000-0000-0000-000000000007", "Reddit",          "minutes",  0.5, iconKey = "forum"),
-        WantActivity("20000000-0000-0000-0000-000000000008", "Gaming",          "minutes",  0.5, iconKey = "sports_esports"),
-        WantActivity("20000000-0000-0000-0000-000000000009", "Online shopping", "minutes",  0.5, iconKey = "shopping_bag"),
-        WantActivity("20000000-0000-0000-0000-000000000010", "Junk food",       "meals",    5.0, iconKey = "restaurant"),
-        WantActivity("20000000-0000-0000-0000-000000000011", "Snacks",          "servings", 2.0, iconKey = "restaurant"),
-        WantActivity("20000000-0000-0000-0000-000000000012", "Sweets",          "pieces",   2.0, iconKey = "cake"),
-        WantActivity("20000000-0000-0000-0000-000000000013", "Sugary drinks",   "drinks",   2.0, iconKey = "local_drink"),
-        WantActivity("20000000-0000-0000-0000-000000000014", "Coffee",          "cups",     1.0, iconKey = "local_cafe"),
+        WantActivity("20000000-0000-0000-0000-000000000001", "TikTok",          "min",     unitsPerPoint =  1, iconKey = "play_circle"),
+        WantActivity("20000000-0000-0000-0000-000000000002", "YouTube Shorts",  "min",     unitsPerPoint =  1, iconKey = "smart_display"),
+        WantActivity("20000000-0000-0000-0000-000000000003", "YouTube",         "min",     unitsPerPoint = 10, iconKey = "smart_display"),
+        WantActivity("20000000-0000-0000-0000-000000000004", "Netflix",         "min",     unitsPerPoint = 15, iconKey = "local_movies"),
+        WantActivity("20000000-0000-0000-0000-000000000005", "Twitter/X",       "min",     unitsPerPoint =  2, iconKey = "chat_bubble"),
+        WantActivity("20000000-0000-0000-0000-000000000006", "Instagram",       "min",     unitsPerPoint =  2, iconKey = "photo_camera"),
+        WantActivity("20000000-0000-0000-0000-000000000007", "Reddit",          "min",     unitsPerPoint =  2, iconKey = "forum"),
+        WantActivity("20000000-0000-0000-0000-000000000008", "Gaming",          "min",     unitsPerPoint = 10, iconKey = "sports_esports"),
+        WantActivity("20000000-0000-0000-0000-000000000009", "Online shopping", "min",     unitsPerPoint =  5, iconKey = "shopping_bag"),
+        WantActivity("20000000-0000-0000-0000-000000000010", "Junk food",       "meal",    unitsPerPoint =  1, iconKey = "restaurant"),
+        WantActivity("20000000-0000-0000-0000-000000000011", "Snacks",          "serving", unitsPerPoint =  1, iconKey = "restaurant"),
+        WantActivity("20000000-0000-0000-0000-000000000012", "Sweets",          "piece",   unitsPerPoint =  1, iconKey = "cake"),
+        WantActivity("20000000-0000-0000-0000-000000000013", "Sugary drinks",   "drink",   unitsPerPoint =  1, iconKey = "local_drink"),
+        WantActivity("20000000-0000-0000-0000-000000000014", "Coffee",          "cup",     unitsPerPoint =  1, iconKey = "local_cafe"),
     )
 }

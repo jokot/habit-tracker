@@ -26,16 +26,16 @@ class SetupUserWantActivitiesUseCaseTest {
     }
 
     @Test
-    fun `reconcile preserves customized cost on existing seed row`() = runTest {
+    fun `reconcile preserves customized unitsPerPoint on existing seed row`() = runTest {
         val (sut, repo) = newSut()
-        val customized = SeedData.wantActivities.first().copy(costPerUnit = 5.0)
+        val customized = SeedData.wantActivities.first().copy(unitsPerPoint = 7)
         repo.saveWantActivity(customized, userId)
 
         sut.reconcile(userId).getOrThrow()
 
         val tiktok = repo.getAllWantActivitiesForUser(userId)
             .single { it.id == customized.id }
-        assertEquals(5.0, tiktok.costPerUnit)
+        assertEquals(7, tiktok.unitsPerPoint)
     }
 
     @Test
