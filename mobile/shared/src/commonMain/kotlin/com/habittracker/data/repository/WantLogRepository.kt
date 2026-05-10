@@ -11,6 +11,7 @@ interface WantLogRepository {
         userId: String,
         activityId: String,
         quantity: Double,
+        pointsSpent: Int,
         deviceMode: DeviceMode,
         loggedAt: Instant,
     ): WantLog

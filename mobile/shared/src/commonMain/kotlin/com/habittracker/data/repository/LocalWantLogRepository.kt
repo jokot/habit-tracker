@@ -21,6 +21,7 @@ class LocalWantLogRepository(
         userId: String,
         activityId: String,
         quantity: Double,
+        pointsSpent: Int,
         deviceMode: DeviceMode,
         loggedAt: Instant,
     ): WantLog {
@@ -29,12 +30,21 @@ class LocalWantLogRepository(
             userId = userId,
             activityId = activityId,
             quantity = quantity,
+            pointsSpent = pointsSpent.toLong(),
             deviceMode = deviceMode.toDbValue(),
             loggedAt = loggedAt.toEpochMilliseconds(),
             deletedAt = null,
             syncedAt = null,
         )
-        return WantLog(id = id, userId = userId, activityId = activityId, quantity = quantity, deviceMode = deviceMode, loggedAt = loggedAt)
+        return WantLog(
+            id = id,
+            userId = userId,
+            activityId = activityId,
+            quantity = quantity,
+            pointsSpent = pointsSpent,
+            deviceMode = deviceMode,
+            loggedAt = loggedAt,
+        )
     }
 
     override suspend fun softDelete(logId: String, userId: String) {
@@ -82,6 +92,7 @@ class LocalWantLogRepository(
             userId = row.userId,
             activityId = row.activityId,
             quantity = row.quantity,
+            pointsSpent = row.pointsSpent.toLong(),
             deviceMode = row.deviceMode.toDbValue(),
             loggedAt = row.loggedAt.toEpochMilliseconds(),
             deletedAt = row.deletedAt?.toEpochMilliseconds(),
@@ -105,6 +116,7 @@ private fun WantLogEntity.toDomain(): WantLog = WantLog(
     userId = userId,
     activityId = activityId,
     quantity = quantity,
+    pointsSpent = pointsSpent.toInt(),
     deviceMode = deviceMode.toDeviceMode(),
     loggedAt = Instant.fromEpochMilliseconds(loggedAt),
     deletedAt = deletedAt?.let { Instant.fromEpochMilliseconds(it) },
