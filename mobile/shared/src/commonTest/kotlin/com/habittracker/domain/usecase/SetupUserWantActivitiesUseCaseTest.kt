@@ -15,14 +15,14 @@ class SetupUserWantActivitiesUseCaseTest {
 
     private fun newSut(): Pair<SetupUserWantActivitiesUseCase, FakeWantActivityRepository> {
         val repo = FakeWantActivityRepository()
-        return SetupUserWantActivitiesUseCase(repo, fixedClock) to repo
+        return SetupUserWantActivitiesUseCase(repo, SeedData.wantActivities, fixedClock) to repo
     }
 
     @Test
     fun `reconcile inserts all 14 seed items for new user`() = runTest {
         val (sut, repo) = newSut()
         sut.reconcile(userId).getOrThrow()
-        assertEquals(14, repo.getAllWantActivitiesForUser(userId).size)
+        assertEquals(SeedData.wantActivities.size, repo.getAllWantActivitiesForUser(userId).size)
     }
 
     @Test

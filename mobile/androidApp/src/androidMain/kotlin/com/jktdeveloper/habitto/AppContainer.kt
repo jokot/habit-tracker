@@ -152,7 +152,10 @@ class AppContainer(context: Context) {
         statsUseCase = computeIdentityStatsUseCase,
     )
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
-    val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
+    val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(
+        wantActivityRepository,
+        SeedData.wantActivities,
+    )
     val pinIdentityUseCase = PinIdentityUseCase(identityRepository)
     val unpinIdentityUseCase = UnpinIdentityUseCase(identityRepository)
     val removeIdentityUseCase = RemoveIdentityUseCase(identityRepository)
@@ -196,6 +199,7 @@ class AppContainer(context: Context) {
         // is additive only — existing rows (including user-edited cost or hidden
         // state) are untouched. Failure must not block app start.
         runCatching { setupUserWantActivitiesUseCase.reconcile(currentUserId()) }
+            .onFailure { e -> android.util.Log.w("AppContainer", "Want-activity reconcile failed", e) }
     }
 
     /**

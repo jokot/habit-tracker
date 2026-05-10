@@ -1,15 +1,19 @@
 package com.habittracker.domain.usecase
 
-import com.habittracker.data.local.SeedData
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.domain.model.WantActivity
 import kotlinx.datetime.Clock
 
 class SetupUserWantActivitiesUseCase(
     private val wantActivityRepository: WantActivityRepository,
+    private val seedActivities: List<WantActivity>,
     private val clock: Clock = Clock.System,
 ) {
-    /** Insert a known list (used by onboarding seed for new users). */
+    /**
+     * Inserts the supplied list of activities for new-user onboarding. Caller-supplied
+     * IDs are persisted as-is (no fresh UUID assignment). For idempotent updates use
+     * [reconcile] instead.
+     */
     suspend fun execute(userId: String, activities: List<WantActivity>): Result<Unit> =
         runCatching {
             val now = clock.now()
@@ -28,8 +32,8 @@ class SetupUserWantActivitiesUseCase(
     suspend fun reconcile(userId: String): Result<Unit> = runCatching {
         val existing = wantActivityRepository.getAllWantActivitiesForUser(userId)
         val existingIds = existing.map { it.id }.toSet()
-        val now = clock.now()
-        SeedData.wantActivities
+        val now by lazy { clock.now() }
+        seedActivities
             .filter { it.id !in existingIds }
             .forEach { seed ->
                 wantActivityRepository.saveWantActivity(
