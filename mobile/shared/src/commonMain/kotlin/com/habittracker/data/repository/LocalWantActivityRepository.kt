@@ -28,6 +28,12 @@ class LocalWantActivityRepository(
             .executeAsList()
             .map { it.toDomain() }
 
+    override suspend fun getAllWantActivitiesForUser(userId: String): List<WantActivity> =
+        db.habitTrackerDatabaseQueries
+            .getAllWantActivitiesForUser(userId)
+            .executeAsList()
+            .map { it.toDomain() }
+
     override suspend fun saveWantActivity(activity: WantActivity, userId: String) {
         val updatedAt = activity.updatedAt.takeIf { it.toEpochMilliseconds() > 0L }
             ?: Clock.System.now()
@@ -39,7 +45,17 @@ class LocalWantActivityRepository(
             costPerUnit = activity.costPerUnit,
             isCustom = if (activity.isCustom) 1L else 0L,
             updatedAt = updatedAt.toEpochMilliseconds(),
+            iconKey = activity.iconKey,
+            hiddenAt = activity.hiddenAt?.toEpochMilliseconds(),
         )
+    }
+
+    override suspend fun hideWantActivity(id: String, userId: String, hiddenAt: Instant) {
+        db.habitTrackerDatabaseQueries.hideWantActivity(hiddenAt.toEpochMilliseconds(), id, userId)
+    }
+
+    override suspend fun unhideWantActivity(id: String, userId: String) {
+        db.habitTrackerDatabaseQueries.unhideWantActivity(id, userId)
     }
 
     override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
@@ -78,6 +94,8 @@ class LocalWantActivityRepository(
             isCustom = if (row.isCustom) 1L else 0L,
             updatedAt = row.updatedAt.toEpochMilliseconds(),
             syncedAt = row.syncedAt?.toEpochMilliseconds(),
+            iconKey = row.iconKey,
+            hiddenAt = row.hiddenAt?.toEpochMilliseconds(),
         )
     }
 }
@@ -91,4 +109,6 @@ private fun LocalWantActivity.toDomain(): WantActivity = WantActivity(
     createdByUserId = userId,
     updatedAt = Instant.fromEpochMilliseconds(updatedAt),
     syncedAt = syncedAt?.let { Instant.fromEpochMilliseconds(it) },
+    iconKey = iconKey,
+    hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it) },
 )

@@ -37,10 +37,25 @@ class FakeWantActivityRepository : WantActivityRepository {
         _activities.map { it }
 
     override suspend fun getWantActivities(userId: String): List<WantActivity> =
+        _activities.value.filter { it.hiddenAt == null }
+
+    override suspend fun getAllWantActivitiesForUser(userId: String): List<WantActivity> =
         _activities.value
 
     override suspend fun saveWantActivity(activity: WantActivity, userId: String) {
         _activities.value = _activities.value.filterNot { it.id == activity.id } + activity
+    }
+
+    override suspend fun hideWantActivity(id: String, userId: String, hiddenAt: Instant) {
+        _activities.value = _activities.value.map { row ->
+            if (row.id == id) row.copy(hiddenAt = hiddenAt, syncedAt = null) else row
+        }
+    }
+
+    override suspend fun unhideWantActivity(id: String, userId: String) {
+        _activities.value = _activities.value.map { row ->
+            if (row.id == id) row.copy(hiddenAt = null, syncedAt = null) else row
+        }
     }
 
     override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
