@@ -50,6 +50,7 @@ import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.habittracker.data.sync.SyncReason
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import com.jktdeveloper.habitto.preferences.AppFlagsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -89,6 +90,7 @@ class AppContainer(context: Context) {
 
     val notificationPreferences = NotificationPreferences(appContext)
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
+    val appFlagsPreferences = AppFlagsPreferences(appContext)
     val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository, habitRepository)
     val notificationScheduler = NotificationScheduler(appContext, notificationPreferences)
 
