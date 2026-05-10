@@ -46,7 +46,7 @@ class WantListViewModel private constructor(
                 it.copy(
                     seeded = all.filter { a -> !a.isCustom && a.hiddenAt == null },
                     custom = all.filter { a -> a.isCustom && a.hiddenAt == null },
-                    hidden = all.filter { a -> a.hiddenAt != null },
+                    hidden = all.filter { a -> !a.isCustom && a.hiddenAt != null },
                 )
             }
         }
