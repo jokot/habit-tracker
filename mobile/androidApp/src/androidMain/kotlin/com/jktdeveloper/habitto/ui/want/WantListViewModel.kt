@@ -8,6 +8,7 @@ import com.jktdeveloper.habitto.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
@@ -41,23 +42,25 @@ class WantListViewModel private constructor(
         viewModelScope.launch {
             val userId = userIdProvider()
             val all = repo.getAllWantActivitiesForUser(userId).sortedBy { it.name.lowercase() }
-            _state.value = _state.value.copy(
-                seeded = all.filter { !it.isCustom && it.hiddenAt == null },
-                custom = all.filter { it.isCustom && it.hiddenAt == null },
-                hidden = all.filter { !it.isCustom && it.hiddenAt != null },
-            )
+            _state.update {
+                it.copy(
+                    seeded = all.filter { a -> !a.isCustom && a.hiddenAt == null },
+                    custom = all.filter { a -> a.isCustom && a.hiddenAt == null },
+                    hidden = all.filter { a -> a.hiddenAt != null },
+                )
+            }
         }
     }
 
     fun toggleShowHidden() {
-        _state.value = _state.value.copy(showHidden = !_state.value.showHidden)
+        _state.update { it.copy(showHidden = !it.showHidden) }
     }
 
     fun hide(activityId: String, name: String) {
         viewModelScope.launch {
             repo.hideWantActivity(activityId, userIdProvider(), clock.now())
             reload()
-            _state.value = _state.value.copy(toast = "$name hidden")
+            _state.update { it.copy(toast = "$name hidden") }
         }
     }
 
@@ -68,7 +71,7 @@ class WantListViewModel private constructor(
         }
     }
 
-    fun consumeToast() { _state.value = _state.value.copy(toast = null) }
+    fun consumeToast() { _state.update { it.copy(toast = null) } }
 
     companion object {
         fun forTest(
