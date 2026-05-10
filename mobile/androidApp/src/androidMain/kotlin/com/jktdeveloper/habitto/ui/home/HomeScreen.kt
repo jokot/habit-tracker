@@ -300,7 +300,7 @@ fun HomeScreen(
                         }
                     }
                     items(uiState.wantActivities, key = { it.id }) { activity ->
-                        val canAfford = uiState.pointBalance.balance >= perTapCostInt(activity, currentRate)
+                        val canAfford = uiState.pointBalance.balance >= 1
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = Spacing.xl)
@@ -311,7 +311,6 @@ fun HomeScreen(
                                 pending = pendingWantMap[activity.id],
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
-                                rate = currentRate,
                                 onTap = { viewModel.tapWant(activity) },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
                                 onLongPress = { onOpenWantDetail(activity.id) },
@@ -482,7 +481,6 @@ private fun WantActivityCard(
     pending: PendingWantLog?,
     balance: Int,
     canAfford: Boolean,
-    rate: Double,
     onTap: () -> Unit,
     onCancel: () -> Unit,
     onLongPress: () -> Unit,
@@ -561,8 +559,7 @@ private fun WantActivityCard(
                     // Subtitle
                     Spacer(Modifier.height(Spacing.xs))
                     if (pending != null) {
-                        val cost = perTapCostInt(activity, rate)
-                        val totalCost = cost * pending.count
+                        val totalCost = pending.count
                         val afterBalance = balance - totalCost
                         Row {
                             Text(
@@ -579,14 +576,14 @@ private fun WantActivityCard(
                     } else {
                         Row {
                             Text(
-                                text = "−${formatRawCost(activity.costPerUnit)} pt",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Text(
-                                text = " / ${activity.unit}",
+                                text = "${activity.unitsPerPoint} ${activity.unit}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = " · −1 pt",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
                             )
                         }
                     }
@@ -707,14 +704,3 @@ private fun EmptyState(message: String) {
     }
 }
 
-// ── Point helpers ─────────────────────────────────────────────────────────────
-
-private fun perTapCostInt(activity: WantActivity, rate: Double): Int =
-    com.habittracker.domain.usecase.PointCalculator
-        .pointsSpentWithRate(1.0, activity.costPerUnit, rate)
-
-private fun formatRawCost(cost: Double): String {
-    val rounded = ((cost * 1000).toLong()) / 1000.0
-    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString()
-    else rounded.toString()
-}

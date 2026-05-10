@@ -189,11 +189,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                                 }
                             val spent = wantLogs
                                 .filter { it.loggedAt >= weekStart }
-                                .sumOf { log ->
-                                    wants.firstOrNull { it.id == log.activityId }?.let {
-                                        PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
-                                    } ?: 0
-                                }
+                                .sumOf { log -> log.pointsSpent }
                             val earnedToday = habitLogs
                                 .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
                                 .groupBy { it.habitId }
@@ -205,11 +201,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                                 }
                             val spentToday = wantLogs
                                 .filter { it.loggedAt >= dayStart && it.loggedAt < dayEnd }
-                                .sumOf { log ->
-                                    wants.firstOrNull { it.id == log.activityId }?.let {
-                                        PointCalculator.pointsSpent(log.quantity, it.costPerUnit)
-                                    } ?: 0
-                                }
+                                .sumOf { log -> log.pointsSpent }
 
                             HomeUiState(
                                 habitsWithProgress = habitsWithProgress,
@@ -311,8 +303,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
     fun tapWant(activity: WantActivity) {
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
-        val perTap = PointCalculator.pointsSpentWithRate(1.0, activity.costPerUnit, currentRate.value)
-        val projectedCost = newCount * perTap
+        val projectedCost = newCount  // 1 tap = 1 pt
         val balance = _uiState.value.pointBalance.balance
         if (projectedCost > balance) {
             _events.tryEmit(
@@ -350,34 +341,25 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         _pendingWants.update { it - activity.id }
         wantTimers.remove(activity.id)
         val userId = container.currentUserId()
-        var totalSpent = 0
-        var succeeded = 0
-        for (i in 1..batch.count) {
-            val result = container.logWantUseCase.execute(userId, activity.id, 1.0, DeviceMode.OTHER)
-            if (result.isSuccess) {
-                totalSpent += result.getOrThrow().pointsSpent
-                succeeded++
-                continue
-            }
-            val e = result.exceptionOrNull()
-            val msg = when (e) {
-                is InsufficientPointsException -> if (succeeded > 0) {
-                    "-$totalSpent pts — $succeeded/${batch.count} logged, balance empty — ${activity.name}"
-                } else {
-                    "Not enough points: need ${e.required}, have ${e.available} — ${activity.name}"
-                }
-                else -> "Failed: ${e?.message}"
-            }
-            _events.tryEmit(HomeEvent.Message(msg))
-            if (succeeded > 0) {
+        val result = container.logWantUseCase.execute(
+            userId = userId,
+            activityId = activity.id,
+            taps = batch.count,
+            deviceMode = DeviceMode.OTHER,
+        )
+        result
+            .onSuccess { r ->
+                _events.tryEmit(HomeEvent.Message("-${r.pointsSpent} pts — ${activity.name}"))
                 SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
             }
-            return
-        }
-        _events.tryEmit(HomeEvent.Message("-$totalSpent pts — ${activity.name}"))
-        if (succeeded > 0) {
-            SyncTriggers.enqueue(container.appContext, SyncReason.POST_LOG)
-        }
+            .onFailure { e ->
+                val msg = when (e) {
+                    is InsufficientPointsException ->
+                        "Not enough points: need ${e.required}, have ${e.available} — ${activity.name}"
+                    else -> "Failed: ${e.message}"
+                }
+                _events.tryEmit(HomeEvent.Message(msg))
+            }
     }
 
     fun manualRefresh() {

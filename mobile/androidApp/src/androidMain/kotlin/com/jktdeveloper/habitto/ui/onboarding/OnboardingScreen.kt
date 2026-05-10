@@ -555,10 +555,9 @@ private fun WantActivityRow(
                     color = if (selected) MaterialTheme.colorScheme.onErrorContainer
                     else MaterialTheme.colorScheme.onSurface,
                 )
-                // Canvas format: "−N pt / unit". Use costPerUnit; floor to 1 if < 1
-                val cost = activity.costPerUnit.toInt().coerceAtLeast(1)
+                // Phase 7 model: every N units = −1 pt.
                 Text(
-                    text = "−$cost pt / ${activity.unit}",
+                    text = "${activity.unitsPerPoint} ${activity.unit} = −1 pt",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (selected) MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.75f)
                     else MaterialTheme.colorScheme.onSurfaceVariant,

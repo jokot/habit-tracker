@@ -152,7 +152,7 @@ private class AllLogsHabitLogRepo(private val logs: List<HabitLog>) : HabitLogRe
 }
 
 private class EmptyWantLogRepo : com.habittracker.data.repository.WantLogRepository {
-    override suspend fun insertLog(id: String, userId: String, activityId: String, quantity: Double, deviceMode: com.habittracker.domain.model.DeviceMode, loggedAt: Instant) = error("unused")
+    override suspend fun insertLog(id: String, userId: String, activityId: String, quantity: Double, pointsSpent: Int, deviceMode: com.habittracker.domain.model.DeviceMode, loggedAt: Instant) = error("unused")
     override suspend fun softDelete(logId: String, userId: String) = error("unused")
     override fun observeAllActiveLogsForUser(userId: String): Flow<List<com.habittracker.domain.model.WantLog>> = flowOf(emptyList())
     override suspend fun getAllActiveLogsForUser(userId: String): List<com.habittracker.domain.model.WantLog> = emptyList()

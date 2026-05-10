@@ -32,7 +32,7 @@ class ExchangeRateViewModelTest {
         val vm = ExchangeRateViewModel(
             userIdProvider = { "u1" },
             streakFlow = { flowOf(streak(0)) },
-            wantActivitiesProvider = { listOf(makeActivity("a1", 5.0)) },
+            wantActivitiesProvider = { listOf(makeActivity("a1", 10)) },
         )
         val state = vm.state.first { !it.isLoading }
         assertEquals(0, state.currentStreak)
@@ -40,8 +40,12 @@ class ExchangeRateViewModelTest {
         assertEquals(1, state.currentTier.level)
         assertEquals(7, state.daysToNext)
         assertEquals(1, state.comparison.size)
-        assertEquals(5.0, state.comparison.first().baseCostPerUnit, 0.0)
-        assertEquals(5.0, state.comparison.first().currentCostPerUnit, 0.0)
+        val row = state.comparison.first()
+        assertEquals(5, row.tiers.size)
+        // YouTube spec: unitsPerPoint = 10 → tier 1 eff = 10
+        assertEquals(10, row.tiers.first { it.tierLevel == 1 }.unitsPerPoint)
+        // tier 5 eff = 10 / 2.0 = 5
+        assertEquals(5, row.tiers.first { it.tierLevel == 5 }.unitsPerPoint)
     }
 
     @Test
@@ -49,14 +53,16 @@ class ExchangeRateViewModelTest {
         val vm = ExchangeRateViewModel(
             userIdProvider = { "u1" },
             streakFlow = { flowOf(streak(22)) },
-            wantActivitiesProvider = { listOf(makeActivity("a1", 5.0)) },
+            wantActivitiesProvider = { listOf(makeActivity("a1", 10)) },
         )
         val state = vm.state.first { !it.isLoading }
-        // Phase 7 rate ladder: tier 4 → ×1.6. costPerUnit 5.0 × 1.6 = 8.0.
+        // Phase 7 rate ladder: tier 4 → ×1.6.
         assertEquals(4, state.currentTier.level)
         assertEquals(1.6, state.currentRate, 0.0)
         assertEquals(8, state.daysToNext)
-        assertEquals(8.0, state.comparison.first().currentCostPerUnit, 0.001)
+        // tier 4 eff = 10 / 1.6 = 6 (truncated)
+        val row = state.comparison.first()
+        assertEquals(6, row.tiers.first { it.tierLevel == 4 }.unitsPerPoint)
     }
 
     @Test
@@ -81,7 +87,7 @@ class ExchangeRateViewModelTest {
         firstLogDate = null,
     )
 
-    private fun makeActivity(id: String, costPerUnit: Double) = WantActivity(
-        id = id, name = id, unit = "u", costPerUnit = costPerUnit,
+    private fun makeActivity(id: String, unitsPerPoint: Int) = WantActivity(
+        id = id, name = id, unit = "u", unitsPerPoint = unitsPerPoint,
     )
 }
