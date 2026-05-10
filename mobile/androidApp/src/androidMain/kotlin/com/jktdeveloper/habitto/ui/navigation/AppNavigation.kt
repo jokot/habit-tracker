@@ -69,6 +69,15 @@ sealed class Screen(val route: String) {
     }
     object ExchangeRate : Screen("exchange_rate")
     object DevTools : Screen("dev_tools")
+    object WantList : Screen("want_list")
+    object WantDetail : Screen("want_detail/{wantId}") {
+        const val ARG_ID = "wantId"
+        fun route(id: String) = "want_detail/$id"
+    }
+    object WantForm : Screen("want_form?wantId={wantId}") {
+        const val ARG_ID = "wantId"
+        fun route(id: String? = null) = if (id == null) "want_form" else "want_form?wantId=$id"
+    }
 }
 
 @Composable
@@ -175,6 +184,7 @@ fun AppNavigation(container: AppContainer) {
                     onIdentityClick = { id -> navController.navigate(Screen.IdentityDetail.route(id)) },
                     onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
                     onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
+                    onOpenWantDetail = { id -> navController.navigate(Screen.WantDetail.route(id)) },
                 )
             }
 
@@ -246,6 +256,65 @@ fun AppNavigation(container: AppContainer) {
                 )
             }
 
+            composable(Screen.WantList.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.want.WantListViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.want.WantListScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onAddWant = { navController.navigate(Screen.WantForm.route()) },
+                    onEditWant = { id -> navController.navigate(Screen.WantForm.route(id)) },
+                    onOpenDetail = { id -> navController.navigate(Screen.WantDetail.route(id)) },
+                )
+            }
+
+            composable(
+                route = Screen.WantDetail.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.WantDetail.ARG_ID) {
+                        type = androidx.navigation.NavType.StringType
+                    },
+                ),
+            ) { entry ->
+                val wantId = entry.arguments?.getString(Screen.WantDetail.ARG_ID).orEmpty()
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.want.WantDetailViewModel(wantId, container)
+                }
+                com.jktdeveloper.habitto.ui.want.WantDetailScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onEdit = { navController.navigate(Screen.WantForm.route(wantId)) },
+                )
+            }
+
+            composable(
+                route = Screen.WantForm.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.WantForm.ARG_ID) {
+                        type = androidx.navigation.NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                val wantId = entry.arguments?.getString(Screen.WantForm.ARG_ID)
+                val mode = if (wantId == null) {
+                    com.jktdeveloper.habitto.ui.want.FormMode.New
+                } else {
+                    com.jktdeveloper.habitto.ui.want.FormMode.Edit(wantId)
+                }
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel(
+                    key = "want_form_${wantId ?: "new"}",
+                ) {
+                    com.jktdeveloper.habitto.ui.want.WantFormViewModel(mode, container)
+                }
+                com.jktdeveloper.habitto.ui.want.WantFormScreen(
+                    viewModel = vm,
+                    onClose = { navController.popBackStack() },
+                )
+            }
+
             devToolsRoute(
                 container = container,
                 routePath = Screen.DevTools.route,
@@ -268,6 +337,7 @@ fun AppNavigation(container: AppContainer) {
                     onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
                     onHabitsClick = { navController.navigate(Screen.HabitList.route) },
                     onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
+                    onOpenWants = { navController.navigate(Screen.WantList.route) },
                 )
             }
 

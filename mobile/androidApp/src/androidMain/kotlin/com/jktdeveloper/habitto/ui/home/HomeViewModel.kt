@@ -91,6 +91,18 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         .map { ExchangeRateCalculator.rateFor(it.currentStreak) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0)
 
+    val showRateLadderBanner: StateFlow<Boolean> = combine(
+        container.appFlagsPreferences.seenRateLadderUpgradeBanner,
+        container.wantLogRepository.observeAllActiveLogsForUser(container.currentUserId()),
+    ) { seen, logs -> !seen && logs.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun markRateLadderBannerSeen() {
+        viewModelScope.launch {
+            container.appFlagsPreferences.setSeenRateLadderUpgradeBanner(true)
+        }
+    }
+
     private val _showLogoutDialog = MutableStateFlow(false)
     val showLogoutDialog: StateFlow<Boolean> = _showLogoutDialog.asStateFlow()
 

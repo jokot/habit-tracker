@@ -2,8 +2,10 @@ package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -76,6 +80,7 @@ fun HomeScreen(
     onIdentityClick: (String) -> Unit,
     onIdentitiesClick: () -> Unit,
     onOpenExchangeRate: () -> Unit = {},
+    onOpenWantDetail: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
@@ -162,6 +167,34 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
             ) {
+
+                // ── Rate-ladder migration banner ──────────────────────────────
+                item {
+                    val showBanner by viewModel.showRateLadderBanner.collectAsState()
+                    if (showBanner) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                viewModel.markRateLadderBannerSeen()
+                                onOpenExchangeRate()
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "Spend rates updated — see Exchange rate.",
+                                    modifier = Modifier.weight(1f),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                                IconButton(onClick = viewModel::markRateLadderBannerSeen) {
+                                    Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // ── Identity strip ────────────────────────────────────────────
                 item {
@@ -281,6 +314,7 @@ fun HomeScreen(
                                 rate = currentRate,
                                 onTap = { viewModel.tapWant(activity) },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
+                                onLongPress = { onOpenWantDetail(activity.id) },
                             )
                         }
                     }
@@ -441,6 +475,7 @@ private fun HabitCard(
 
 // ── Want Activity Card ────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WantActivityCard(
     activity: WantActivity,
@@ -450,6 +485,7 @@ private fun WantActivityCard(
     rate: Double,
     onTap: () -> Unit,
     onCancel: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val isPending = pending != null
     val isDark = isSystemInDarkTheme()
@@ -461,7 +497,10 @@ private fun WantActivityCard(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (!canAfford && !isPending) 0.5f else 1f)
-            .clickable(onClick = onTap)
+            .combinedClickable(
+                onClick = { onTap() },
+                onLongClick = { onLongPress() },
+            )
             .animateContentSize(),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
