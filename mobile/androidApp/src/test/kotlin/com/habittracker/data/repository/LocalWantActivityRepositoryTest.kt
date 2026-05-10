@@ -32,7 +32,7 @@ class LocalWantActivityRepositoryTest {
             id = id,
             name = "n-$id",
             unit = "minutes",
-            costPerUnit = 1.0,
+            unitsPerPoint = 1,
             isCustom = false,
             updatedAt = Instant.fromEpochMilliseconds(1_000),
             syncedAt = null,
