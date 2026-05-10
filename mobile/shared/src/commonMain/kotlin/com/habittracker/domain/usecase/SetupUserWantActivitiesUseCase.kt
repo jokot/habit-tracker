@@ -2,6 +2,8 @@ package com.habittracker.domain.usecase
 
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.domain.model.WantActivity
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.datetime.Clock
 
 class SetupUserWantActivitiesUseCase(
@@ -26,18 +28,25 @@ class SetupUserWantActivitiesUseCase(
         }
 
     /**
-     * Idempotent reconciliation. For each canonical seeded id, if the user has no
-     * row with that id, insert it. Existing rows untouched.
+     * Idempotent reconciliation. Matches existing seeded rows by name (case-insensitive)
+     * to support cross-device sync where the same canonical seed may have a different UUID
+     * per user. Missing seeds are inserted with a fresh per-user UUID — sharing seed UUIDs
+     * across users causes Postgres `ON CONFLICT(id) DO UPDATE` to hit RLS USING violations
+     * when another user already claimed the row.
      */
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun reconcile(userId: String): Result<Unit> = runCatching {
         val existing = wantActivityRepository.getAllWantActivitiesForUser(userId)
-        val existingIds = existing.map { it.id }.toSet()
+        val existingSeedNames = existing
+            .filter { !it.isCustom }
+            .map { it.name.lowercase() }
+            .toSet()
         val now by lazy { clock.now() }
         seedActivities
-            .filter { it.id !in existingIds }
+            .filter { it.name.lowercase() !in existingSeedNames }
             .forEach { seed ->
                 wantActivityRepository.saveWantActivity(
-                    seed.copy(updatedAt = now),
+                    seed.copy(id = Uuid.random().toString(), updatedAt = now),
                     userId,
                 )
             }
