@@ -196,10 +196,25 @@ class AppContainer(context: Context) {
         if (identityRepository.getAllIdentities().isEmpty()) {
             identityRepository.upsertIdentities(SeedData.identities)
         }
-        // Want activities: reconcile the canonical 14-item seed list on every app
-        // start so existing users gain newly-added seed rows automatically. The call
-        // is additive only — existing rows (including user-edited cost or hidden
-        // state) are untouched. Failure must not block app start.
+        // For authenticated users: pull from server FIRST so reconcile sees any
+        // existing seed wants the user already owns and skips re-inserting them
+        // with fresh UUIDs. Reconcile-before-pull would push 14 random-UUID rows
+        // every install, accumulating duplicates server-side across reinstalls.
+        // Bounded timeout — failure must not block app start; reconcile then
+        // proceeds against whatever local state exists.
+        if (isAuthenticated()) {
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(5_000) {
+                    syncEngine.sync(SyncReason.POST_SIGN_IN)
+                }
+            }.onFailure { e ->
+                android.util.Log.w("AppContainer", "Pre-reconcile sync failed", e)
+            }
+        }
+        // Want activities: reconcile the canonical 14-item seed list. Name-match
+        // against existing rows means already-pulled seeds are skipped. Brand-new
+        // users (or guests pre-auth) with empty local state get the full 14
+        // inserted with fresh per-user UUIDs.
         runCatching { setupUserWantActivitiesUseCase.reconcile(currentUserId()) }
             .onFailure { e -> android.util.Log.w("AppContainer", "Want-activity reconcile failed", e) }
     }
