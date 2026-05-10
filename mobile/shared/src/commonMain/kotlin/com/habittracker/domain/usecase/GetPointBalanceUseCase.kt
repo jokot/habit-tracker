@@ -21,10 +21,13 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * @param getUserStreakOnDayUseCase Phase 6 rate-at-log-day source. When `null`, [spentOnDay]
- *   falls back to rate=1.0 (pre-Phase-6 parity). Production wiring in `AppContainer` MUST
- *   pass a non-null instance; the nullable default exists only for back-compat in tests
- *   that predate Phase 6 and don't exercise rate behavior.
+ * @param wantActivityRepo Reserved for future use. Phase 7 stamps `pointsSpent` at write
+ *   time, so the read path no longer needs activity lookup for spend math. Kept on the
+ *   constructor to avoid rippling changes to callers (e.g. `AppContainer`).
+ * @param getUserStreakOnDayUseCase Reserved for future use. Phase 6 used this to scale
+ *   spend at read time; Phase 7 stamps the scaled `pointsSpent` at write time, so the
+ *   read path no longer applies a rate. Kept on the constructor to avoid rippling changes
+ *   to callers.
  */
 class GetPointBalanceUseCase(
     private val habitLogRepo: HabitLogRepository,
@@ -39,7 +42,6 @@ class GetPointBalanceUseCase(
         val today = clock.now().toLocalDateTime(timeZone).date
         val weekStartDate = currentWeekStartDate()
         val habits = habitRepo.getHabitsForUser(userId).associateBy { it.id }
-        val activities = wantActivityRepo.getWantActivities(userId).associateBy { it.id }
         val dailyEarnCap = habits.values.sumOf { it.dailyTarget }
         val rolloverCap = dailyEarnCap * 2
 
@@ -58,7 +60,7 @@ class GetPointBalanceUseCase(
         var day = weekStartDate
         while (day <= today) {
             val earnedThisDay = earnedOnDay(day, habitLogs, habits)
-            val spentThisDay = spentOnDay(userId, day, wantLogs, activities)
+            val spentThisDay = spentOnDay(day, wantLogs)
             if (day != weekStartDate) balance = minOf(balance, rolloverCap)
             balance = (balance + earnedThisDay - spentThisDay).coerceAtLeast(0)
             totalEarned += earnedThisDay
@@ -96,24 +98,15 @@ class GetPointBalanceUseCase(
         }
     }
 
-    private suspend fun spentOnDay(
-        userId: String,
+    private fun spentOnDay(
         day: LocalDate,
         weekWantLogs: List<WantLog>,
-        activities: Map<String, WantActivity>,
     ): Int {
         val dayStart = day.atStartOfDayIn(timeZone)
         val nextDayStart = day.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
-        val rate = getUserStreakOnDayUseCase?.let {
-            ExchangeRateCalculator.rateFor(it.execute(userId, day))
-        } ?: 1.0
         return weekWantLogs
             .filter { it.loggedAt >= dayStart && it.loggedAt < nextDayStart }
-            .sumOf { log ->
-                activities[log.activityId]?.let {
-                    PointCalculator.pointsSpentWithRate(log.quantity, it.costPerUnit, rate)
-                } ?: 0
-            }
+            .sumOf { it.pointsSpent }
     }
 
     /** Local Monday 00:00 of the current week, as a LocalDate. */
