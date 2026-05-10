@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,7 +23,7 @@ import com.jktdeveloper.habitto.ui.components.WantIconPicker
 import com.jktdeveloper.habitto.ui.components.wantIconForKey
 
 private val UNITS = listOf(
-    "minutes", "servings", "match", "matches", "episode", "session",
+    "min", "servings", "match", "matches", "episode", "session",
     "item", "drinks", "cups", "pieces", "meals",
 )
 
@@ -90,42 +89,34 @@ fun WantFormScreen(
             Spacer(Modifier.height(20.dp))
             Text("Unit", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = state.unit,
+                onValueChange = viewModel::onUnit,
+                singleLine = true,
+                label = { Text("Unit (e.g. min, cup, meal)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                UNITS.forEach { unit ->
-                    FilterChip(
-                        selected = unit == state.unit,
-                        onClick = { viewModel.onUnit(unit) },
-                        label = { Text(unit) },
+                UNITS.forEach { u ->
+                    AssistChip(
+                        onClick = { viewModel.onUnit(u) },
+                        label = { Text(u) },
                     )
                 }
             }
 
             Spacer(Modifier.height(20.dp))
-            Text("Cost", fontWeight = FontWeight.SemiBold)
+            Text("Units per point", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            CostStepperRow(
-                value = state.costInput,
-                onChange = viewModel::onCostInput,
+            UnitsStepperRow(
+                value = state.unitsInput,
+                onChange = viewModel::onUnitsInput,
                 unit = state.unit,
             )
-
-            if (state.showCostEditWarning) {
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        "Editing this cost rewrites your spend history.",
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                }
-            }
 
             state.validationError?.let { err ->
                 Spacer(Modifier.height(12.dp))
@@ -155,36 +146,28 @@ fun WantFormScreen(
 }
 
 @Composable
-private fun CostStepperRow(value: String, onChange: (String) -> Unit, unit: String) {
-    val parsed = value.toDoubleOrNull() ?: 0.0
+private fun UnitsStepperRow(value: String, onChange: (String) -> Unit, unit: String) {
+    val parsed = value.toIntOrNull() ?: 1
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f),
-            label = { Text("Cost (pt / $unit)") },
+            label = { Text("$unit per −1 pt") },
         )
         Spacer(Modifier.width(8.dp))
-        IconButton(onClick = { onChange(((parsed - 0.1).coerceAtLeast(0.0)).toRoundedString()) }) {
+        IconButton(onClick = { onChange((parsed - 1).coerceAtLeast(1).toString()) }) {
             Icon(Icons.Default.Remove, contentDescription = "Decrement")
         }
-        IconButton(onClick = { onChange(((parsed + 0.1)).toRoundedString()) }) {
+        IconButton(onClick = { onChange((parsed + 1).toString()) }) {
             Icon(Icons.Default.Add, contentDescription = "Increment")
         }
     }
-    val previewPts = if (parsed > 0.0) {
-        kotlin.math.ceil(parsed * 30).toInt().coerceAtLeast(1)
-    } else 0
     Text(
-        "(e.g. 30 $unit = $previewPts pt)",
+        "$parsed $unit = −1 pt",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-}
-
-private fun Double.toRoundedString(): String {
-    val rounded = ((this * 10).toInt()) / 10.0
-    return rounded.toString()
 }

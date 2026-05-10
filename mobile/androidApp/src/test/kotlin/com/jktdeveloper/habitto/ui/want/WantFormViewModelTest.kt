@@ -6,8 +6,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.habittracker.data.local.HabitTrackerDatabase
 import com.habittracker.data.repository.LocalWantActivityRepository
-import com.habittracker.data.repository.LocalWantLogRepository
-import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,20 +36,20 @@ class WantFormViewModelTest {
     @Before fun setUp() { Dispatchers.setMain(UnconfinedTestDispatcher()) }
     @After fun tearDown() { Dispatchers.resetMain() }
 
-    private fun newRepos(): Pair<LocalWantActivityRepository, LocalWantLogRepository> {
+    private fun newRepo(): LocalWantActivityRepository {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val driver = AndroidSqliteDriver(HabitTrackerDatabase.Schema, context, name = null)
         val db = HabitTrackerDatabase(driver)
-        return LocalWantActivityRepository(db) to LocalWantLogRepository(db)
+        return LocalWantActivityRepository(db)
     }
 
     @Test
     fun `new mode saves a custom activity`() = runTest {
-        val (wantRepo, logRepo) = newRepos()
-        val vm = WantFormViewModel.forTest(FormMode.New, wantRepo, logRepo, { userId }, fixedClock)
+        val wantRepo = newRepo()
+        val vm = WantFormViewModel.forTest(FormMode.New, wantRepo, { userId }, fixedClock)
         vm.onName("Bingewatch")
         vm.onUnit("episode")
-        vm.onCostInput("0.5")
+        vm.onUnitsInput("5")
         vm.onIconKey("local_movies")
         var done = false
         vm.save { done = true }
@@ -60,82 +58,66 @@ class WantFormViewModelTest {
         assertEquals("Bingewatch", saved.name)
         assertTrue(saved.isCustom)
         assertEquals("local_movies", saved.iconKey)
-        assertEquals(0.5, saved.costPerUnit, 0.0)
+        assertEquals(5, saved.unitsPerPoint)
     }
 
     @Test
     fun `edit mode loads existing fields`() = runTest {
-        val (wantRepo, logRepo) = newRepos()
+        val wantRepo = newRepo()
         wantRepo.saveWantActivity(
             WantActivity(id = "a", name = "TikTok", unit = "minutes",
-                         costPerUnit = 1.0, iconKey = "play_circle"),
+                         unitsPerPoint = 1, iconKey = "play_circle"),
             userId,
         )
-        val vm = WantFormViewModel.forTest(FormMode.Edit("a"), wantRepo, logRepo, { userId }, fixedClock)
+        val vm = WantFormViewModel.forTest(FormMode.Edit("a"), wantRepo, { userId }, fixedClock)
         val loaded = vm.state.first { it.name.isNotEmpty() }
         assertEquals("TikTok", loaded.name)
         assertEquals("play_circle", loaded.iconKey)
-        assertEquals("1.0", loaded.costInput)
+        assertEquals("1", loaded.unitsInput)
     }
 
     @Test
-    fun `cost change triggers warning when past logs exist`() = runTest {
-        val (wantRepo, logRepo) = newRepos()
-        wantRepo.saveWantActivity(
-            WantActivity(id = "a", name = "TikTok", unit = "minutes", costPerUnit = 1.0),
-            userId,
-        )
-        logRepo.insertLog(
-            id = "l1", userId = userId, activityId = "a",
-            quantity = 1.0, deviceMode = DeviceMode.OTHER,
-            loggedAt = Instant.fromEpochMilliseconds(900_000),
-        )
-        val vm = WantFormViewModel.forTest(FormMode.Edit("a"), wantRepo, logRepo, { userId }, fixedClock)
-        vm.state.first { it.hasPastLogs }
-        vm.onCostInput("2.0")
-        val s = vm.state.first { it.showCostEditWarning }
-        assertTrue(s.showCostEditWarning)
+    fun `unitsInput updates state without warning state`() = runTest {
+        val wantRepo = newRepo()
+        val vm = WantFormViewModel.forTest(FormMode.New, wantRepo, { userId }, fixedClock)
+        vm.onUnitsInput("7")
+        assertEquals("7", vm.state.first().unitsInput)
     }
 
     @Test
-    fun `cost change doesn't warn when no past logs`() = runTest {
-        val (wantRepo, logRepo) = newRepos()
-        wantRepo.saveWantActivity(
-            WantActivity(id = "a", name = "TikTok", unit = "minutes", costPerUnit = 1.0),
-            userId,
-        )
-        val vm = WantFormViewModel.forTest(FormMode.Edit("a"), wantRepo, logRepo, { userId }, fixedClock)
-        vm.state.first { !it.hasPastLogs && it.name.isNotEmpty() }
-        vm.onCostInput("2.0")
-        assertFalse(vm.state.first().showCostEditWarning)
-    }
+    fun `validation rejects empty name and units below 1`() = runTest {
+        val wantRepo = newRepo()
+        val vm = WantFormViewModel.forTest(FormMode.New, wantRepo, { userId }, fixedClock)
 
-    @Test
-    fun `validation rejects empty name and negative cost`() = runTest {
-        val (wantRepo, logRepo) = newRepos()
-        val vm = WantFormViewModel.forTest(FormMode.New, wantRepo, logRepo, { userId }, fixedClock)
+        // blank name + valid units -> fails on name
         vm.onName("")
-        vm.onCostInput("1.0")
+        vm.onUnitsInput("1")
         var done = false
         vm.save { done = true }
         assertFalse(done)
         assertNotNull(vm.state.first().validationError)
 
+        // valid name + units = 0 -> fails
         vm.onName("X")
-        vm.onCostInput("-1")
+        vm.onUnitsInput("0")
+        vm.save { done = true }
+        assertFalse(done)
+
+        // valid name + non-numeric units -> fails (toIntOrNull null)
+        vm.onUnitsInput("abc")
         vm.save { done = true }
         assertFalse(done)
     }
 
     @Test
     fun `delete softHides the activity`() = runTest {
-        val (wantRepo, logRepo) = newRepos()
+        val wantRepo = newRepo()
         wantRepo.saveWantActivity(
             WantActivity(id = "a", name = "TikTok", unit = "minutes",
-                         costPerUnit = 1.0, isCustom = true),
+                         unitsPerPoint = 1, isCustom = true),
             userId,
         )
-        val vm = WantFormViewModel.forTest(FormMode.Edit("a"), wantRepo, logRepo, { userId }, fixedClock)
+        val vm = WantFormViewModel.forTest(FormMode.Edit("a"), wantRepo, { userId }, fixedClock)
         vm.state.first { it.name == "TikTok" }
         var done = false
         vm.delete { done = true }

@@ -3,7 +3,6 @@ package com.jktdeveloper.habitto.ui.want
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.WantActivityRepository
-import com.habittracker.data.repository.WantLogRepository
 import com.habittracker.domain.model.WantActivity
 import com.jktdeveloper.habitto.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,21 +22,17 @@ sealed interface FormMode {
 data class WantFormUi(
     val mode: FormMode,
     val name: String = "",
-    val unit: String = "minutes",
-    val costInput: String = "1.0",
+    val unit: String = "min",
+    val unitsInput: String = "1",
     val iconKey: String = "more_horiz",
-    val hasPastLogs: Boolean = false,
-    val originalCost: Double = 1.0,
     val isSaving: Boolean = false,
     val validationError: String? = null,
-    val showCostEditWarning: Boolean = false,
     val saved: Boolean = false,
 )
 
 class WantFormViewModel private constructor(
     private val mode: FormMode,
     private val wantActivityRepo: WantActivityRepository,
-    private val wantLogRepo: WantLogRepository,
     private val userIdProvider: () -> String,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
@@ -48,7 +43,6 @@ class WantFormViewModel private constructor(
     constructor(mode: FormMode, container: AppContainer) : this(
         mode = mode,
         wantActivityRepo = container.wantActivityRepository,
-        wantLogRepo = container.wantLogRepository,
         userIdProvider = { container.currentUserId() },
     )
 
@@ -62,17 +56,13 @@ class WantFormViewModel private constructor(
                     val userId = userIdProvider()
                     val w = wantActivityRepo.getAllWantActivitiesForUser(userId)
                         .firstOrNull { it.id == m.activityId } ?: return@launch
-                    val pastLogs = wantLogRepo.getAllActiveLogsForUser(userId)
-                        .any { it.activityId == m.activityId }
                     _state.update { _ ->
                         WantFormUi(
                             mode = m,
                             name = w.name,
                             unit = w.unit,
-                            costInput = w.costPerUnit.toString(),
+                            unitsInput = w.unitsPerPoint.toString(),
                             iconKey = w.iconKey ?: "more_horiz",
-                            originalCost = w.costPerUnit,
-                            hasPastLogs = pastLogs,
                         )
                     }
                 }
@@ -81,34 +71,23 @@ class WantFormViewModel private constructor(
     }
 
     fun onName(v: String) { _state.update { it.copy(name = v, validationError = null) } }
-    fun onUnit(v: String) { _state.update { it.copy(unit = v) } }
+    fun onUnit(v: String) { _state.update { it.copy(unit = v, validationError = null) } }
     fun onIconKey(v: String) { _state.update { it.copy(iconKey = v) } }
 
-    fun onCostInput(v: String) {
-        val parsed = v.toDoubleOrNull()
-        val warning = mode is FormMode.Edit
-            && _state.value.hasPastLogs
-            && parsed != null
-            && parsed != _state.value.originalCost
-        _state.update {
-            it.copy(
-                costInput = v,
-                validationError = null,
-                showCostEditWarning = warning,
-            )
-        }
+    fun onUnitsInput(v: String) {
+        _state.update { it.copy(unitsInput = v, validationError = null) }
     }
 
     @OptIn(ExperimentalUuidApi::class)
     fun save(onDone: () -> Unit) {
         val s = _state.value
-        val cost = s.costInput.toDoubleOrNull()
         if (s.name.isBlank()) {
             _state.update { it.copy(validationError = "Name required") }
             return
         }
-        if (cost == null || cost < 0.0) {
-            _state.update { it.copy(validationError = "Cost must be ≥ 0") }
+        val units = s.unitsInput.toIntOrNull()
+        if (units == null || units < 1) {
+            _state.update { it.copy(validationError = "Units per point must be ≥ 1") }
             return
         }
         viewModelScope.launch {
@@ -119,7 +98,7 @@ class WantFormViewModel private constructor(
                     id = Uuid.random().toString(),
                     name = s.name,
                     unit = s.unit,
-                    costPerUnit = cost,
+                    unitsPerPoint = units,
                     isCustom = true,
                     createdByUserId = userId,
                     iconKey = s.iconKey,
@@ -131,7 +110,7 @@ class WantFormViewModel private constructor(
                     existing.copy(
                         name = s.name,
                         unit = s.unit,
-                        costPerUnit = cost,
+                        unitsPerPoint = units,
                         iconKey = s.iconKey,
                         updatedAt = clock.now(),
                     )
@@ -155,9 +134,8 @@ class WantFormViewModel private constructor(
         fun forTest(
             mode: FormMode,
             wantActivityRepo: WantActivityRepository,
-            wantLogRepo: WantLogRepository,
             userIdProvider: () -> String,
             clock: Clock = Clock.System,
-        ) = WantFormViewModel(mode, wantActivityRepo, wantLogRepo, userIdProvider, clock)
+        ) = WantFormViewModel(mode, wantActivityRepo, userIdProvider, clock)
     }
 }
