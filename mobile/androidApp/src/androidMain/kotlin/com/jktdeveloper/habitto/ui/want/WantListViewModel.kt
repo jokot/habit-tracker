@@ -12,11 +12,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
+enum class WantSortMode { Name, Recent }
+
 data class WantListUi(
     val seeded: List<WantActivity>,
     val custom: List<WantActivity>,
     val hidden: List<WantActivity>,
     val showHidden: Boolean = false,
+    val sortMode: WantSortMode = WantSortMode.Name,
+    val helpOpen: Boolean = false,
     val toast: String? = null,
 )
 
@@ -41,7 +45,8 @@ class WantListViewModel private constructor(
     private fun reload() {
         viewModelScope.launch {
             val userId = userIdProvider()
-            val all = repo.getAllWantActivitiesForUser(userId).sortedBy { it.name.lowercase() }
+            val sortMode = _state.value.sortMode
+            val all = repo.getAllWantActivitiesForUser(userId).let { applySort(it, sortMode) }
             _state.update {
                 it.copy(
                     seeded = all.filter { a -> !a.isCustom && a.hiddenAt == null },
@@ -52,8 +57,27 @@ class WantListViewModel private constructor(
         }
     }
 
+    private fun applySort(list: List<WantActivity>, mode: WantSortMode): List<WantActivity> =
+        when (mode) {
+            WantSortMode.Name -> list.sortedBy { it.name.lowercase() }
+            WantSortMode.Recent -> list.sortedByDescending { it.updatedAt }
+        }
+
     fun toggleShowHidden() {
         _state.update { it.copy(showHidden = !it.showHidden) }
+    }
+
+    fun cycleSortMode() {
+        val next = when (_state.value.sortMode) {
+            WantSortMode.Name -> WantSortMode.Recent
+            WantSortMode.Recent -> WantSortMode.Name
+        }
+        _state.update { it.copy(sortMode = next) }
+        reload()
+    }
+
+    fun setHelpOpen(open: Boolean) {
+        _state.update { it.copy(helpOpen = open) }
     }
 
     fun hide(activityId: String, name: String) {

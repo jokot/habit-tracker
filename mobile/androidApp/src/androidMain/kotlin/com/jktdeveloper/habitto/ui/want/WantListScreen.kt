@@ -24,11 +24,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -89,25 +94,60 @@ fun WantListScreen(
                     }
                 },
                 actions = {
-                    if (state.hidden.isNotEmpty()) {
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                        ) {
+                            val showHidden = state.showHidden
+                            val hiddenCount = state.hidden.size
+                            val sortLabel = when (state.sortMode) {
+                                WantSortMode.Name -> "Sort: by name"
+                                WantSortMode.Recent -> "Sort: recent"
                             }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (state.showHidden) "Hide hidden"
-                                            else "Show hidden (${state.hidden.size})"
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.toggleShowHidden()
-                                        menuOpen = false
-                                    },
-                                )
-                            }
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (showHidden) "Hide hidden"
+                                        else "Show hidden · $hiddenCount"
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (showHidden) Icons.Default.VisibilityOff
+                                        else Icons.Default.Visibility,
+                                        contentDescription = null,
+                                    )
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    leadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                                modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer),
+                                onClick = {
+                                    viewModel.toggleShowHidden()
+                                    menuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(sortLabel) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null) },
+                                onClick = {
+                                    viewModel.cycleSortMode()
+                                    menuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("What's a Want?") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = null) },
+                                onClick = {
+                                    viewModel.setHelpOpen(true)
+                                    menuOpen = false
+                                },
+                            )
                         }
                     }
                 },
@@ -189,6 +229,25 @@ fun WantListScreen(
 
             item { AddWantTile(onClick = onAddWant) }
             item { Spacer(Modifier.height(24.dp)) }
+        }
+
+        if (state.helpOpen) {
+            AlertDialog(
+                onDismissRequest = { viewModel.setHelpOpen(false) },
+                title = { Text("What's a Want?") },
+                text = {
+                    Text(
+                        "Wants are the activities you spend points on — scrolling, " +
+                            "snacking, gaming, etc. Each tap on a Want subtracts 1 point. " +
+                            "Adjust units per point to match how you log it (e.g. " +
+                            "10 minutes of YouTube = −1 pt). Hide seeded wants you don't " +
+                            "want to track; delete custom wants you no longer need.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.setHelpOpen(false) }) { Text("Got it") }
+                },
+            )
         }
     }
 }
