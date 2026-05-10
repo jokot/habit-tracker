@@ -1,27 +1,19 @@
 package com.habittracker.domain.usecase
 
-import kotlin.math.ceil
-
 object PointCalculator {
-    /** Points earned rounds down: need [threshold] quantity for each point. */
+    /** Habit side — units accumulate, points = floor(quantity / threshold). */
     fun pointsEarned(quantity: Double, threshold: Double): Int =
-        (quantity / threshold).toInt()
+        if (threshold <= 0.0) 0 else (quantity / threshold).toInt()
+
+    /** Want side — one tap is one point. Multi-tap sums. */
+    fun pointsSpent(taps: Int): Int = taps.coerceAtLeast(0)
 
     /**
-     * Points spent rounds up: any positive consumption costs at least 1 pt.
-     * Prevents "free" micro-sessions (e.g. 1 min of a 2-min-per-pt activity).
+     * Higher rate squeezes the unit count behind a single −1 pt tap.
+     * Clamped to 1 so cheap wants (unitsPerPoint = 1) stay at 1 unit per tap
+     * regardless of tier.
      */
-    fun pointsSpent(quantity: Double, costPerUnit: Double): Int {
-        if (quantity <= 0.0 || costPerUnit <= 0.0) return 0
-        return ceil(quantity * costPerUnit).toInt().coerceAtLeast(1)
-    }
-
-    /**
-     * Cost × rate, rounded up, with `1pt` minimum if any quantity was consumed.
-     * Phase 6: rate is the exchange-rate multiplier (1.0..1.4) keyed off user-level streak.
-     */
-    fun pointsSpentWithRate(quantity: Double, costPerUnit: Double, rate: Double): Int {
-        if (quantity <= 0.0 || costPerUnit <= 0.0) return 0
-        return ceil(quantity * costPerUnit * rate).toInt().coerceAtLeast(1)
-    }
+    fun effectiveUnitsPerPoint(unitsPerPoint: Int, rate: Double): Int =
+        if (unitsPerPoint <= 0 || rate <= 0.0) 1
+        else (unitsPerPoint / rate).toInt().coerceAtLeast(1)
 }
