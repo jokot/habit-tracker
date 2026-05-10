@@ -35,23 +35,25 @@ class LogWantUseCaseRateTest {
     }
 
     @Test
-    fun `streak 14 applies rate 1_2`() = runTest {
+    fun `streak 14 applies rate 1_4`() = runTest {
         val today = LocalDate(2026, 5, 5)
         val sut = makeSut(today, completeDaysEndingToday = 14)
         seedActivity(sut.wantActivityRepo, "a1", costPerUnit = 1.0)
         seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
+        // Phase 7 rate ladder: streak 14 → tier 3 → ×1.4. ceil(10 × 1.0 × 1.4) = 14.
         val result = sut.useCase.execute(userId, "a1", quantity = 10.0, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
-        assertEquals(12, result.pointsSpent)
+        assertEquals(14, result.pointsSpent)
     }
 
     @Test
-    fun `streak 30 applies rate 1_4`() = runTest {
+    fun `streak 30 applies rate 2_0`() = runTest {
         val today = LocalDate(2026, 5, 5)
         val sut = makeSut(today, completeDaysEndingToday = 30)
         seedActivity(sut.wantActivityRepo, "a1", costPerUnit = 1.0)
         seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
+        // Phase 7 rate ladder: streak 30 → tier 5 → ×2.0. ceil(10 × 1.0 × 2.0) = 20.
         val result = sut.useCase.execute(userId, "a1", quantity = 10.0, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
-        assertEquals(14, result.pointsSpent)
+        assertEquals(20, result.pointsSpent)
     }
 
     // ── helpers ─────────────────────────────────────────────────────

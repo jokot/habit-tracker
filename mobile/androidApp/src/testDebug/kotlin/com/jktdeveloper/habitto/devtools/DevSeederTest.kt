@@ -141,10 +141,10 @@ class DevSeederTest {
 
     @Test
     fun `expectedRateForCompleteCount maps tier ladder`() {
-        // 0 → 1.0×; 7 → 1.1×; 14 → 1.2×; 30 → 1.4×.
+        // Phase 7 ladder: 0 → 1.0×; 7 → 1.2×; 14 → 1.4×; 30 → 2.0×.
         assertEquals(1.0, DevSeeder.expectedRateForCompleteCount(0), 0.0)
-        assertEquals(1.1, DevSeeder.expectedRateForCompleteCount(7), 0.0)
-        assertEquals(1.2, DevSeeder.expectedRateForCompleteCount(14), 0.0)
-        assertEquals(1.4, DevSeeder.expectedRateForCompleteCount(30), 0.0)
+        assertEquals(1.2, DevSeeder.expectedRateForCompleteCount(7), 0.0)
+        assertEquals(1.4, DevSeeder.expectedRateForCompleteCount(14), 0.0)
+        assertEquals(2.0, DevSeeder.expectedRateForCompleteCount(30), 0.0)
     }
 }

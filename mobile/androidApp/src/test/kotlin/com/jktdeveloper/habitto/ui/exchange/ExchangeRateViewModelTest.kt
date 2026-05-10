@@ -45,29 +45,31 @@ class ExchangeRateViewModelTest {
     }
 
     @Test
-    fun `streak 22 → tier 4 rate 1_3 daysToNext 8`() = runTest {
+    fun `streak 22 → tier 4 rate 1_6 daysToNext 8`() = runTest {
         val vm = ExchangeRateViewModel(
             userIdProvider = { "u1" },
             streakFlow = { flowOf(streak(22)) },
             wantActivitiesProvider = { listOf(makeActivity("a1", 5.0)) },
         )
         val state = vm.state.first { !it.isLoading }
+        // Phase 7 rate ladder: tier 4 → ×1.6. costPerUnit 5.0 × 1.6 = 8.0.
         assertEquals(4, state.currentTier.level)
-        assertEquals(1.3, state.currentRate, 0.0)
+        assertEquals(1.6, state.currentRate, 0.0)
         assertEquals(8, state.daysToNext)
-        assertEquals(6.5, state.comparison.first().currentCostPerUnit, 0.001)
+        assertEquals(8.0, state.comparison.first().currentCostPerUnit, 0.001)
     }
 
     @Test
-    fun `streak 100 → tier 5 rate 1_4 daysToNext null`() = runTest {
+    fun `streak 100 → tier 5 rate 2_0 daysToNext null`() = runTest {
         val vm = ExchangeRateViewModel(
             userIdProvider = { "u1" },
             streakFlow = { flowOf(streak(100)) },
             wantActivitiesProvider = { emptyList() },
         )
         val state = vm.state.first { !it.isLoading }
+        // Phase 7 rate ladder: tier 5 → ×2.0.
         assertEquals(5, state.currentTier.level)
-        assertEquals(1.4, state.currentRate, 0.0)
+        assertEquals(2.0, state.currentRate, 0.0)
         assertNull(state.daysToNext)
         assertEquals(0, state.comparison.size)
     }

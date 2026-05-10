@@ -46,7 +46,7 @@ class GetDayPointsUseCaseRateTest {
                 createdAt = anchor, updatedAt = anchor, effectiveFrom = anchor,
             )
         )
-        // 14 consecutive complete days ending today → streak=14 → rate 1.2
+        // 14 consecutive complete days ending today → streak=14 → Phase 7 rate 1.4
         (0..13).forEach { offset ->
             val d = today.minus(offset, DateTimeUnit.DAY)
             habitLogRepo.insertLog(
@@ -58,7 +58,7 @@ class GetDayPointsUseCaseRateTest {
         wantActivityRepo.activities.add(
             WantActivity(id = "a1", name = "a", unit = "u", costPerUnit = 5.0)
         )
-        // Spend today: qty 1 × cost 5 × rate 1.2 = ceil(6.0) = 6
+        // Spend today: qty 1 × cost 5 × rate 1.4 = ceil(7.0) = 7
         wantLogRepo.insertLog(
             id = "w-today", userId = userId, activityId = "a1", quantity = 1.0,
             deviceMode = DeviceMode.OTHER,
@@ -72,7 +72,7 @@ class GetDayPointsUseCaseRateTest {
         )
 
         val day = sut.execute(userId, today).getOrThrow()
-        assertEquals(6, day.spent)
+        assertEquals(7, day.spent)
         assertEquals(1, day.earned)  // earn unaffected by rate
     }
 
@@ -94,7 +94,7 @@ class GetDayPointsUseCaseRateTest {
                 createdAt = anchor, updatedAt = anchor, effectiveFrom = anchor,
             )
         )
-        // 14 days of qty=3 logs each day to keep the day "complete" → streak=14 → rate 1.2
+        // 14 days of qty=3 logs each day to keep the day "complete" → streak=14 → Phase 7 rate 1.4
         (0..13).forEach { offset ->
             val d = today.minus(offset, DateTimeUnit.DAY)
             habitLogRepo.insertLog(
@@ -111,7 +111,7 @@ class GetDayPointsUseCaseRateTest {
         )
 
         // Without rate-multiplication: pointsEarned(3.0, 1.0) = 3.
-        // If a regression rate-multiplied earn: ceil(3.0 × 1.2) = 4. Catches that case.
+        // If a regression rate-multiplied earn: ceil(3.0 × 1.4) = 5. Catches that case.
         val day = sut.execute(userId, today).getOrThrow()
         assertEquals(3, day.earned)
         assertEquals(0, day.spent)

@@ -63,7 +63,7 @@ class GetPointBalanceUseCaseRateTest {
             )
         }
 
-        // Activity costs 5 per unit. 1 unit on Mon (rate 1.0 → 5pt) + 1 unit on Sun (rate 1.1 → 6pt).
+        // Activity costs 5 per unit. 1 unit on Mon (rate 1.0 → 5pt) + 1 unit on Sun (rate 1.2 → ceil(6.0)=6pt).
         wantActivityRepo.activities.add(
             WantActivity(id = "a1", name = "Scroll", unit = "unit", costPerUnit = 5.0),
         )
@@ -94,7 +94,7 @@ class GetPointBalanceUseCaseRateTest {
         )
 
         val result = balance.execute(userId).getOrThrow()
-        // Mon spend: ceil(1 * 5 * 1.0) = 5; Sun spend: ceil(1 * 5 * 1.1) = 6. Total = 11.
+        // Mon spend: ceil(1 * 5 * 1.0) = 5; Sun spend: ceil(1 * 5 * 1.2) = 6. Total = 11.
         assertEquals(11, result.spent)
         // Sun is "today"; spentToday is just the Sun spend = 6.
         assertEquals(6, result.spentToday)
@@ -102,8 +102,8 @@ class GetPointBalanceUseCaseRateTest {
 
     @Test
     fun `habit earning is NOT rate-multiplied`() = runTest {
-        // Today = Sun 2026-05-03. 14 consecutive complete days ending today → rate 1.2 if applied.
-        // Earned today must be base value (3 from 3.0 quantity at threshold 1.0), NOT 4 (3 * 1.2 ceiled).
+        // Today = Sun 2026-05-03. 14 consecutive complete days ending today → Phase 7 rate 1.4 if applied.
+        // Earned today must be base value (3 from 3.0 quantity at threshold 1.0), NOT 5 (3 * 1.4 ceiled).
         val today = LocalDate(2026, 5, 3)
         val now = LocalDateTime(today, LocalTime(20, 0)).toInstant(tz)
         val clock = object : Clock { override fun now(): Instant = now }
@@ -121,7 +121,7 @@ class GetPointBalanceUseCaseRateTest {
             effectiveFromInstant = LocalDateTime(LocalDate(2026, 1, 1), LocalTime(0, 0)).toInstant(tz),
         )
         habitRepo.saveHabit(habit)
-        // Log every day for 14 days ending today (tier 3, rate 1.2 if it were ever applied).
+        // Log every day for 14 days ending today (tier 3, Phase 7 rate 1.4 if it were ever applied).
         for (offset in 0..13) {
             val day = today.minus(offset, DateTimeUnit.DAY)
             habitLogRepo.insertLog(
@@ -143,7 +143,7 @@ class GetPointBalanceUseCaseRateTest {
         )
 
         val result = balance.execute(userId).getOrThrow()
-        // earnedToday MUST be 3 (3 quantity / 1 threshold = 3 pts), NOT 4 (3 * 1.2 = 3.6 ceil).
+        // earnedToday MUST be 3 (3 quantity / 1 threshold = 3 pts), NOT 5 (3 * 1.4 = 4.2 ceil).
         assertEquals(3, result.earnedToday)
     }
 
