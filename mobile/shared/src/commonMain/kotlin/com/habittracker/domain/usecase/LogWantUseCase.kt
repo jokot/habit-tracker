@@ -29,9 +29,10 @@ class LogWantUseCase(
     suspend fun execute(
         userId: String,
         activityId: String,
-        quantity: Double,
+        taps: Int = 1,
         deviceMode: DeviceMode,
     ): Result<LogWantResult> = runCatching {
+        require(taps >= 1) { "taps must be >= 1" }
         val activity = wantActivityRepository.getWantActivities(userId)
             .firstOrNull { it.id == activityId }
             ?: error("Activity $activityId not found")
@@ -40,13 +41,23 @@ class LogWantUseCase(
         val today = now.toLocalDateTime(timeZone).date
         val streakOnDay = getUserStreakOnDayUseCase.execute(userId, today)
         val rate = ExchangeRateCalculator.rateFor(streakOnDay)
-        val points = PointCalculator.pointsSpentWithRate(quantity, activity.costPerUnit, rate)
+        val effUnits = PointCalculator.effectiveUnitsPerPoint(activity.unitsPerPoint, rate)
+        val quantity = (effUnits.toLong() * taps.toLong()).toDouble()
+        val points = PointCalculator.pointsSpent(taps)
 
         val balance = getPointBalanceUseCase.execute(userId).getOrThrow().balance
         if (points > balance) throw InsufficientPointsException(balance, points)
 
         val id = Uuid.random().toString()
-        val log = wantLogRepository.insertLog(id, userId, activityId, quantity, deviceMode, now)
+        val log = wantLogRepository.insertLog(
+            id = id,
+            userId = userId,
+            activityId = activityId,
+            quantity = quantity,
+            pointsSpent = points,
+            deviceMode = deviceMode,
+            loggedAt = now,
+        )
         LogWantResult(log, points)
     }
 }

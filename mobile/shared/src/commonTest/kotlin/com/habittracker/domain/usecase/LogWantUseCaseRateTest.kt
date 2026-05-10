@@ -19,41 +19,85 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class LogWantUseCaseRateTest {
     private val tz = TimeZone.UTC
     private val userId = "u1"
 
     @Test
-    fun `streak 0 applies rate 1_0`() = runTest {
+    fun `single tap at tier 1 stamps quantity equal to unitsPerPoint and pointsSpent 1`() = runTest {
         val today = LocalDate(2026, 5, 5)
         val sut = makeSut(today, completeDaysEndingToday = 0)
-        seedActivity(sut.wantActivityRepo, "a1", costPerUnit = 1.0)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 10)
         seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
-        val result = sut.useCase.execute(userId, "a1", quantity = 10.0, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
-        assertEquals(10, result.pointsSpent)
+
+        val result = sut.useCase.execute(userId, "a1", taps = 1, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
+
+        assertEquals(1, result.pointsSpent)
+        assertEquals(10.0, result.log.quantity)
+        assertEquals(1, result.log.pointsSpent)
     }
 
     @Test
-    fun `streak 14 applies rate 1_4`() = runTest {
+    fun `tier 5 squeezes quantity per tap to floor of unitsPerPoint over 2`() = runTest {
         val today = LocalDate(2026, 5, 5)
-        val sut = makeSut(today, completeDaysEndingToday = 14)
-        seedActivity(sut.wantActivityRepo, "a1", costPerUnit = 1.0)
-        seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
-        // Phase 7 rate ladder: streak 14 → tier 3 → ×1.4. ceil(10 × 1.0 × 1.4) = 14.
-        val result = sut.useCase.execute(userId, "a1", quantity = 10.0, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
-        assertEquals(14, result.pointsSpent)
-    }
-
-    @Test
-    fun `streak 30 applies rate 2_0`() = runTest {
-        val today = LocalDate(2026, 5, 5)
+        // streak 30 → tier 5 → rate 2.0
         val sut = makeSut(today, completeDaysEndingToday = 30)
-        seedActivity(sut.wantActivityRepo, "a1", costPerUnit = 1.0)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 10)
         seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
-        // Phase 7 rate ladder: streak 30 → tier 5 → ×2.0. ceil(10 × 1.0 × 2.0) = 20.
-        val result = sut.useCase.execute(userId, "a1", quantity = 10.0, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
-        assertEquals(20, result.pointsSpent)
+
+        val result = sut.useCase.execute(userId, "a1", taps = 1, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
+
+        // effectiveUnitsPerPoint(10, 2.0) = 5
+        assertEquals(1, result.pointsSpent)
+        assertEquals(5.0, result.log.quantity)
+        assertEquals(1, result.log.pointsSpent)
+    }
+
+    @Test
+    fun `multi-tap multiplies quantity and points by tap count`() = runTest {
+        val today = LocalDate(2026, 5, 5)
+        val sut = makeSut(today, completeDaysEndingToday = 0)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 10)
+        seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
+
+        val result = sut.useCase.execute(userId, "a1", taps = 3, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
+
+        assertEquals(3, result.pointsSpent)
+        assertEquals(30.0, result.log.quantity)
+        assertEquals(3, result.log.pointsSpent)
+    }
+
+    @Test
+    fun `unitsPerPoint 1 stays 1 unit per tap at tier 5`() = runTest {
+        val today = LocalDate(2026, 5, 5)
+        // streak 30 → tier 5 → rate 2.0; clamp keeps effective = 1
+        val sut = makeSut(today, completeDaysEndingToday = 30)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 1)
+        seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
+
+        val result = sut.useCase.execute(userId, "a1", taps = 1, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
+
+        assertEquals(1, result.pointsSpent)
+        assertEquals(1.0, result.log.quantity)
+        assertEquals(1, result.log.pointsSpent)
+    }
+
+    @Test
+    fun `insufficient balance throws InsufficientPointsException`() = runTest {
+        val today = LocalDate(2026, 5, 5)
+        val sut = makeSut(today, completeDaysEndingToday = 0)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 10)
+        // No earn → balance = 0
+
+        val result = sut.useCase.execute(userId, "a1", taps = 1, deviceMode = DeviceMode.THIS_DEVICE)
+
+        assertTrue(result.isFailure)
+        val ex = assertFailsWith<InsufficientPointsException> { result.getOrThrow() }
+        assertEquals(0, ex.available)
+        assertEquals(1, ex.required)
     }
 
     // ── helpers ─────────────────────────────────────────────────────
@@ -109,8 +153,8 @@ class LogWantUseCaseRateTest {
         return Sut(useCase, habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo)
     }
 
-    private fun seedActivity(repo: FakeWantActivityRepository, id: String, costPerUnit: Double) {
-        repo.activities.add(WantActivity(id = id, name = id, unit = "x", costPerUnit = costPerUnit))
+    private fun seedActivity(repo: FakeWantActivityRepository, id: String, unitsPerPoint: Int) {
+        repo.activities.add(WantActivity(id = id, name = id, unit = "x", unitsPerPoint = unitsPerPoint))
     }
 
     /**
