@@ -57,6 +57,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jktdeveloper.habitto.ui.components.resolveWantIcon
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,9 +160,13 @@ fun WantDetailScreen(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             } else {
+                val today = remember {
+                    Clock.System.now()
+                        .toLocalDateTime(TimeZone.currentSystemDefault()).date
+                }
                 nonEmptyDays.forEach { day ->
                     DayCard(
-                        dateLabel = day.date.toString(),
+                        dateLabel = relativeDayLabel(day.date, today),
                         items = day.items,
                         unit = want.unit,
                     )
@@ -412,4 +422,11 @@ private fun formatQty(qty: Double): String {
 
 private fun formatTime(raw: String): String {
     return raw.take(5)
+}
+
+private fun relativeDayLabel(date: LocalDate, today: LocalDate): String {
+    if (date == today) return "TODAY"
+    if (date == today.minus(1, DateTimeUnit.DAY)) return "YESTERDAY"
+    val month = date.month.name.take(3)
+    return "$month ${date.dayOfMonth}"
 }

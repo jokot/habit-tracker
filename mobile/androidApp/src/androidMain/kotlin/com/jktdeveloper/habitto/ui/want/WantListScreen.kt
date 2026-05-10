@@ -89,23 +89,25 @@ fun WantListScreen(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (state.showHidden) "Hide hidden"
-                                        else "Show hidden (${state.hidden.size})"
-                                    )
-                                },
-                                onClick = {
-                                    viewModel.toggleShowHidden()
-                                    menuOpen = false
-                                },
-                            )
+                    if (state.hidden.isNotEmpty()) {
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (state.showHidden) "Hide hidden"
+                                            else "Show hidden (${state.hidden.size})"
+                                        )
+                                    },
+                                    onClick = {
+                                        viewModel.toggleShowHidden()
+                                        menuOpen = false
+                                    },
+                                )
+                            }
                         }
                     }
                 },

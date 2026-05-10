@@ -175,6 +175,8 @@ private data class WantActivityDto(
     @SerialName("cost_per_unit") val costPerUnit: Double,
     @SerialName("is_custom") val isCustom: Boolean,
     @SerialName("updated_at") val updatedAt: String,
+    @SerialName("icon_key") val iconKey: String? = null,
+    @SerialName("hidden_at") val hiddenAt: String? = null,
 )
 
 private fun WantActivity.toDto(ownerUserId: String) = WantActivityDto(
@@ -185,6 +187,8 @@ private fun WantActivity.toDto(ownerUserId: String) = WantActivityDto(
     costPerUnit = costPerUnit,
     isCustom = isCustom,
     updatedAt = updatedAt.toString(),
+    iconKey = iconKey,
+    hiddenAt = hiddenAt?.toString(),
 )
 
 private fun WantActivityDto.toDomain() = WantActivity(
@@ -194,6 +198,8 @@ private fun WantActivityDto.toDomain() = WantActivity(
     costPerUnit = costPerUnit,
     isCustom = isCustom,
     createdByUserId = userId,
+    iconKey = iconKey,
+    hiddenAt = hiddenAt?.let { Instant.parse(it) },
     updatedAt = Instant.parse(updatedAt),
     syncedAt = Instant.parse(updatedAt),
 )

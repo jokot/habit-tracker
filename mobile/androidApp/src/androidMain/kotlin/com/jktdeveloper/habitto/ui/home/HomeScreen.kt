@@ -579,7 +579,7 @@ private fun WantActivityCard(
                     } else {
                         Row {
                             Text(
-                                text = "−${perTapCostInt(activity, rate)} pt",
+                                text = "−${formatRawCost(activity.costPerUnit)} pt",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -712,3 +712,9 @@ private fun EmptyState(message: String) {
 private fun perTapCostInt(activity: WantActivity, rate: Double): Int =
     com.habittracker.domain.usecase.PointCalculator
         .pointsSpentWithRate(1.0, activity.costPerUnit, rate)
+
+private fun formatRawCost(cost: Double): String {
+    val rounded = ((cost * 1000).toLong()) / 1000.0
+    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString()
+    else rounded.toString()
+}
