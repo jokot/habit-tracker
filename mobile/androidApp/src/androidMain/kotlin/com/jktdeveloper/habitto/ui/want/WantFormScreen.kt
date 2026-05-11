@@ -405,17 +405,30 @@ private fun UnitsCard(value: String, onChange: (String) -> Unit, unit: String) {
 
 @Composable
 private fun NumeralInput(value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        textStyle = MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        ),
-        modifier = Modifier.width(96.dp),
+    val numStyle = TextStyle(
+        fontSize = 28.sp,
+        lineHeight = 32.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
     )
+    Column(modifier = Modifier.width(72.dp)) {
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            textStyle = numStyle,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(MaterialTheme.colorScheme.primary),
+        )
+    }
 }
 
 @Composable
