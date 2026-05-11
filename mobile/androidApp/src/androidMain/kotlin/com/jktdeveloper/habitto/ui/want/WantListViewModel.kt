@@ -42,7 +42,7 @@ class WantListViewModel private constructor(
 
     init { reload() }
 
-    private fun reload() {
+    fun reload() {
         viewModelScope.launch {
             val userId = userIdProvider()
             val sortMode = _state.value.sortMode

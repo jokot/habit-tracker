@@ -47,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +74,10 @@ fun WantDetailScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    LifecycleResumeEffect(Unit) {
+        viewModel.reload()
+        onPauseOrDispose {}
+    }
     val toast = state.toast
     LaunchedEffect(toast) {
         if (toast != null) {

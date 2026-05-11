@@ -128,8 +128,8 @@ fun WantFormScreen(
             UnderlineField(
                 value = state.unit,
                 onChange = viewModel::onUnit,
-                label = "Or type your own",
-                placeholder = "min",
+                label = null,
+                placeholder = "Or type your own",
                 textStyle = TextStyle(
                     fontSize = 18.sp,
                     lineHeight = 22.sp,
@@ -163,9 +163,12 @@ fun WantFormScreen(
 
             if (state.mode is FormMode.Edit) {
                 Spacer(Modifier.height(8.dp))
-                TextButton(
-                    onClick = { viewModel.delete({}) },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                Row(
+                    modifier = Modifier
+                        .height(44.dp)
+                        .clickable { viewModel.delete({}) }
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         Icons.Default.DeleteOutline,
@@ -174,7 +177,12 @@ fun WantFormScreen(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("Delete want", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "Delete want",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             }
             Spacer(Modifier.height(32.dp))
@@ -255,18 +263,20 @@ private fun HeroRow(
 private fun UnderlineField(
     value: String,
     onChange: (String) -> Unit,
-    label: String,
+    label: String?,
     placeholder: String,
     textStyle: TextStyle,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
+        if (label != null) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+        }
         Box {
             if (value.isEmpty()) {
                 Text(
