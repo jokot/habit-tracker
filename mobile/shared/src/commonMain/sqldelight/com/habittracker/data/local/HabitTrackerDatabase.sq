@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS WantLog (
     userId TEXT NOT NULL,
     activityId TEXT NOT NULL,
     quantity REAL NOT NULL,
+    pointsSpent INTEGER NOT NULL DEFAULT 1,
     deviceMode TEXT NOT NULL,
     loggedAt INTEGER NOT NULL,
     deletedAt INTEGER,
@@ -70,10 +71,12 @@ CREATE TABLE IF NOT EXISTS LocalWantActivity (
     userId TEXT,
     name TEXT NOT NULL,
     unit TEXT NOT NULL,
-    costPerUnit REAL NOT NULL,
+    unitsPerPoint INTEGER NOT NULL DEFAULT 1,
     isCustom INTEGER NOT NULL DEFAULT 0,
     updatedAt INTEGER NOT NULL,
-    syncedAt INTEGER
+    syncedAt INTEGER,
+    iconKey TEXT,
+    hiddenAt INTEGER
 );
 
 -- HabitLog queries
@@ -123,12 +126,12 @@ WHERE userId = ?
 
 -- WantLog queries
 insertWantLog:
-INSERT INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO WantLog (id, userId, activityId, quantity, pointsSpent, deviceMode, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 mergePulledWantLog:
-INSERT OR REPLACE INTO WantLog (id, userId, activityId, quantity, deviceMode, loggedAt, deletedAt, syncedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO WantLog (id, userId, activityId, quantity, pointsSpent, deviceMode, loggedAt, deletedAt, syncedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 softDeleteWantLog:
 UPDATE WantLog SET deletedAt = ?, syncedAt = NULL WHERE id = ? AND userId = ?;
@@ -165,11 +168,20 @@ SELECT * FROM LocalIdentity;
 
 -- LocalWantActivity queries
 upsertWantActivity:
-INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, NULL);
+INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, unitsPerPoint, isCustom, updatedAt, syncedAt, iconKey, hiddenAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?);
 
 getWantActivitiesForUser:
+SELECT * FROM LocalWantActivity WHERE userId = ? AND hiddenAt IS NULL;
+
+getAllWantActivitiesForUser:
 SELECT * FROM LocalWantActivity WHERE userId = ?;
+
+hideWantActivity:
+UPDATE LocalWantActivity SET hiddenAt = ?, syncedAt = NULL WHERE id = ? AND userId = ?;
+
+unhideWantActivity:
+UPDATE LocalWantActivity SET hiddenAt = NULL, syncedAt = NULL WHERE id = ? AND userId = ?;
 
 -- User id migration (guest → authenticated)
 migrateHabitsUserId:
@@ -225,8 +237,8 @@ INSERT OR REPLACE INTO LocalHabit (id, userId, templateId, name, unit, threshold
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 mergePulledWantActivity:
-INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, costPerUnit, isCustom, updatedAt, syncedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalWantActivity (id, userId, name, unit, unitsPerPoint, isCustom, updatedAt, syncedAt, iconKey, hiddenAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- LocalUserIdentity queries
 upsertUserIdentity:

@@ -204,6 +204,7 @@ class DevToolsViewModel(
                     userId = userId,
                     activityId = s.selectedActivityId,
                     quantity = s.wantQuantity,
+                    pointsSpent = 1,
                     deviceMode = DeviceMode.OTHER,
                     loggedAt = noon,
                 )

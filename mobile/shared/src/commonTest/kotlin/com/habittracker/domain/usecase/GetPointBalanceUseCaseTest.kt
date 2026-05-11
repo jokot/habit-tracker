@@ -70,8 +70,8 @@ class GetPointBalanceUseCaseTest {
 
     @Test
     fun `computes spent from want logs this week`() = runTest {
-        activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 0.1))
-        wantLogRepo.insertLog("l1", userId, "a1", 30.0, DeviceMode.OTHER, at(WEEK_START_DATE))
+        activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 10))
+        wantLogRepo.insertLog("l1", userId, "a1", 30.0, 3, DeviceMode.OTHER, at(WEEK_START_DATE))
         val result = useCase().execute(userId).getOrThrow()
         assertEquals(3, result.spent)
     }
@@ -79,9 +79,9 @@ class GetPointBalanceUseCaseTest {
     @Test
     fun `balance is earned minus spent`() = runTest {
         habitRepo.saveHabit(habit("h1", threshold = 3.0, dailyTarget = 3))
-        activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 0.1))
+        activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 10))
         habitLogRepo.insertLog("l1", userId, "h1", 9.0, at(WEEK_START_DATE))
-        wantLogRepo.insertLog("l2", userId, "a1", 30.0, DeviceMode.OTHER, at(WEEK_START_DATE))
+        wantLogRepo.insertLog("l2", userId, "a1", 30.0, 3, DeviceMode.OTHER, at(WEEK_START_DATE))
         val result = useCase().execute(userId).getOrThrow()
         assertEquals(3, result.earned)
         assertEquals(3, result.spent)
@@ -90,8 +90,8 @@ class GetPointBalanceUseCaseTest {
 
     @Test
     fun `balance clamps at zero even if raw spent exceeds earned`() = runTest {
-        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1.0))
-        wantLogRepo.insertLog("l1", userId, "a1", 10.0, DeviceMode.OTHER, at(WEEK_START_DATE))
+        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1))
+        wantLogRepo.insertLog("l1", userId, "a1", 10.0, 10, DeviceMode.OTHER, at(WEEK_START_DATE))
         val result = useCase().execute(userId).getOrThrow()
         assertEquals(0, result.balance)
     }
@@ -165,11 +165,11 @@ class GetPointBalanceUseCaseTest {
         // Day1: earn 3, spend 2 → end balance=1.
         // Day2 midnight: min(1,6)=1 → 1+3=4.
         habitRepo.saveHabit(habit("h1", threshold = 1.0, dailyTarget = 3))
-        activityRepo.activities.add(WantActivity("a1", "Activity", "units", 1.0))
+        activityRepo.activities.add(WantActivity("a1", "Activity", "units", 1))
         val day1 = WEEK_START_DATE
         val day2 = day1.plus(1, DateTimeUnit.DAY)
         habitLogRepo.insertLog("l1", userId, "h1", 3.0, at(day1))
-        wantLogRepo.insertLog("w1", userId, "a1", 2.0, DeviceMode.OTHER, at(day1, hour = 20))
+        wantLogRepo.insertLog("w1", userId, "a1", 2.0, 2, DeviceMode.OTHER, at(day1, hour = 20))
         habitLogRepo.insertLog("l2", userId, "h1", 3.0, at(day2))
         val clock = makeClock(at(day2, hour = 12))
         val result = GetPointBalanceUseCase(
@@ -183,10 +183,10 @@ class GetPointBalanceUseCaseTest {
     fun `balance never goes negative`() = runTest {
         // Spend more than earned in a single day.
         habitRepo.saveHabit(habit("h1", threshold = 1.0, dailyTarget = 3))
-        activityRepo.activities.add(WantActivity("a1", "Activity", "units", 1.0))
+        activityRepo.activities.add(WantActivity("a1", "Activity", "units", 1))
         val day1 = WEEK_START_DATE
         habitLogRepo.insertLog("l1", userId, "h1", 3.0, at(day1))
-        wantLogRepo.insertLog("w1", userId, "a1", 10.0, DeviceMode.OTHER, at(day1, hour = 20))
+        wantLogRepo.insertLog("w1", userId, "a1", 10.0, 10, DeviceMode.OTHER, at(day1, hour = 20))
         val result = useCase().execute(userId).getOrThrow()
         assertEquals(0, result.balance)
     }
@@ -252,13 +252,13 @@ class GetPointBalanceUseCaseTest {
         // Use a clock fixed to Wednesday noon (UTC)
         val clock = makeClock(at(wednesday, hour = 12))
         val habits = FakeHabitRepository().apply { saveHabit(habit("h2", threshold = 1.0, dailyTarget = 5)) }
-        val acts = FakeWantActivityRepository().apply { activities.add(WantActivity("a2", "X", "min", 1.0)) }
+        val acts = FakeWantActivityRepository().apply { activities.add(WantActivity("a2", "X", "min", 1)) }
         val hLogs = FakeHabitLogRepository()
         val wLogs = FakeWantLogRepository()
         val uc = GetPointBalanceUseCase(hLogs, wLogs, habits, acts, TimeZone.UTC, clock)
         hLogs.insertLog("l1", userId, "h2", 5.0, at(tuesday))   // Tuesday: 5 pts
         hLogs.insertLog("l2", userId, "h2", 3.0, at(wednesday)) // Wednesday: 3 pts
-        wLogs.insertLog("w1", userId, "a2", 2.0, DeviceMode.OTHER, at(wednesday, hour = 11)) // Wednesday: 2 pts spent
+        wLogs.insertLog("w1", userId, "a2", 2.0, 2, DeviceMode.OTHER, at(wednesday, hour = 11)) // Wednesday: 2 pts spent
         val r = uc.execute(userId).getOrThrow()
         assertEquals(3, r.earnedToday)
         assertEquals(2, r.spentToday)

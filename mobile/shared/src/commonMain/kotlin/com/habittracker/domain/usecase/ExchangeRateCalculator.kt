@@ -10,10 +10,10 @@ import com.habittracker.domain.model.RateTier
 object ExchangeRateCalculator {
     val tiers: List<RateTier> = listOf(
         RateTier(level = 1, rate = 1.0, minStreak = 0,  maxStreak = 6),
-        RateTier(level = 2, rate = 1.1, minStreak = 7,  maxStreak = 13),
-        RateTier(level = 3, rate = 1.2, minStreak = 14, maxStreak = 20),
-        RateTier(level = 4, rate = 1.3, minStreak = 21, maxStreak = 29),
-        RateTier(level = 5, rate = 1.4, minStreak = 30, maxStreak = null),
+        RateTier(level = 2, rate = 1.2, minStreak = 7,  maxStreak = 13),
+        RateTier(level = 3, rate = 1.4, minStreak = 14, maxStreak = 20),
+        RateTier(level = 4, rate = 1.6, minStreak = 21, maxStreak = 29),
+        RateTier(level = 5, rate = 2.0, minStreak = 30, maxStreak = null),
     )
 
     fun rateFor(streak: Int): Double = tierFor(streak).rate

@@ -37,12 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.RateTier
 import com.habittracker.domain.usecase.ExchangeRateCalculator
-import com.habittracker.domain.usecase.PointCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,7 +83,7 @@ fun ExchangeRateScreen(
             item { TierLadder(state.currentTier) }
             if (state.comparison.isNotEmpty()) {
                 item { ComparisonHeader() }
-                items(state.comparison) { row -> ComparisonRowView(row) }
+                items(state.comparison) { row -> ComparisonRowView(row, state.currentTier.level) }
             }
             item { Spacer(Modifier.height(32.dp)) }
         }
@@ -227,65 +225,57 @@ private fun ComparisonHeader() {
 }
 
 @Composable
-private fun ComparisonRowView(row: ComparisonRow) {
-    val basePerTap = PointCalculator.pointsSpent(1.0, row.baseCostPerUnit)
-    val rate = if (row.baseCostPerUnit > 0.0) row.currentCostPerUnit / row.baseCostPerUnit else 1.0
-    val currentPerTap = PointCalculator.pointsSpentWithRate(1.0, row.baseCostPerUnit, rate)
-    val isFree = row.baseCostPerUnit == 0.0
-    val showArrow = !isFree && basePerTap != currentPerTap
-
+private fun ComparisonRowView(row: ComparisonRow, currentTierLevel: Int) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(row.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "per ${row.unit}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (isFree) {
-                Text(
-                    "FREE",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (showArrow) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(row.name, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                row.tiers.forEach { cell ->
+                    val isCurrent = cell.tierLevel == currentTierLevel
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+                                else Color.Transparent,
+                            )
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    ) {
                         Text(
-                            basePerTap.toString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textDecoration = TextDecoration.LineThrough,
+                            "T${cell.tierLevel}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isCurrent) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text("→", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        Text(
+                            cell.unitsPerPoint.toString(),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isCurrent) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            row.unit,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "/ −1 pt",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    Text(
-                        currentPerTap.toString(),
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (currentPerTap > basePerTap)
-                            MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        "pt / ${row.unit}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
@@ -299,11 +289,3 @@ private fun formatRate(value: Double): String {
     return "$whole.$frac"
 }
 
-private fun formatNumber(value: Double): String {
-    return if (value == value.toLong().toDouble()) {
-        value.toLong().toString()
-    } else {
-        val rounded = (value * 10).toInt() / 10.0
-        rounded.toString()
-    }
-}

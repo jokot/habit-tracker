@@ -1,0 +1,3 @@
+-- Phase 7: WantActivity gains iconKey + hiddenAt for explicit icons + hide/delete.
+ALTER TABLE LocalWantActivity ADD COLUMN iconKey TEXT;
+ALTER TABLE LocalWantActivity ADD COLUMN hiddenAt INTEGER;

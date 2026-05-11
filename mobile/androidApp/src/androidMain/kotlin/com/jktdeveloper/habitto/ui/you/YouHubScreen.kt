@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +37,7 @@ fun YouHubScreen(
     onOpenIdentities: () -> Unit,
     onHabitsClick: () -> Unit,
     onOpenExchangeRate: () -> Unit,
+    onOpenWants: () -> Unit,
 ) {
     val authState by viewModel.authState.collectAsState()
     val isSigningOut by viewModel.isSigningOut.collectAsState()
@@ -96,6 +98,19 @@ fun YouHubScreen(
                         val rateLabel = ((rate * 10).toInt() / 10.0).toString()
                         Text("${rateLabel}× · earned by ${streak}-day streak")
                     },
+                    trailingContent = {
+                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenWants() },
+                    leadingContent = {
+                        Icon(Icons.Default.ShoppingBag, contentDescription = null)
+                    },
+                    headlineContent = { Text("Wants") },
+                    supportingContent = { Text("Manage what you spend points on") },
                     trailingContent = {
                         Icon(Icons.Default.ChevronRight, contentDescription = null)
                     },

@@ -14,9 +14,17 @@ class FakeWantLogRepository : WantLogRepository {
 
     override suspend fun insertLog(
         id: String, userId: String, activityId: String,
-        quantity: Double, deviceMode: DeviceMode, loggedAt: Instant,
+        quantity: Double, pointsSpent: Int, deviceMode: DeviceMode, loggedAt: Instant,
     ): WantLog {
-        val log = WantLog(id = id, userId = userId, activityId = activityId, quantity = quantity, deviceMode = deviceMode, loggedAt = loggedAt)
+        val log = WantLog(
+            id = id,
+            userId = userId,
+            activityId = activityId,
+            quantity = quantity,
+            pointsSpent = pointsSpent,
+            deviceMode = deviceMode,
+            loggedAt = loggedAt,
+        )
         _logs.value = _logs.value + log
         return log
     }
@@ -28,10 +36,10 @@ class FakeWantLogRepository : WantLogRepository {
     }
 
     override fun observeAllActiveLogsForUser(userId: String): Flow<List<WantLog>> =
-        _logs.map { list -> list.filter { it.isActive && it.userId == userId } }
+        _logs.map { list -> list.filter { it.deletedAt == null && it.userId == userId } }
 
     override suspend fun getAllActiveLogsForUser(userId: String): List<WantLog> =
-        _logs.value.filter { it.isActive && it.userId == userId }
+        _logs.value.filter { it.deletedAt == null && it.userId == userId }
 
     override suspend fun migrateUserId(oldUserId: String, newUserId: String) {
         _logs.value = _logs.value.map {

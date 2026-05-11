@@ -21,15 +21,16 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Phase 6 Task 5: GetDayPoints applies rate-at-day to Want spending.
- * Habit earning remains base-rate (NOT rate-multiplied).
+ * Phase 7 pivot: GetDayPoints sums [WantLog.pointsSpent] stamped at write time.
+ * The read path no longer applies a rate or recomputes from cost — it simply sums
+ * the persisted per-log point cost. Habit earning remains base-rate.
  */
 class GetDayPointsUseCaseRateTest {
     private val tz = TimeZone.UTC
     private val userId = "u1"
 
     @Test
-    fun `day with streak 14 applies rate 1_2 to want spend on that day`() = runTest {
+    fun `dayPoints sums pointsSpent across want logs on the day`() = runTest {
         val today = LocalDate(2026, 5, 30)
         val now = LocalDateTime(today, LocalTime(20, 0)).toInstant(tz)
         val clock = object : Clock { override fun now(): Instant = now }
@@ -46,7 +47,7 @@ class GetDayPointsUseCaseRateTest {
                 createdAt = anchor, updatedAt = anchor, effectiveFrom = anchor,
             )
         )
-        // 14 consecutive complete days ending today → streak=14 → rate 1.2
+        // 14 consecutive complete days ending today (kept for parity with earn-side logic).
         (0..13).forEach { offset ->
             val d = today.minus(offset, DateTimeUnit.DAY)
             habitLogRepo.insertLog(
@@ -56,13 +57,18 @@ class GetDayPointsUseCaseRateTest {
             )
         }
         wantActivityRepo.activities.add(
-            WantActivity(id = "a1", name = "a", unit = "u", costPerUnit = 5.0)
+            WantActivity(id = "a1", name = "a", unit = "u", unitsPerPoint = 5)
         )
-        // Spend today: qty 1 × cost 5 × rate 1.2 = ceil(6.0) = 6
+        // Two want logs today with pre-stamped pointsSpent — reader sums them: 1 + 3 = 4.
         wantLogRepo.insertLog(
-            id = "w-today", userId = userId, activityId = "a1", quantity = 1.0,
-            deviceMode = DeviceMode.OTHER,
+            id = "w-1", userId = userId, activityId = "a1", quantity = 5.0,
+            pointsSpent = 1, deviceMode = DeviceMode.OTHER,
             loggedAt = LocalDateTime(today, LocalTime(11, 0)).toInstant(tz),
+        )
+        wantLogRepo.insertLog(
+            id = "w-2", userId = userId, activityId = "a1", quantity = 15.0,
+            pointsSpent = 3, deviceMode = DeviceMode.OTHER,
+            loggedAt = LocalDateTime(today, LocalTime(12, 0)).toInstant(tz),
         )
 
         val streak = ComputeStreakUseCase(habitLogRepo, habitRepo, tz, clock)
@@ -72,8 +78,8 @@ class GetDayPointsUseCaseRateTest {
         )
 
         val day = sut.execute(userId, today).getOrThrow()
-        assertEquals(6, day.spent)
-        assertEquals(1, day.earned)  // earn unaffected by rate
+        assertEquals(4, day.spent)
+        assertEquals(1, day.earned)  // earn unaffected
     }
 
     @Test
@@ -94,7 +100,7 @@ class GetDayPointsUseCaseRateTest {
                 createdAt = anchor, updatedAt = anchor, effectiveFrom = anchor,
             )
         )
-        // 14 days of qty=3 logs each day to keep the day "complete" → streak=14 → rate 1.2
+        // 14 days of qty=3 logs each day to keep the day "complete" → streak=14 → Phase 7 rate 1.4
         (0..13).forEach { offset ->
             val d = today.minus(offset, DateTimeUnit.DAY)
             habitLogRepo.insertLog(
@@ -111,7 +117,7 @@ class GetDayPointsUseCaseRateTest {
         )
 
         // Without rate-multiplication: pointsEarned(3.0, 1.0) = 3.
-        // If a regression rate-multiplied earn: ceil(3.0 × 1.2) = 4. Catches that case.
+        // If a regression rate-multiplied earn: ceil(3.0 × 1.4) = 5. Catches that case.
         val day = sut.execute(userId, today).getOrThrow()
         assertEquals(3, day.earned)
         assertEquals(0, day.spent)

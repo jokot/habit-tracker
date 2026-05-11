@@ -7,10 +7,9 @@ data class WantLog(
     val userId: String,
     val activityId: String,
     val quantity: Double,
+    val pointsSpent: Int,
     val deviceMode: DeviceMode,
     val loggedAt: Instant,
     val deletedAt: Instant? = null,
     val syncedAt: Instant? = null,
-) {
-    val isActive: Boolean get() = deletedAt == null
-}
+)

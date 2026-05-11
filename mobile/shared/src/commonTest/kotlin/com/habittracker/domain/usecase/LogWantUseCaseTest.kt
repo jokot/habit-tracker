@@ -33,48 +33,37 @@ class LogWantUseCaseTest {
     @Test
     fun `returns correct points spent for youtube`() = runTest {
         giveBalance(5)
-        activityRepo.activities.add(WantActivity("a1", "YouTube long-form", "minutes", 0.1))
-        val result = useCase.execute(userId, "a1", 30.0, DeviceMode.OTHER).getOrThrow()
+        // Old: 0.1 pt/min × 30 min = 3 pts. New: unitsPerPoint=10, taps=3 → 3 pts.
+        activityRepo.activities.add(WantActivity("a1", "YouTube long-form", "minutes", 10))
+        val result = useCase.execute(userId, "a1", taps = 3, deviceMode = DeviceMode.OTHER).getOrThrow()
         assertEquals(3, result.pointsSpent)
     }
 
     @Test
     fun `records device mode correctly`() = runTest {
         giveBalance(10)
-        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1.0))
-        val result = useCase.execute(userId, "a1", 10.0, DeviceMode.THIS_DEVICE).getOrThrow()
+        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1))
+        val result = useCase.execute(userId, "a1", taps = 10, deviceMode = DeviceMode.THIS_DEVICE).getOrThrow()
         assertEquals(DeviceMode.THIS_DEVICE, result.log.deviceMode)
     }
 
     @Test
     fun `fails for unknown activity`() = runTest {
-        val result = useCase.execute(userId, "unknown", 10.0, DeviceMode.OTHER)
+        val result = useCase.execute(userId, "unknown", taps = 1, deviceMode = DeviceMode.OTHER)
         assertTrue(result.isFailure)
     }
 
-    @Test
-    fun `partial-point spend rounds up to 1 pt`() = runTest {
-        giveBalance(5)
-        activityRepo.activities.add(WantActivity("a1", "YouTube long-form", "minutes", 0.1))
-        // 5 min × 0.1 = 0.5 pts → ceil = 1 pt (any positive consumption costs at least 1).
-        val result = useCase.execute(userId, "a1", 5.0, DeviceMode.OTHER).getOrThrow()
-        assertEquals(1, result.pointsSpent)
-    }
+    // Dropped: `partial-point spend rounds up to 1 pt` — under the new unitsPerPoint
+    // model, points are stamped per tap (1 pt per tap), so the decimal-cost ceiling
+    // semantics no longer exist. This is the bug being fixed.
 
-    @Test
-    fun `twitter 1 minute costs 1 pt via ceil`() = runTest {
-        giveBalance(5)
-        // Cost 0.5 pt/min (1 pt per 2 min).
-        activityRepo.activities.add(WantActivity("a1", "Twitter", "minutes", 0.5))
-        val result = useCase.execute(userId, "a1", 1.0, DeviceMode.OTHER).getOrThrow()
-        assertEquals(1, result.pointsSpent)
-    }
+    // Dropped: `twitter 1 minute costs 1 pt via ceil` — same reason as above.
 
     @Test
     fun `blocks log when balance insufficient`() = runTest {
-        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1.0))
-        // Balance 0, trying to spend 10. Reject.
-        val result = useCase.execute(userId, "a1", 10.0, DeviceMode.OTHER)
+        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1))
+        // Balance 0, trying to spend 10 pts (taps=10). Reject.
+        val result = useCase.execute(userId, "a1", taps = 10, deviceMode = DeviceMode.OTHER)
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is InsufficientPointsException)
         // And no log was written.
@@ -84,9 +73,9 @@ class LogWantUseCaseTest {
     @Test
     fun `allows spend exactly equal to balance`() = runTest {
         giveBalance(3)
-        activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 0.1))
-        // 30 × 0.1 = 3 pts, balance 3 → allowed.
-        val result = useCase.execute(userId, "a1", 30.0, DeviceMode.OTHER).getOrThrow()
+        // unitsPerPoint=10, taps=3 → 3 pts; balance 3 → allowed.
+        activityRepo.activities.add(WantActivity("a1", "YouTube", "minutes", 10))
+        val result = useCase.execute(userId, "a1", taps = 3, deviceMode = DeviceMode.OTHER).getOrThrow()
         assertEquals(3, result.pointsSpent)
     }
 }

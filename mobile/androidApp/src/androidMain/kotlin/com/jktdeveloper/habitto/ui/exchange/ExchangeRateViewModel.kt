@@ -6,6 +6,7 @@ import com.habittracker.domain.model.RateTier
 import com.habittracker.domain.model.StreakSummary
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.usecase.ExchangeRateCalculator
+import com.habittracker.domain.usecase.PointCalculator
 import com.jktdeveloper.habitto.AppContainer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,12 +14,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+data class TierCell(
+    val tierLevel: Int,
+    val unitsPerPoint: Int,
+)
+
 data class ComparisonRow(
     val activityId: String,
     val name: String,
     val unit: String,
-    val baseCostPerUnit: Double,
-    val currentCostPerUnit: Double,
+    val iconKey: String?,
+    val tiers: List<TierCell>,
 )
 
 data class ExchangeRateState(
@@ -57,12 +63,18 @@ class ExchangeRateViewModel(
             val tier = ExchangeRateCalculator.tierFor(summary.currentStreak)
             val daysToNext = ExchangeRateCalculator.daysToNextTier(summary.currentStreak)
             val comparison = activities.map { activity ->
+                val tiers = ExchangeRateCalculator.tiers.map { t ->
+                    TierCell(
+                        tierLevel = t.level,
+                        unitsPerPoint = PointCalculator.effectiveUnitsPerPoint(activity.unitsPerPoint, t.rate),
+                    )
+                }
                 ComparisonRow(
                     activityId = activity.id,
                     name = activity.name,
                     unit = activity.unit,
-                    baseCostPerUnit = activity.costPerUnit,
-                    currentCostPerUnit = activity.costPerUnit * rate,
+                    iconKey = activity.iconKey,
+                    tiers = tiers,
                 )
             }
             _state.value = ExchangeRateState(

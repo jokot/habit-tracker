@@ -50,6 +50,7 @@ import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.habittracker.data.sync.SyncReason
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import com.jktdeveloper.habitto.preferences.AppFlagsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -89,6 +90,7 @@ class AppContainer(context: Context) {
 
     val notificationPreferences = NotificationPreferences(appContext)
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
+    val appFlagsPreferences = AppFlagsPreferences(appContext)
     val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository, habitRepository)
     val notificationScheduler = NotificationScheduler(appContext, notificationPreferences)
 
@@ -152,7 +154,10 @@ class AppContainer(context: Context) {
         statsUseCase = computeIdentityStatsUseCase,
     )
     val setupUserHabitsUseCase = SetupUserHabitsUseCase(habitRepository)
-    val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(wantActivityRepository)
+    val setupUserWantActivitiesUseCase = SetupUserWantActivitiesUseCase(
+        wantActivityRepository,
+        SeedData.wantActivities,
+    )
     val pinIdentityUseCase = PinIdentityUseCase(identityRepository)
     val unpinIdentityUseCase = UnpinIdentityUseCase(identityRepository)
     val removeIdentityUseCase = RemoveIdentityUseCase(identityRepository)
@@ -191,9 +196,27 @@ class AppContainer(context: Context) {
         if (identityRepository.getAllIdentities().isEmpty()) {
             identityRepository.upsertIdentities(SeedData.identities)
         }
-        // Want activities are NOT auto-seeded — user picks their subset during
-        // onboarding's WantsStep, which writes only the selected rows scoped to
-        // currentUserId(). Home shows exactly what the user selected.
+        // For authenticated users: pull from server FIRST so reconcile sees any
+        // existing seed wants the user already owns and skips re-inserting them
+        // with fresh UUIDs. Reconcile-before-pull would push 14 random-UUID rows
+        // every install, accumulating duplicates server-side across reinstalls.
+        // Bounded timeout — failure must not block app start; reconcile then
+        // proceeds against whatever local state exists.
+        if (isAuthenticated()) {
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(5_000) {
+                    syncEngine.sync(SyncReason.POST_SIGN_IN)
+                }
+            }.onFailure { e ->
+                android.util.Log.w("AppContainer", "Pre-reconcile sync failed", e)
+            }
+        }
+        // Want activities: reconcile the canonical 14-item seed list. Name-match
+        // against existing rows means already-pulled seeds are skipped. Brand-new
+        // users (or guests pre-auth) with empty local state get the full 14
+        // inserted with fresh per-user UUIDs.
+        runCatching { setupUserWantActivitiesUseCase.reconcile(currentUserId()) }
+            .onFailure { e -> android.util.Log.w("AppContainer", "Want-activity reconcile failed", e) }
     }
 
     /**

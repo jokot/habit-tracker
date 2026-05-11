@@ -2,8 +2,10 @@ package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,17 +25,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.SmartDisplay
-import androidx.compose.material.icons.filled.SmokingRooms
-import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +64,7 @@ import com.jktdeveloper.habitto.ui.components.IdentityHue
 import com.jktdeveloper.habitto.ui.components.IdentityStrip
 import com.jktdeveloper.habitto.ui.components.SyncChip
 import com.jktdeveloper.habitto.ui.components.habitIcon
+import com.jktdeveloper.habitto.ui.components.resolveWantIcon
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.jktdeveloper.habitto.ui.theme.InterFontFamily
 import com.jktdeveloper.habitto.ui.theme.Spacing
@@ -85,6 +80,7 @@ fun HomeScreen(
     onIdentityClick: (String) -> Unit,
     onIdentitiesClick: () -> Unit,
     onOpenExchangeRate: () -> Unit = {},
+    onOpenWantDetail: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
@@ -171,6 +167,34 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
             ) {
+
+                // ── Rate-ladder migration banner ──────────────────────────────
+                item {
+                    val showBanner by viewModel.showRateLadderBanner.collectAsState()
+                    if (showBanner) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                viewModel.markRateLadderBannerSeen()
+                                onOpenExchangeRate()
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "Spend rates updated — see Exchange rate.",
+                                    modifier = Modifier.weight(1f),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                                IconButton(onClick = viewModel::markRateLadderBannerSeen) {
+                                    Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // ── Identity strip ────────────────────────────────────────────
                 item {
@@ -276,7 +300,7 @@ fun HomeScreen(
                         }
                     }
                     items(uiState.wantActivities, key = { it.id }) { activity ->
-                        val canAfford = uiState.pointBalance.balance >= perTapCostInt(activity, currentRate)
+                        val canAfford = uiState.pointBalance.balance >= 1
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = Spacing.xl)
@@ -287,9 +311,9 @@ fun HomeScreen(
                                 pending = pendingWantMap[activity.id],
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
-                                rate = currentRate,
                                 onTap = { viewModel.tapWant(activity) },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
+                                onLongPress = { onOpenWantDetail(activity.id) },
                             )
                         }
                     }
@@ -450,15 +474,16 @@ private fun HabitCard(
 
 // ── Want Activity Card ────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WantActivityCard(
     activity: WantActivity,
     pending: PendingWantLog?,
     balance: Int,
     canAfford: Boolean,
-    rate: Double,
     onTap: () -> Unit,
     onCancel: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val isPending = pending != null
     val isDark = isSystemInDarkTheme()
@@ -470,7 +495,10 @@ private fun WantActivityCard(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (!canAfford && !isPending) 0.5f else 1f)
-            .clickable(onClick = onTap)
+            .combinedClickable(
+                onClick = { onTap() },
+                onLongClick = { onLongPress() },
+            )
             .animateContentSize(),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -494,7 +522,7 @@ private fun WantActivityCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = wantIcon(activity.name),
+                        imageVector = resolveWantIcon(activity.iconKey, activity.name),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp),
@@ -531,8 +559,7 @@ private fun WantActivityCard(
                     // Subtitle
                     Spacer(Modifier.height(Spacing.xs))
                     if (pending != null) {
-                        val cost = perTapCostInt(activity, rate)
-                        val totalCost = cost * pending.count
+                        val totalCost = pending.count
                         val afterBalance = balance - totalCost
                         Row {
                             Text(
@@ -549,14 +576,14 @@ private fun WantActivityCard(
                     } else {
                         Row {
                             Text(
-                                text = "−${perTapCostInt(activity, rate)} pt",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Text(
-                                text = " / ${activity.unit}",
+                                text = "${activity.unitsPerPoint} ${activity.unit}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = " · −1 pt",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
                             )
                         }
                     }
@@ -677,25 +704,3 @@ private fun EmptyState(message: String) {
     }
 }
 
-// ── Icon mapping helpers ──────────────────────────────────────────────────────
-
-private fun wantIcon(name: String): ImageVector = when {
-    name.contains("twitter", ignoreCase = true) || name.contains("/x", ignoreCase = true) -> Icons.Default.ChatBubble
-    name.contains("instagram", ignoreCase = true) -> Icons.Default.PhotoCamera
-    name.contains("tiktok", ignoreCase = true) || name.contains("scroll", ignoreCase = true) || name.contains("reel", ignoreCase = true) || name.contains("short", ignoreCase = true) -> Icons.Default.PlayCircle
-    name.contains("youtube", ignoreCase = true) -> Icons.Default.SmartDisplay
-    name.contains("netflix", ignoreCase = true) || name.contains("stream", ignoreCase = true) -> Icons.Default.SmartDisplay
-    name.contains("reddit", ignoreCase = true) -> Icons.Default.Forum
-    name.contains("game", ignoreCase = true) || name.contains("valorant", ignoreCase = true) || name.contains("pc gaming", ignoreCase = true) -> Icons.Default.SportsEsports
-    name.contains("snack", ignoreCase = true) || name.contains("food", ignoreCase = true) || name.contains("junk", ignoreCase = true) || name.contains("donut", ignoreCase = true) || name.contains("dessert", ignoreCase = true) -> Icons.Default.Restaurant
-    name.contains("smoke", ignoreCase = true) || name.contains("smoking", ignoreCase = true) -> Icons.Default.SmokingRooms
-    name.contains("shop", ignoreCase = true) || name.contains("purchase", ignoreCase = true) -> Icons.Default.Restaurant
-    name.contains("drink", ignoreCase = true) || name.contains("sugary", ignoreCase = true) -> Icons.Default.Restaurant
-    else -> Icons.Default.MoreHoriz
-}
-
-// ── Point helpers ─────────────────────────────────────────────────────────────
-
-private fun perTapCostInt(activity: WantActivity, rate: Double): Int =
-    com.habittracker.domain.usecase.PointCalculator
-        .pointsSpentWithRate(1.0, activity.costPerUnit, rate)
