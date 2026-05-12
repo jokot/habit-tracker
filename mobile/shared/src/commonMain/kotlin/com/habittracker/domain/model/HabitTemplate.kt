@@ -6,6 +6,7 @@ data class HabitTemplate(
     val unit: String,
     val defaultThreshold: Double,
     val defaultDailyTarget: Int,
+    val iconName: String? = null,
     val isCustom: Boolean = false,
     val createdByUserId: String? = null,
 )
