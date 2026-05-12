@@ -43,7 +43,7 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
     val finished: SharedFlow<OnboardingFinishEvent> = _finished.asSharedFlow()
 
     fun toggleIdentity(identityId: String) {
-        val current = _uiState.value.selectedIdentityIds.toMutableSet()
+        val current = LinkedHashSet(_uiState.value.selectedIdentityIds)
         if (current.contains(identityId)) current.remove(identityId) else current.add(identityId)
         val newTemplates = container.getHabitTemplatesForIdentitiesUseCase.execute(current)
         val newTemplateIds = newTemplates.map { it.template.id }.toSet()
@@ -61,7 +61,7 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun toggleHabit(templateId: String) {
-        val current = _uiState.value.selectedTemplateIds.toMutableSet()
+        val current = LinkedHashSet(_uiState.value.selectedTemplateIds)
         if (current.contains(templateId)) current.remove(templateId) else current.add(templateId)
         _uiState.value = _uiState.value.copy(selectedTemplateIds = current)
     }
@@ -71,7 +71,7 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun toggleWantActivity(activityId: String) {
-        val current = _uiState.value.selectedActivityIds.toMutableSet()
+        val current = LinkedHashSet(_uiState.value.selectedActivityIds)
         if (current.contains(activityId)) current.remove(activityId) else current.add(activityId)
         _uiState.value = _uiState.value.copy(selectedActivityIds = current)
     }
