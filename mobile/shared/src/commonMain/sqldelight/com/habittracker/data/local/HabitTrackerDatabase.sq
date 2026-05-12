@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS LocalIdentity (
     id TEXT NOT NULL PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT NOT NULL,
-    icon TEXT NOT NULL
+    icon TEXT NOT NULL,
+    hue INTEGER NOT NULL DEFAULT 142
 );
 
 CREATE TABLE IF NOT EXISTS LocalUserIdentity (
@@ -161,7 +162,7 @@ UPDATE LocalHabit SET effectiveTo = :effectiveTo, updatedAt = :effectiveTo, sync
 
 -- LocalIdentity queries
 upsertIdentity:
-INSERT OR REPLACE INTO LocalIdentity (id, name, description, icon) VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO LocalIdentity (id, name, description, icon, hue) VALUES (?, ?, ?, ?, ?);
 
 getAllIdentities:
 SELECT * FROM LocalIdentity;
