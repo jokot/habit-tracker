@@ -23,13 +23,19 @@ class LocalIdentityRepository(
 
     override suspend fun getAllIdentities(): List<Identity> =
         q.getAllIdentities().executeAsList().map {
-            Identity(id = it.id, name = it.name, description = it.description, icon = it.icon)
+            Identity(id = it.id, name = it.name, description = it.description, icon = it.icon, hue = it.hue.toInt())
         }
 
     override suspend fun upsertIdentities(identities: List<Identity>) {
         q.transaction {
             identities.forEach {
-                q.upsertIdentity(id = it.id, name = it.name, description = it.description, icon = it.icon)
+                q.upsertIdentity(
+                    id = it.id,
+                    name = it.name,
+                    description = it.description,
+                    icon = it.icon,
+                    hue = it.hue.toLong(),
+                )
             }
         }
     }
@@ -40,7 +46,7 @@ class LocalIdentityRepository(
         val userIdsFlow = q.getUserIdentities(userId).asFlow().mapToList(Dispatchers.Default)
         val seedFlow = q.getAllIdentities().asFlow().mapToList(Dispatchers.Default)
         return combine(userIdsFlow, seedFlow) { userIds, seeds ->
-            val seedMap = seeds.associate { it.id to Identity(it.id, it.name, it.description, it.icon) }
+            val seedMap = seeds.associate { it.id to Identity(it.id, it.name, it.description, it.icon, it.hue.toInt()) }
             userIds.mapNotNull { seedMap[it.identityId] }
         }
     }
