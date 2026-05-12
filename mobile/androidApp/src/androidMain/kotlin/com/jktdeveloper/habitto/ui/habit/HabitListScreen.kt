@@ -144,9 +144,8 @@ private fun HabitRow(row: HabitRowItem, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 14.dp),
     ) {
-        val firstIdentityName = row.identityNames.firstOrNull()
-        val hue = if (firstIdentityName != null)
-            IdentityHue.forIdentityId(firstIdentityName.lowercase())
+        val hue = if (row.firstIdentity != null)
+            IdentityHue.forIdentity(row.firstIdentity)
         else 0f
         HabitGlyph(
             icon = habitIcon(row.habit.name),

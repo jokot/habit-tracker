@@ -65,7 +65,7 @@ fun AddIdentityStep2Screen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val selectedIdentity = state.selectedIdentity
-    val hue = IdentityHue.forIdentityId(selectedIdentity?.name?.lowercase())
+    val hue = IdentityHue.forIdentity(selectedIdentity)
     val identityName = selectedIdentity?.name ?: ""
 
     // Show error in snackbar

@@ -36,6 +36,21 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun HabitGlyph(
+    iconName: String?,
+    hue: Float = 142f,
+    size: Dp = 44.dp,
+    contentDescription: String? = null,
+) {
+    HabitGlyph(
+        icon = materialIconFor(iconName),
+        hue = hue,
+        size = size,
+        contentDescription = contentDescription,
+    )
+}
+
+@Composable
+fun HabitGlyph(
     icon: ImageVector,
     hue: Float = 142f,
     size: Dp = 44.dp,
@@ -75,27 +90,9 @@ fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
     else -> Icons.Default.Person
 }
 
-/** Identity-hue mapping. Matches IDENTITY_HUE in shared.jsx. */
+/** Identity hue source. Phase 8: prefer reading Identity.hue directly. */
 object IdentityHue {
-    const val HEALTHY = 142f
-    const val READER = 28f
-    const val MAKER = 222f
-    const val CALM = 268f
-    const val LEARNER = 188f
-    const val ATHLETE = 8f
-    const val SLEEPER = 252f
-    const val PARENT = 320f
     const val DEFAULT = 142f
-
-    fun forIdentityId(id: String?): Float = when (id) {
-        "healthy" -> HEALTHY
-        "reader" -> READER
-        "maker" -> MAKER
-        "calm" -> CALM
-        "learner" -> LEARNER
-        "athlete" -> ATHLETE
-        "sleeper" -> SLEEPER
-        "parent" -> PARENT
-        else -> DEFAULT
-    }
+    fun forIdentity(identity: com.habittracker.domain.model.Identity?): Float =
+        identity?.hue?.toFloat() ?: DEFAULT
 }
