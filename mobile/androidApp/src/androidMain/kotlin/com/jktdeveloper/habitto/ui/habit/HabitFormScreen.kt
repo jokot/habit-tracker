@@ -144,10 +144,10 @@ fun HabitFormScreen(
 
 @Composable
 private fun NameRow(state: HabitFormState, onNameChange: (String) -> Unit) {
-    val firstHueId = state.selectedIdentityIds.firstOrNull()?.let { id ->
-        state.availableIdentities.firstOrNull { it.id == id }?.name?.lowercase()
+    val firstIdentity = state.selectedIdentityIds.firstOrNull()?.let { id ->
+        state.availableIdentities.firstOrNull { it.id == id }
     }
-    val hue = if (firstHueId != null) IdentityHue.forIdentityId(firstHueId) else 0f
+    val hue = if (firstIdentity != null) IdentityHue.forIdentity(firstIdentity) else 0f
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -229,7 +229,7 @@ private fun FlowChips(content: @Composable () -> Unit) {
 
 @Composable
 private fun SelectedIdentityPill(identity: Identity, onRemove: () -> Unit) {
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     val bg = Color.hsl(hue, 0.50f, 0.94f)
     val fg = Color.hsl(hue, 0.50f, 0.30f)
     Surface(
@@ -252,7 +252,7 @@ private fun SelectedIdentityPill(identity: Identity, onRemove: () -> Unit) {
 
 @Composable
 private fun SuggestionPill(identity: Identity, onAdd: () -> Unit) {
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     Surface(
         onClick = onAdd,
         shape = RoundedCornerShape(999.dp),

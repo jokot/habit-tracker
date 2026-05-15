@@ -128,7 +128,7 @@ fun IdentityListScreen(
 private fun IdentityCard(iws: IdentityWithStats, isPinned: Boolean, onClick: () -> Unit) {
     val identity = iws.identity
     val stats = iws.stats
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     val isDark = isSystemInDarkTheme()
     val gradStart = if (isDark) Color.hsl(hue, 0.30f, 0.18f) else Color.hsl(hue, 0.30f, 0.92f)
     val gradEnd = MaterialTheme.colorScheme.surface

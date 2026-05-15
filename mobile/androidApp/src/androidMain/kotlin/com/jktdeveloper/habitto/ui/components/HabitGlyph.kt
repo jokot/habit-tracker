@@ -36,6 +36,21 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun HabitGlyph(
+    iconName: String?,
+    hue: Float = 142f,
+    size: Dp = 44.dp,
+    contentDescription: String? = null,
+) {
+    HabitGlyph(
+        icon = materialIconFor(iconName),
+        hue = hue,
+        size = size,
+        contentDescription = contentDescription,
+    )
+}
+
+@Composable
+fun HabitGlyph(
     icon: ImageVector,
     hue: Float = 142f,
     size: Dp = 44.dp,
@@ -59,6 +74,37 @@ fun HabitGlyph(
     }
 }
 
+/**
+ * Identity-style circular avatar. Dark hue bg + white icon — distinct from
+ * HabitGlyph (light bg + dark icon). Use for identity glyphs in identity cards,
+ * picked-identity pills, identity strip, etc.
+ *
+ * Mirrors the JSX IdentityAvatar from /tmp/habitto-design/habitto/project/shared.jsx.
+ * oklch(0.55 0.16 hue) bg → HSL approx: hsl(hue, 70%, 50%)
+ * #fff icon.
+ */
+@Composable
+fun IdentityAvatar(
+    iconName: String?,
+    hue: Float,
+    size: Dp = 36.dp,
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.hsl(hue = hue, saturation = 0.70f, lightness = 0.50f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = materialIconFor(iconName),
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.55f),
+        )
+    }
+}
+
 /** Map identity name → Material icon. Identity seed stores emoji in `icon` field;
  *  this resolver picks an appropriate vector icon for in-app rendering. */
 fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
@@ -75,27 +121,9 @@ fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
     else -> Icons.Default.Person
 }
 
-/** Identity-hue mapping. Matches IDENTITY_HUE in shared.jsx. */
+/** Identity hue source. Phase 8: prefer reading Identity.hue directly. */
 object IdentityHue {
-    const val HEALTHY = 142f
-    const val READER = 28f
-    const val MAKER = 222f
-    const val CALM = 268f
-    const val LEARNER = 188f
-    const val ATHLETE = 8f
-    const val SLEEPER = 252f
-    const val PARENT = 320f
     const val DEFAULT = 142f
-
-    fun forIdentityId(id: String?): Float = when (id) {
-        "healthy" -> HEALTHY
-        "reader" -> READER
-        "maker" -> MAKER
-        "calm" -> CALM
-        "learner" -> LEARNER
-        "athlete" -> ATHLETE
-        "sleeper" -> SLEEPER
-        "parent" -> PARENT
-        else -> DEFAULT
-    }
+    fun forIdentity(identity: com.habittracker.domain.model.Identity?): Float =
+        identity?.hue?.toFloat() ?: DEFAULT
 }

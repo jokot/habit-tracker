@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.HabitRepository
 import com.habittracker.data.repository.IdentityRepository
 import com.habittracker.domain.model.Habit
+import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.PerHabitStreakResult
 import com.habittracker.domain.usecase.ComputePerHabitStreakUseCase
 import com.jktdeveloper.habitto.AppContainer
@@ -22,6 +23,7 @@ sealed interface HabitDetailState {
         val habit: Habit,
         val identityNames: List<String>,
         val streak: PerHabitStreakResult,
+        val firstIdentity: Identity? = null,
     ) : HabitDetailState
 }
 
@@ -63,8 +65,14 @@ class HabitDetailViewModel private constructor(
                 val identityById = identities.associateBy { it.id }
                 val links = identityRepo.getHabitIdentityLinksForUser(userId)
                     .filter { it.habitId == habitId && it.effectiveTo == null }
-                val identityNames = links.mapNotNull { identityById[it.identityId]?.name }
-                _state.value = HabitDetailState.Loaded(habit, identityNames, streak)
+                val linkedIdentities = links.mapNotNull { identityById[it.identityId] }
+                val identityNames = linkedIdentities.map { it.name }
+                _state.value = HabitDetailState.Loaded(
+                    habit = habit,
+                    identityNames = identityNames,
+                    streak = streak,
+                    firstIdentity = linkedIdentities.firstOrNull(),
+                )
             }
         }
     }

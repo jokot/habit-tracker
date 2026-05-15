@@ -43,7 +43,7 @@ fun IdentityHubCard(identities: List<Identity>, onClick: () -> Unit) {
         EmptyHubCard(onClick = onClick)
         return
     }
-    val firstHue = IdentityHue.forIdentityId(identities.first().name.lowercase())
+    val firstHue = IdentityHue.forIdentity(identities.first())
     val isDark = isSystemInDarkTheme()
     val gradStart = if (isDark) Color.hsl(firstHue, 0.30f, 0.18f) else Color.hsl(firstHue, 0.30f, 0.92f)
     val gradEnd = MaterialTheme.colorScheme.surface
@@ -169,7 +169,7 @@ private fun StackedAvatars(identities: List<Identity>) {
             ) {
                 HabitGlyph(
                     icon = identityIcon(identity.name),
-                    hue = IdentityHue.forIdentityId(identity.name.lowercase()),
+                    hue = IdentityHue.forIdentity(identity),
                     size = 40.dp,
                 )
             }
@@ -181,7 +181,7 @@ private fun StackedAvatars(identities: List<Identity>) {
 private fun buildIAmCopy(identities: List<Identity>) = buildAnnotatedString {
     append("I am a ")
     identities.forEachIndexed { i, identity ->
-        val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+        val hue = IdentityHue.forIdentity(identity)
         val tint = Color.hsl(hue, 0.50f, 0.32f)
         if (i > 0) {
             append(if (i == identities.lastIndex) " & a " else ", a ")

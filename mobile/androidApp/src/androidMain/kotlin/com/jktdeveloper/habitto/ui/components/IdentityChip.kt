@@ -24,7 +24,7 @@ import com.habittracker.domain.model.Identity
 
 @Composable
 fun IdentityChip(identity: Identity, onClick: () -> Unit, isPinned: Boolean = false) {
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     val isDark = isSystemInDarkTheme()
     val hueTint = Color.hsl(hue, 0.60f, if (isDark) 0.65f else 0.40f)
     val pinnedBg = if (isDark) Color.hsl(hue, 0.30f, 0.18f) else Color.hsl(hue, 0.30f, 0.92f)

@@ -1,0 +1,12 @@
+-- Phase 8: Identity gains `hue` (OKLCH 0..360).
+-- Existing rows keep their current data; reconcile path on next startup
+-- overwrites icon + hue from the new canvas catalog. Per-row backfill of
+-- canonical hue is done server-side; local clients pull updated rows via sync.
+--
+-- Note: HabitTemplate is a domain-only model with no SQL table, so its new
+-- `iconName` field needs no migration. The plan/spec referenced a
+-- `LocalHabitTemplate` table that does not exist; SeedData is the source of
+-- truth for templates. If/when templates become persistent, a follow-up
+-- migration will add the table with iconName included.
+
+ALTER TABLE LocalIdentity ADD COLUMN hue INTEGER NOT NULL DEFAULT 142;

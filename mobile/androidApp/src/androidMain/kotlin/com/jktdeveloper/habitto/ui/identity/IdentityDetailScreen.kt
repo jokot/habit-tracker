@@ -133,7 +133,7 @@ private fun Body(
 ) {
     val identity = state.identity
     val stats = state.stats
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     val isDark = isSystemInDarkTheme()
     val gradStart = if (isDark) Color.hsl(hue, 0.30f, 0.18f) else Color.hsl(hue, 0.30f, 0.92f)
     val gradEnd = MaterialTheme.colorScheme.surface
@@ -466,7 +466,7 @@ private fun HabitRow(
 @Composable
 private fun OtherIdentityPill(identity: Identity) {
     val isDark = isSystemInDarkTheme()
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     val bg = if (isDark) Color.hsl(hue, 0.30f, 0.20f) else Color.hsl(hue, 0.50f, 0.94f)
     val fg = if (isDark) Color.hsl(hue, 0.30f, 0.85f) else Color.hsl(hue, 0.50f, 0.30f)
     Surface(

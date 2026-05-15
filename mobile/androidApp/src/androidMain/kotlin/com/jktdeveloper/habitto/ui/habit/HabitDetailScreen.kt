@@ -100,9 +100,8 @@ fun HabitDetailScreen(
 
 @Composable
 private fun LoadedContent(state: HabitDetailState.Loaded, contentPadding: PaddingValues) {
-    val firstIdentityName = state.identityNames.firstOrNull()
-    val hue = if (firstIdentityName != null)
-        IdentityHue.forIdentityId(firstIdentityName.lowercase())
+    val hue = if (state.firstIdentity != null)
+        IdentityHue.forIdentity(state.firstIdentity)
     else 0f
 
     LazyColumn(modifier = Modifier.padding(contentPadding).fillMaxSize()) {

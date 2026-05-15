@@ -11,9 +11,18 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.SmartDisplay
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.habittracker.data.local.SeedData
 
 fun habitIcon(name: String?): ImageVector {
     if (name == null) return Icons.Default.CheckCircle
+    // Primary: match canvas template by name → use its Material iconName so
+    // Today renders the same glyph as onboarding (single source of truth: SeedData).
+    // Falls back to keyword resolver for custom habits + names that don't match.
+    val match = SeedData.habitTemplates.values.firstOrNull {
+        it.name.equals(name, ignoreCase = true)
+    }
+    val iconName = match?.iconName
+    if (iconName != null) return materialIconFor(iconName)
     return when {
         name.contains("read", ignoreCase = true) -> Icons.AutoMirrored.Filled.MenuBook
         name.contains("water", ignoreCase = true) || name.contains("drink", ignoreCase = true) -> Icons.Default.WaterDrop

@@ -202,7 +202,7 @@ private fun IdentityCandidateTile(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val hue = IdentityHue.forIdentityId(identity.name.lowercase())
+    val hue = IdentityHue.forIdentity(identity)
     val selectedBg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.94f)
     val selectedBorder = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.50f)
     val selectedTitleFg = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.18f)
