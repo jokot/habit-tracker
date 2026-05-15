@@ -51,7 +51,7 @@ fun HabitsStep(
 ) {
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(bottom = 100.dp),
+        contentPadding = PaddingValues(bottom = 32.dp),
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
