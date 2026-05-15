@@ -3,6 +3,7 @@ package com.jktdeveloper.habitto.ui.onboarding.steps
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.Identity
-import com.jktdeveloper.habitto.ui.components.HabitGlyph
+import com.jktdeveloper.habitto.ui.components.IdentityAvatar
 
 @Composable
 fun IdentityStep(
@@ -72,9 +73,12 @@ fun IdentityStep(
 
 @Composable
 private fun InfoCard() {
+    val isDark = isSystemInDarkTheme()
+    val bg = if (isDark) Color(0xFF0E3A47) else Color(0xFFE0F7FA)
+    val fg = if (isDark) Color(0xFF4DD0E1) else Color(0xFF00838F)
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
+        color = bg,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -84,7 +88,7 @@ private fun InfoCard() {
             Icon(
                 imageVector = Icons.Default.Lightbulb,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.tertiary,
+                tint = fg,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(8.dp))
@@ -162,7 +166,7 @@ private fun IdentityCard(
                 }
             }
             Column {
-                HabitGlyph(
+                IdentityAvatar(
                     iconName = identity.icon,
                     hue = identity.hue.toFloat(),
                     size = 36.dp,

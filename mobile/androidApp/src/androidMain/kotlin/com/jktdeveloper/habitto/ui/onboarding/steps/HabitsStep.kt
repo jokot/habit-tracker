@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.TemplateWithIdentities
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
+import com.jktdeveloper.habitto.ui.components.IdentityAvatar
 
 @Composable
 fun HabitsStep(
@@ -93,7 +94,7 @@ private fun PickedIdentityPillRow(identities: List<Identity>) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 10.dp, bottom = 4.dp),
                 ) {
-                    HabitGlyph(
+                    IdentityAvatar(
                         iconName = identity.icon,
                         hue = hue,
                         size = 20.dp,

@@ -74,6 +74,37 @@ fun HabitGlyph(
     }
 }
 
+/**
+ * Identity-style circular avatar. Dark hue bg + white icon — distinct from
+ * HabitGlyph (light bg + dark icon). Use for identity glyphs in identity cards,
+ * picked-identity pills, identity strip, etc.
+ *
+ * Mirrors the JSX IdentityAvatar from /tmp/habitto-design/habitto/project/shared.jsx.
+ * oklch(0.55 0.16 hue) bg → HSL approx: hsl(hue, 70%, 50%)
+ * #fff icon.
+ */
+@Composable
+fun IdentityAvatar(
+    iconName: String?,
+    hue: Float,
+    size: Dp = 36.dp,
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.hsl(hue = hue, saturation = 0.70f, lightness = 0.50f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = materialIconFor(iconName),
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.55f),
+        )
+    }
+}
+
 /** Map identity name → Material icon. Identity seed stores emoji in `icon` field;
  *  this resolver picks an appropriate vector icon for in-app rendering. */
 fun identityIcon(name: String): ImageVector = when (name.lowercase()) {
