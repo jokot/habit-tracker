@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 enum class OnboardingStep { IDENTITY, HABITS, WANTS, SYNC }
 
@@ -103,7 +104,6 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
             val selectedTemplates = state.habitTemplates
                 .filter { it.template.id in state.selectedTemplateIds }
                 .map { it.template }
-            val selectedActivities = state.wantActivities.filter { it.id in state.selectedActivityIds }
 
             container.setupUserIdentitiesUseCase
                 .execute(userId, state.selectedIdentityIds)
@@ -123,11 +123,20 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
                     return@launch
                 }
-            container.setupUserWantActivitiesUseCase
-                .execute(userId, selectedActivities)
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
-                    return@launch
+            // Wants seeded by reconcile (AppContainer.seedLocalDataIfEmpty) with
+            // fresh per-user UUIDs — selectedActivityIds references SeedData
+            // canonical UUIDs, not the DB rows. Filter by NAME instead and hide
+            // non-picked seed wants so Today shows only the user's chosen subset.
+            val pickedNames = SeedData.wantActivities
+                .filter { it.id in state.selectedActivityIds }
+                .map { it.name.lowercase() }
+                .toSet()
+            val now = Clock.System.now()
+            container.wantActivityRepository
+                .getAllWantActivitiesForUser(userId)
+                .filter { !it.isCustom && it.hiddenAt == null && it.name.lowercase() !in pickedNames }
+                .forEach { want ->
+                    container.wantActivityRepository.hideWantActivity(want.id, userId, now)
                 }
             _finished.emit(target)
         }
