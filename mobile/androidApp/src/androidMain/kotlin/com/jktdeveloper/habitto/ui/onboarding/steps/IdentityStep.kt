@@ -6,18 +6,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,7 +32,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.Identity
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
@@ -42,10 +52,14 @@ fun IdentityStep(
         columns = GridCells.Fixed(2),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 100.dp),
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
     ) {
+        item(span = { GridItemSpan(2) }) {
+            InfoCard()
+        }
         items(identities, key = { it.id }) { identity ->
             IdentityCard(
                 identity = identity,
@@ -57,22 +71,76 @@ fun IdentityStep(
 }
 
 @Composable
+private fun InfoCard() {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lightbulb,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            val annotated = buildAnnotatedString {
+                append("Most people pick ")
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("1–3") }
+                append(" to start. You can add more later.")
+            }
+            Text(
+                text = annotated,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+private data class IdentityCardColors(
+    val bg: Color,
+    val border: Color,
+    val title: Color,
+    val desc: Color,
+    val badge: Color,
+)
+
+@Composable
+private fun cardColors(hue: Float, selected: Boolean): IdentityCardColors {
+    if (!selected) {
+        return IdentityCardColors(
+            bg = MaterialTheme.colorScheme.surface,
+            border = MaterialTheme.colorScheme.outlineVariant,
+            title = MaterialTheme.colorScheme.onSurface,
+            desc = MaterialTheme.colorScheme.onSurfaceVariant,
+            badge = Color.Transparent,
+        )
+    }
+    return IdentityCardColors(
+        bg = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.92f),
+        border = Color.hsl(hue = hue, saturation = 0.70f, lightness = 0.50f),
+        title = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.18f),
+        desc = Color.hsl(hue = hue, saturation = 0.40f, lightness = 0.30f),
+        badge = Color.hsl(hue = hue, saturation = 0.70f, lightness = 0.50f),
+    )
+}
+
+@Composable
 private fun IdentityCard(
     identity: Identity,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primaryContainer
-    else MaterialTheme.colorScheme.surface
-    val border = BorderStroke(
-        width = if (selected) 2.dp else 1.dp,
-        color = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.outlineVariant,
-    )
+    val colors = cardColors(hue = identity.hue.toFloat(), selected = selected)
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = bg,
-        border = border,
+        color = colors.bg,
+        border = BorderStroke(width = 2.dp, color = colors.border),
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Box(modifier = Modifier.padding(14.dp)) {
@@ -82,13 +150,13 @@ private fun IdentityCard(
                         .size(22.dp)
                         .align(Alignment.TopEnd)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(colors.badge),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         Icons.Default.Check,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(14.dp),
                     )
                 }
@@ -104,12 +172,13 @@ private fun IdentityCard(
                     identity.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
+                    color = colors.title,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     identity.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.desc,
                 )
             }
         }

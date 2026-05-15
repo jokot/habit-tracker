@@ -2,19 +2,25 @@ package com.jktdeveloper.habitto.ui.onboarding.steps
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -36,120 +42,68 @@ import com.jktdeveloper.habitto.ui.components.HabitGlyph
 
 @Composable
 fun HabitsStep(
+    pickedIdentities: List<Identity>,
     templates: List<TemplateWithIdentities>,
-    selectedIdentityIds: Set<String>,
     selectedTemplateIds: Set<String>,
     onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Group each template by its PRIMARY identity = first identity in pick order
-    // (selectedIdentityIds) that recommends the template. Fall back to first
-    // recommender if no overlap (shouldn't happen — VM filters to picked identities).
-    val orderedIds = selectedIdentityIds.toList()
-    val grouped: Map<Identity, List<TemplateWithIdentities>> = templates
-        .mapNotNull { item ->
-            val primary = orderedIds.firstNotNullOfOrNull { iid ->
-                item.recommendedBy.firstOrNull { it.id == iid }
-            } ?: item.recommendedBy.firstOrNull()
-            primary?.let { it to item }
-        }
-        .groupBy({ it.first }, { it.second })
-
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 100.dp),
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
     ) {
-        orderedIds.forEach { iid ->
-            val primaryIdentity = grouped.keys.firstOrNull { it.id == iid } ?: return@forEach
-            val sectionItems = grouped[primaryIdentity] ?: return@forEach
-            if (sectionItems.isEmpty()) return@forEach
-            item(key = "header-$iid") {
-                Text(
-                    primaryIdentity.name.uppercase(),
-                    fontSize = 11.sp,
-                    letterSpacing = 0.6.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                )
+        if (pickedIdentities.isNotEmpty()) {
+            item(key = "picked-identities") {
+                PickedIdentityPillRow(pickedIdentities)
+                Spacer(Modifier.height(4.dp))
             }
-            items(sectionItems, key = { it.template.id }) { item ->
-                HabitRow(
-                    item = item,
-                    primaryIdentity = primaryIdentity,
-                    selected = item.template.id in selectedTemplateIds,
-                    onClick = { onToggle(item.template.id) },
-                )
-            }
+        }
+        items(templates, key = { it.template.id }) { item ->
+            val primaryIdentity = pickedIdentities.firstOrNull { id ->
+                item.recommendedBy.any { it.id == id.id }
+            } ?: item.recommendedBy.firstOrNull()
+            HabitRow(
+                item = item,
+                primaryIdentity = primaryIdentity,
+                selected = item.template.id in selectedTemplateIds,
+                onClick = { onToggle(item.template.id) },
+            )
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HabitRow(
-    item: TemplateWithIdentities,
-    primaryIdentity: Identity,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val bg = if (selected) MaterialTheme.colorScheme.primaryContainer
-    else MaterialTheme.colorScheme.surface
-    val border = BorderStroke(
-        width = 1.dp,
-        color = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.outlineVariant,
-    )
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = bg,
-        border = border,
-        modifier = Modifier.clickable(onClick = onClick),
+private fun PickedIdentityPillRow(identities: List<Identity>) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HabitGlyph(
-                iconName = item.template.iconName,
-                hue = primaryIdentity.hue.toFloat(),
-                size = 40.dp,
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    item.template.name,
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    "Target ${item.template.defaultDailyTarget} ${item.template.unit} · ${item.template.defaultThreshold.toInt()} per pt",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                val otherNames = item.recommendedBy
-                    .filter { it.id != primaryIdentity.id }
-                    .map { it.name }
-                if (otherNames.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    AlsoForPill(otherNames = otherNames)
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-                    ),
-                contentAlignment = Alignment.Center,
+        identities.forEach { identity ->
+            val hue = identity.hue.toFloat()
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.94f),
             ) {
-                if (selected) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp),
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 10.dp, bottom = 4.dp),
+                ) {
+                    HabitGlyph(
+                        iconName = identity.icon,
+                        hue = hue,
+                        size = 20.dp,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        identity.name,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.18f),
                     )
                 }
             }
@@ -158,18 +112,108 @@ private fun HabitRow(
 }
 
 @Composable
-private fun AlsoForPill(otherNames: List<String>) {
+private fun HabitRow(
+    item: TemplateWithIdentities,
+    primaryIdentity: Identity?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val primaryHue = primaryIdentity?.hue?.toFloat() ?: 142f
+    val selectedColor = Color.hsl(hue = primaryHue, saturation = 0.70f, lightness = 0.50f)
+    val borderColor = if (selected) selectedColor else MaterialTheme.colorScheme.outlineVariant
     Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(width = 2.dp, color = borderColor),
+        modifier = Modifier.clickable(onClick = onClick),
     ) {
-        Text(
-            "Also for ${otherNames.joinToString(", ")}",
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 0.4.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-        )
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            HabitCheckbox(
+                selected = selected,
+                selectedColor = selectedColor,
+            )
+            HabitGlyph(
+                iconName = item.template.iconName,
+                hue = primaryHue,
+                size = 40.dp,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    item.template.name,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    "${item.template.defaultDailyTarget} × ${item.template.defaultThreshold.toInt()} ${item.template.unit}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (item.recommendedBy.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    RecommendedByPills(item.recommendedBy.toList())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitCheckbox(selected: Boolean, selectedColor: Color) {
+    val borderColor = if (selected) selectedColor else MaterialTheme.colorScheme.outline
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (selected) selectedColor else Color.Transparent)
+            .border(width = 2.dp, color = borderColor, shape = RoundedCornerShape(6.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecommendedByPills(identities: List<Identity>) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        identities.forEach { identity ->
+            val hue = identity.hue.toFloat()
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color.hsl(hue = hue, saturation = 0.30f, lightness = 0.95f),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 3.dp, top = 2.dp, end = 7.dp, bottom = 2.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color.hsl(hue = hue, saturation = 0.70f, lightness = 0.50f)),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        identity.name.substringBefore(' '),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.22f),
+                    )
+                }
+            }
+        }
     }
 }

@@ -75,17 +75,25 @@ private fun WantRow(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val iconBoxBg = if (selected)
+                MaterialTheme.colorScheme.onErrorContainer
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+            val iconTint = if (selected)
+                MaterialTheme.colorScheme.errorContainer
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(iconBoxBg),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     resolveWantIcon(want.iconKey, want.name),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = iconTint,
                     modifier = Modifier.size(20.dp),
                 )
             }

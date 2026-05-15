@@ -41,12 +41,12 @@ private data class StepCopy(val title: String, val subtitle: String)
 
 private fun stepCopy(step: OnboardingStep) = when (step) {
     OnboardingStep.IDENTITY -> StepCopy(
-        title = "Who do you want to become?",
-        subtitle = "Choose an identity. Habitto suggests habits that support it.",
+        title = "Who are you becoming?",
+        subtitle = "Pick everyone that's true. You'll see habits for each.",
     )
     OnboardingStep.HABITS -> StepCopy(
         title = "Pick habits that prove it.",
-        subtitle = "Each habit earns points. Stay above your daily target to bank them.",
+        subtitle = "One list, deduped. Some habits work for more than one identity you picked.",
     )
     OnboardingStep.WANTS -> StepCopy(
         title = "What pulls you away?",
@@ -157,15 +157,19 @@ fun OnboardingScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             )
-            OnboardingStep.HABITS -> HabitsStep(
-                templates = uiState.habitTemplates,
-                selectedIdentityIds = uiState.selectedIdentityIds,
-                selectedTemplateIds = uiState.selectedTemplateIds,
-                onToggle = viewModel::toggleHabit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-            )
+            OnboardingStep.HABITS -> {
+                val pickedIdentities = uiState.selectedIdentityIds.toList()
+                    .mapNotNull { id -> uiState.identities.firstOrNull { it.id == id } }
+                HabitsStep(
+                    pickedIdentities = pickedIdentities,
+                    templates = uiState.habitTemplates,
+                    selectedTemplateIds = uiState.selectedTemplateIds,
+                    onToggle = viewModel::toggleHabit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                )
+            }
             OnboardingStep.WANTS -> WantsStep(
                 wants = uiState.wantActivities,
                 selectedIds = uiState.selectedActivityIds,
