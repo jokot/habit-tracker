@@ -1,0 +1,14 @@
+-- Phase 9: LocalWantTimer (local-only, no sync). Single-row-at-a-time semantics
+-- enforced in repo layer — starting a new timer cancels the previous.
+
+CREATE TABLE IF NOT EXISTS LocalWantTimer (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    activityId TEXT NOT NULL,
+    durationSec INTEGER NOT NULL,
+    startedAt INTEGER NOT NULL,
+    endsAt INTEGER NOT NULL,
+    state TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_wanttimer_user_state ON LocalWantTimer(userId, state);
