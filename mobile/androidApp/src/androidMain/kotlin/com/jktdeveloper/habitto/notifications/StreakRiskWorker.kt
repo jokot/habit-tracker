@@ -23,6 +23,7 @@ class StreakRiskWorker(
         val app = applicationContext.applicationContext as HabitTrackerApplication
         val container = app.container
         val prefs = container.notificationPreferences.current()
+        if (!prefs.masterEnabled) return@runCatching Result.success()
         if (!prefs.streakRiskEnabled) return@runCatching Result.success()
         if (!PermissionUtils.hasNotificationPermission(applicationContext)) return@runCatching Result.success()
 
@@ -38,10 +39,10 @@ class StreakRiskWorker(
         val summary = container.computeStreakUseCase.computeSummaryNow(userId)
         if (summary.currentStreak <= 0) return@runCatching Result.success()
 
-        val builder = NotificationCompat.Builder(applicationContext, NotificationChannels.STREAK_RISK)
+        val builder = NotificationCompat.Builder(applicationContext, NotificationChannels.ALERT)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Habitto")
-            .setContentText("${summary.currentStreak}-day streak at risk. Log a habit before midnight.")
+            .setContentText("${summary.currentStreak}-day streak at risk — log before midnight.")
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
         NotificationManagerCompat.from(applicationContext).notify(NOTIF_ID, builder.build())
