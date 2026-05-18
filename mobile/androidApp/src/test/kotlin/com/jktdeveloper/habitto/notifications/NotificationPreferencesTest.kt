@@ -33,7 +33,13 @@ class NotificationPreferencesTest {
 
     @Test fun `defaults match spec`() = runTest {
         val snap = prefs.flow.first()
-        assertEquals(NotificationPrefs.DEFAULT, snap)
+        assertEquals(true, snap.masterEnabled)
+        assertEquals(true, snap.dailyReminderEnabled)
+        assertEquals(9 * 60, snap.dailyReminderMinutes)
+        assertEquals(true, snap.streakRiskEnabled)
+        assertEquals(21 * 60, snap.streakRiskMinutes)
+        assertEquals(true, snap.streakFrozenEnabled)
+        assertEquals(true, snap.streakResetEnabled)
     }
 
     @Test fun `toggle daily reminder persists`() = runTest {
@@ -52,5 +58,25 @@ class NotificationPreferencesTest {
         val prefs = NotificationPreferences(context)
         prefs.setMasterEnabled(false)
         assertEquals(false, prefs.flow.first().masterEnabled)
+    }
+
+    @Test fun `defaults include every NotificationTypeId with the catalog default`() = runTest {
+        val snap = prefs.flow.first()
+        for (t in NotificationTypeId.values()) {
+            assertEquals(t.defaultEnabled, snap.isEnabled(t))
+            if (t.hasTime) {
+                assertEquals(t.defaultMinutesOfDay, snap.minutesOfDay(t))
+            }
+        }
+    }
+
+    @Test fun `setTypeEnabled persists per-type toggle`() = runTest {
+        prefs.setTypeEnabled(NotificationTypeId.MILESTONE_STREAK, false)
+        assertEquals(false, prefs.flow.first().isEnabled(NotificationTypeId.MILESTONE_STREAK))
+    }
+
+    @Test fun `setTypeMinutesOfDay clamps over-range value`() = runTest {
+        prefs.setTypeMinutesOfDay(NotificationTypeId.DAILY_REMINDER, 3000)
+        assertEquals(1439, prefs.flow.first().minutesOfDay(NotificationTypeId.DAILY_REMINDER))
     }
 }
