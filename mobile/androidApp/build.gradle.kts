@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.compose.activity)
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.service)
     implementation(libs.navigation.compose)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.datastore.preferences)

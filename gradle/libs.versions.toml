@@ -42,6 +42,7 @@ compose-material-icons-extended = { module = "androidx.compose.material:material
 compose-activity = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }
 androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workmanager" }
