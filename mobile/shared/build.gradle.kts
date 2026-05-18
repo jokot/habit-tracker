@@ -13,6 +13,8 @@ kotlin {
         }
     }
 
+    jvm()
+
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -42,6 +44,14 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
+        }
+
+        jvmMain.dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
+        }
+
+        jvmTest.dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
         }
 
         androidMain.dependencies {
