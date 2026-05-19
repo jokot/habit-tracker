@@ -70,6 +70,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
@@ -375,6 +376,25 @@ class AppContainer(context: Context) {
         }
     }
 
+    private fun startPerIdentityReconciler() {
+        applicationScope.launch {
+            var previous: Set<String> = emptySet()
+            combine(
+                identityRepository.observeUserIdentities(currentUserId()),
+                notificationPreferences.flow,
+            ) { ids, prefs -> ids to prefs }
+                .collect { (identities, prefs) ->
+                    val active = if (
+                        prefs.masterEnabled
+                        && prefs.isEnabled(NotificationTypeId.DAILY_REMINDER_PER_IDENTITY)
+                    ) identities.map { it.id }.toSet() else emptySet()
+                    val minutes = prefs.minutesOfDay(NotificationTypeId.DAILY_REMINDER_PER_IDENTITY) ?: (17 * 60 + 30)
+                    perIdentityReminderScheduler.reconcile(active, minutes, previous)
+                    previous = active
+                }
+        }
+    }
+
     private fun fireSystemNotif(id: Int, body: String) {
         val builder = NotificationCompat.Builder(appContext, NotificationChannels.SYSTEM)
             .setSmallIcon(com.jktdeveloper.habitto.R.drawable.ic_notification)
@@ -399,5 +419,6 @@ class AppContainer(context: Context) {
         }
         startSessionGuard()
         startSyncNotifier()
+        startPerIdentityReconciler()
     }
 }
