@@ -134,6 +134,45 @@ fun WantDetailScreen(
                 timesLogged = state.timesLogged7d,
             )
 
+            state.activeTimer?.let { _ ->
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Timer running · ${state.timerRemainingMmSs ?: "--:--"}",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        TextButton(onClick = viewModel::cancelTimer) {
+                            Text("Cancel", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+                }
+            }
+
+            if (state.activeTimer == null) {
+                Spacer(Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = viewModel::showDurationSheet,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .height(48.dp),
+                ) {
+                    Text("Start timer", fontWeight = FontWeight.SemiBold)
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
             FilledTonalButton(
                 onClick = onEdit,
@@ -237,6 +276,25 @@ fun WantDetailScreen(
                     OutlinedButton(onClick = { pendingDelete = false }) { Text("Cancel") }
                 },
             )
+        }
+
+        if (state.showDurationSheet) {
+            androidx.compose.material3.ModalBottomSheet(onDismissRequest = viewModel::dismissDurationSheet) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("How long?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(12.dp))
+                    val durations = listOf(5, 10, 15, 20, 30, 60)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        durations.forEach { mins ->
+                            androidx.compose.material3.AssistChip(
+                                onClick = { viewModel.startTimer(mins * 60) },
+                                label = { Text("$mins min") },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
         }
     }
 }
