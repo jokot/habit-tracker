@@ -4,8 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantLogRepository
+import com.habittracker.data.repository.WantTimerRepository
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.WantTimer
 import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.timer.WantTimerController
+import com.jktdeveloper.habitto.timer.WantTimerService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,12 +36,17 @@ data class WantDetailUi(
     val timesLogged7d: Int = 0,
     val timeline: List<DayLogs> = emptyList(),
     val toast: String? = null,
+    val activeTimer: WantTimer? = null,
+    val timerRemainingMmSs: String? = null,
+    val showDurationSheet: Boolean = false,
 )
 
 class WantDetailViewModel private constructor(
     private val activityId: String,
     private val wantActivityRepo: WantActivityRepository,
     private val wantLogRepo: WantLogRepository,
+    private val timerController: WantTimerController,
+    private val timerRepo: WantTimerRepository,
     private val userIdProvider: () -> String,
     private val clock: Clock = Clock.System,
     private val tz: TimeZone = TimeZone.currentSystemDefault(),
@@ -49,10 +59,40 @@ class WantDetailViewModel private constructor(
         activityId = activityId,
         wantActivityRepo = container.wantActivityRepository,
         wantLogRepo = container.wantLogRepository,
+        timerController = WantTimerController(container.appContext, container.wantTimerRepository),
+        timerRepo = container.wantTimerRepository,
         userIdProvider = { container.currentUserId() },
     )
 
-    init { reload() }
+    init { reload(); observeTimer() }
+
+    fun showDurationSheet() { _state.update { it.copy(showDurationSheet = true) } }
+    fun dismissDurationSheet() { _state.update { it.copy(showDurationSheet = false) } }
+
+    fun startTimer(durationSec: Int) {
+        viewModelScope.launch {
+            timerController.start(userIdProvider(), activityId, durationSec)
+            _state.update { it.copy(showDurationSheet = false) }
+        }
+    }
+
+    fun cancelTimer() {
+        viewModelScope.launch { timerController.cancel(userIdProvider()) }
+    }
+
+    private fun observeTimer() {
+        viewModelScope.launch {
+            while (true) {
+                val active = timerRepo.getActive(userIdProvider())
+                val remainingMmSs = active?.let {
+                    val remainSec = (it.endsAt - clock.now()).inWholeSeconds.coerceAtLeast(0).toInt()
+                    WantTimerService.formatMmSs(remainSec)
+                }
+                _state.update { it.copy(activeTimer = active, timerRemainingMmSs = remainingMmSs) }
+                delay(1000L)
+            }
+        }
+    }
 
     fun reload() {
         viewModelScope.launch {
@@ -96,10 +136,6 @@ class WantDetailViewModel private constructor(
                 )
             }
         }
-    }
-
-    fun onTimerStub() {
-        _state.update { it.copy(toast = "Timer coming soon.") }
     }
 
     fun consumeToast() {
