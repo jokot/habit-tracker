@@ -78,6 +78,7 @@ sealed class Screen(val route: String) {
         const val ARG_ID = "wantId"
         fun route(id: String? = null) = if (id == null) "want_form" else "want_form?wantId=$id"
     }
+    object NotificationsSettings : Screen("notifications-settings")
 }
 
 @Composable
@@ -227,9 +228,20 @@ fun AppNavigation(container: AppContainer) {
                     onSignOut = { vm.beginSignOut() },
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onBack = { navController.popBackStack() },
+                    onOpenNotificationsSettings = { navController.navigate(Screen.NotificationsSettings.route) },
                     onOpenDevTools = if (com.jktdeveloper.habitto.BuildConfig.DEBUG) {
                         { navController.navigate(Screen.DevTools.route) }
                     } else null,
+                )
+            }
+
+            composable(Screen.NotificationsSettings.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.settings.NotificationsSettingsViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.settings.NotificationsSettingsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
 

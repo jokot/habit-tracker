@@ -42,6 +42,7 @@ fun SettingsScreen(
     onSignOut: () -> Unit,
     onSignIn: () -> Unit,
     onBack: () -> Unit,
+    onOpenNotificationsSettings: (() -> Unit)? = null,
     onOpenDevTools: (() -> Unit)? = null,
 ) {
     val prefs by viewModel.prefs.collectAsState()
@@ -94,6 +95,22 @@ fun SettingsScreen(
 
         // ── Notifications section ─────────────────────────────────────────────
         SettingsSection(title = "Notifications") {
+            if (onOpenNotificationsSettings != null) {
+                SettingsRow(
+                    title = "Notifications",
+                    supporting = "Daily reminders, alerts, status, system",
+                    trailing = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    onClick = onOpenNotificationsSettings,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
             val masterParentEnabled = permissionGranted
             SettingsRow(
                 title = "All notifications",
