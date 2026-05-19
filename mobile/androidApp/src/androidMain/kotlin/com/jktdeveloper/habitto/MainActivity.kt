@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             HabitTrackerTheme {
                 AppNavigation(container = container)
+                com.jktdeveloper.habitto.ui.onboarding.NotificationPermissionPromptHost()
             }
         }
     }
