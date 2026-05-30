@@ -59,7 +59,7 @@ class WantDetailViewModel private constructor(
         activityId = activityId,
         wantActivityRepo = container.wantActivityRepository,
         wantLogRepo = container.wantLogRepository,
-        timerController = WantTimerController(container.appContext, container.wantTimerRepository),
+        timerController = container.wantTimerController,
         timerRepo = container.wantTimerRepository,
         userIdProvider = { container.currentUserId() },
     )
@@ -77,7 +77,10 @@ class WantDetailViewModel private constructor(
     }
 
     fun cancelTimer() {
-        viewModelScope.launch { timerController.cancel(userIdProvider()) }
+        viewModelScope.launch {
+            timerController.cancelWithPartialLog(userIdProvider())
+            timerController.signalServiceStop()
+        }
     }
 
     private fun observeTimer() {

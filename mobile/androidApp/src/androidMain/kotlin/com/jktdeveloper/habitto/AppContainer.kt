@@ -151,6 +151,12 @@ class AppContainer(context: Context) {
         getPointBalanceUseCase = getPointBalanceUseCase,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
     )
+    val wantTimerController = com.jktdeveloper.habitto.timer.WantTimerController(
+        context = appContext,
+        repository = wantTimerRepository,
+        wantActivityRepository = wantActivityRepository,
+        logWantUseCase = logWantUseCase,
+    )
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
     val isOnboardedUseCase = IsOnboardedUseCase(habitRepository)
