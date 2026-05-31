@@ -8,6 +8,7 @@ import com.habittracker.data.repository.WantTimerRepository
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.WantTimer
 import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.timer.CancelResult
 import com.jktdeveloper.habitto.timer.WantTimerController
 import com.jktdeveloper.habitto.timer.WantTimerService
 import kotlinx.coroutines.delay
@@ -38,7 +39,19 @@ data class WantDetailUi(
     val toast: String? = null,
     val activeTimer: WantTimer? = null,
     val timerRemainingMmSs: String? = null,
+    val activeTimerActivityName: String? = null,
+    val activeTimerElapsedMin: Int = 0,
+    val activeTimerMinutesLeft: Int = 0,
     val showDurationSheet: Boolean = false,
+    val pendingOverlap: PendingOverlap? = null,
+    val navigateToTimerActivityId: String? = null,
+)
+
+data class PendingOverlap(
+    val otherWantName: String,
+    val elapsedMin: Int,
+    val minutesLeft: Int,
+    val desiredDurationSec: Int,
 )
 
 class WantDetailViewModel private constructor(
@@ -68,30 +81,116 @@ class WantDetailViewModel private constructor(
 
     fun showDurationSheet() { _state.update { it.copy(showDurationSheet = true) } }
     fun dismissDurationSheet() { _state.update { it.copy(showDurationSheet = false) } }
+    fun dismissOverlap() { _state.update { it.copy(pendingOverlap = null) } }
+    fun consumeNavigation() { _state.update { it.copy(navigateToTimerActivityId = null) } }
 
-    fun startTimer(durationSec: Int) {
+    fun requestStartTimer(durationSec: Int) {
         viewModelScope.launch {
-            timerController.start(userIdProvider(), activityId, durationSec)
-            _state.update { it.copy(showDurationSheet = false) }
+            val userId = userIdProvider()
+            val active = timerRepo.getActive(userId)
+            if (active != null && active.activityId != activityId) {
+                val otherWant = wantActivityRepo
+                    .getAllWantActivitiesForUser(userId)
+                    .firstOrNull { it.id == active.activityId }
+                val elapsedMin = ((clock.now() - active.startedAt).inWholeSeconds / 60).coerceAtLeast(0).toInt()
+                val minutesLeft = ((active.endsAt - clock.now()).inWholeSeconds / 60).coerceAtLeast(0).toInt()
+                _state.update {
+                    it.copy(
+                        showDurationSheet = false,
+                        pendingOverlap = PendingOverlap(
+                            otherWantName = otherWant?.name ?: "another want",
+                            elapsedMin = elapsedMin,
+                            minutesLeft = minutesLeft,
+                            desiredDurationSec = durationSec,
+                        ),
+                    )
+                }
+            } else {
+                doStart(durationSec)
+            }
+        }
+    }
+
+    fun confirmReplace() {
+        viewModelScope.launch {
+            val pending = _state.value.pendingOverlap ?: return@launch
+            timerController.cancelWithPartialLog(userIdProvider())
+            timerController.signalServiceStop()
+            _state.update { it.copy(pendingOverlap = null) }
+            doStart(pending.desiredDurationSec)
+        }
+    }
+
+    private suspend fun doStart(durationSec: Int) {
+        timerController.start(userIdProvider(), activityId, durationSec)
+        _state.update {
+            it.copy(
+                showDurationSheet = false,
+                navigateToTimerActivityId = activityId,
+            )
         }
     }
 
     fun cancelTimer() {
         viewModelScope.launch {
-            timerController.cancelWithPartialLog(userIdProvider())
+            val result = timerController.cancelWithPartialLog(userIdProvider())
             timerController.signalServiceStop()
+            val toast = when (result) {
+                is CancelResult.Logged -> "Logged ${result.minutes} min · −${result.pointsSpent} pt"
+                CancelResult.Discarded -> "Timer cancelled"
+                CancelResult.NoActiveTimer -> null
+            }
+            _state.update { it.copy(toast = toast) }
         }
+    }
+
+    fun openTimerScreen() {
+        _state.update { it.copy(navigateToTimerActivityId = activityId) }
+    }
+
+    @Deprecated("Use requestStartTimer for overlap detection", ReplaceWith("requestStartTimer(durationSec)"))
+    fun startTimer(durationSec: Int) = requestStartTimer(durationSec)
+
+    private data class TimerSnapshot(
+        val remainingMmSs: String?,
+        val otherName: String?,
+        val elapsedMin: Int,
+        val minLeft: Int,
+    )
+
+    private suspend fun snapshot(userId: String, active: WantTimer?): TimerSnapshot {
+        if (active == null) return TimerSnapshot(null, null, 0, 0)
+        val remainSec = (active.endsAt - clock.now()).inWholeSeconds.coerceAtLeast(0).toInt()
+        val totalMin = (active.durationSec / 60).coerceAtLeast(1)
+        val minLeft = ((remainSec + 59) / 60)
+        val elapsedMin = (totalMin - minLeft).coerceAtLeast(0)
+        val otherName = if (active.activityId == activityId) null else {
+            wantActivityRepo.getAllWantActivitiesForUser(userId)
+                .firstOrNull { it.id == active.activityId }?.name
+        }
+        return TimerSnapshot(
+            remainingMmSs = WantTimerService.formatMmSs(remainSec),
+            otherName = otherName,
+            elapsedMin = elapsedMin,
+            minLeft = minLeft,
+        )
     }
 
     private fun observeTimer() {
         viewModelScope.launch {
             while (true) {
-                val active = timerRepo.getActive(userIdProvider())
-                val remainingMmSs = active?.let {
-                    val remainSec = (it.endsAt - clock.now()).inWholeSeconds.coerceAtLeast(0).toInt()
-                    WantTimerService.formatMmSs(remainSec)
+                val userId = userIdProvider()
+                val active = timerRepo.getActive(userId)
+                val snap = snapshot(userId, active)
+                _state.update {
+                    it.copy(
+                        activeTimer = active,
+                        timerRemainingMmSs = snap.remainingMmSs,
+                        activeTimerActivityName = snap.otherName,
+                        activeTimerElapsedMin = snap.elapsedMin,
+                        activeTimerMinutesLeft = snap.minLeft,
+                    )
                 }
-                _state.update { it.copy(activeTimer = active, timerRemainingMmSs = remainingMmSs) }
                 delay(1000L)
             }
         }
