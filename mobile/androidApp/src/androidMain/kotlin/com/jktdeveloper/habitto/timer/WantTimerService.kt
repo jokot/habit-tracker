@@ -3,6 +3,7 @@ package com.jktdeveloper.habitto.timer
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -40,12 +41,28 @@ class WantTimerService : LifecycleService() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
+            ACTION_STOP_PARTIAL_LOG -> {
+                tickJob?.cancel()
+                val container = (applicationContext as HabitTrackerApplication).container
+                lifecycleScope.launch {
+                    runCatching { container.wantTimerController.cancelWithPartialLog(container.currentUserId()) }
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
+            }
         }
         return START_NOT_STICKY
     }
 
     private fun startForegroundForTimer() {
-        val n = buildRunningNotification(remaining = "starting…", activityName = null)
+        val n = buildRunningNotification(
+            activityName = null,
+            activityId = null,
+            minLeft = 0,
+            elapsedMin = 0,
+            totalMin = 1,
+            pointsSpent = 0,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIF_RUNNING_ID, n,
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -74,8 +91,22 @@ class WantTimerService : LifecycleService() {
                 onTimerFinished(current, activityName)
                 break
             }
+            val totalMin = (initial.durationSec / 60).coerceAtLeast(1)
+            val minLeft = ((remainingSec + 59) / 60).toInt()
+            val elapsedMin = (totalMin - minLeft).coerceAtLeast(0)
+            val pointsSpent = elapsedMin / ((activity?.unitsPerPoint ?: 1).coerceAtLeast(1))
             NotificationManagerCompat.from(applicationContext)
-                .notify(NOTIF_RUNNING_ID, buildRunningNotification(formatMmSs(remainingSec.toInt()), activityName))
+                .notify(
+                    NOTIF_RUNNING_ID,
+                    buildRunningNotification(
+                        activityName = activityName,
+                        activityId = initial.activityId,
+                        minLeft = minLeft,
+                        elapsedMin = elapsedMin,
+                        totalMin = totalMin,
+                        pointsSpent = pointsSpent,
+                    ),
+                )
             val tickDelay = ((remainingSec % 60).coerceAtLeast(1) * 1000L).coerceAtMost(60_000L)
             delay(tickDelay)
         }
@@ -116,35 +147,51 @@ class WantTimerService : LifecycleService() {
                 .setContentText("$activityName timer finished$pointsSegment")
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setContentIntent(openAppPendingIntent())
+                .setContentIntent(openTimerScreenPendingIntent(null))
             NotificationManagerCompat.from(applicationContext).notify(NOTIF_END_ID, builder.build())
         }
     }
 
-    private fun buildRunningNotification(remaining: String, activityName: String?): Notification {
-        val cancelIntent = Intent(this, WantTimerService::class.java).apply { action = ACTION_STOP }
+    private fun buildRunningNotification(
+        activityName: String?,
+        activityId: String?,
+        minLeft: Int,
+        elapsedMin: Int,
+        totalMin: Int,
+        pointsSpent: Int,
+    ): Notification {
+        val cancelIntent = Intent(this, WantTimerService::class.java).apply { action = ACTION_STOP_PARTIAL_LOG }
         val cancelPi = PendingIntent.getService(
             this, 0, cancelIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val title = activityName?.let { "$it timer" } ?: "Want timer"
+        val body = "$minLeft min left · −$pointsSpent pt spent"
         return NotificationCompat.Builder(this, NotificationChannels.WANT_TIMER_RUNNING)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
-            .setContentText("$remaining remaining")
+            .setContentText(body)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(openAppPendingIntent())
+            .setProgress(totalMin.coerceAtLeast(1), elapsedMin, false)
+            .setContentIntent(openTimerScreenPendingIntent(activityId))
             .addAction(0, "Cancel", cancelPi)
             .build()
     }
 
-    private fun openAppPendingIntent(): PendingIntent {
-        val intent = Intent(this, MainActivity::class.java)
+    private fun openTimerScreenPendingIntent(activityId: String?): PendingIntent {
+        val uri = if (activityId != null) {
+            Uri.parse("com.jktdeveloper.habitto://want-timer/$activityId")
+        } else {
+            Uri.parse("com.jktdeveloper.habitto://want-timer")
+        }
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+            .setClass(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val requestCode = (activityId?.hashCode() ?: 0) and 0xffff
         return PendingIntent.getActivity(
-            this, 1, intent,
+            this, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
@@ -152,6 +199,7 @@ class WantTimerService : LifecycleService() {
     companion object {
         const val ACTION_START = "com.jktdeveloper.habitto.timer.START"
         const val ACTION_STOP = "com.jktdeveloper.habitto.timer.STOP"
+        const val ACTION_STOP_PARTIAL_LOG = "com.jktdeveloper.habitto.timer.STOP_PARTIAL_LOG"
         const val EXTRA_TIMER_ID = "timer_id"
         const val NOTIF_RUNNING_ID = 4201
         const val NOTIF_END_ID = 4202
