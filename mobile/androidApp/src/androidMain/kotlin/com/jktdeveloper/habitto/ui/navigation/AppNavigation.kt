@@ -301,6 +301,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(Screen.WantForm.route(wantId)) },
+                    onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },
                 )
             }
 

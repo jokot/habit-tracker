@@ -3,12 +3,14 @@ package com.jktdeveloper.habitto.ui.want
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,12 +19,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -71,6 +78,7 @@ fun WantDetailScreen(
     viewModel: WantDetailViewModel,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onOpenTimer: (activityId: String) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -84,6 +92,13 @@ fun WantDetailScreen(
             Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
             viewModel.consumeToast()
             if (toast == "Hidden" || toast == "Deleted") onBack()
+        }
+    }
+    val navTarget = state.navigateToTimerActivityId
+    LaunchedEffect(navTarget) {
+        if (navTarget != null) {
+            viewModel.consumeNavigation()
+            onOpenTimer(navTarget)
         }
     }
     var pendingDelete by remember { mutableStateOf(false) }
@@ -134,42 +149,35 @@ fun WantDetailScreen(
                 timesLogged = state.timesLogged7d,
             )
 
-            state.activeTimer?.let { _ ->
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            val isActiveThisWant = state.activeTimer != null && state.activeTimer!!.activityId == want.id
+            val isMinUnit = want.unit == "min"
+
+            when {
+                isActiveThisWant -> {
+                    Spacer(Modifier.height(8.dp))
+                    ActiveThisWantBanner(
+                        remainingMmSs = state.timerRemainingMmSs ?: "--:--",
+                        onBannerTap = viewModel::openTimerScreen,
+                        onCancel = viewModel::cancelTimer,
+                    )
+                }
+                isMinUnit -> {
+                    Spacer(Modifier.height(8.dp))
+                    FilledTonalButton(
+                        onClick = viewModel::showDurationSheet,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(52.dp),
                     ) {
-                        Text(
-                            "Timer running · ${state.timerRemainingMmSs ?: "--:--"}",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        TextButton(onClick = viewModel::cancelTimer) {
-                            Text("Cancel", color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        }
+                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Start timer", fontWeight = FontWeight.SemiBold)
                     }
                 }
-            }
-
-            if (state.activeTimer == null) {
-                Spacer(Modifier.height(8.dp))
-                FilledTonalButton(
-                    onClick = viewModel::showDurationSheet,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(48.dp),
-                ) {
-                    Text("Start timer", fontWeight = FontWeight.SemiBold)
+                else -> {
+                    Spacer(Modifier.height(8.dp))
+                    IdleNonMinPlaceholder(unit = want.unit)
                 }
             }
 
@@ -287,7 +295,7 @@ fun WantDetailScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         durations.forEach { mins ->
                             androidx.compose.material3.AssistChip(
-                                onClick = { viewModel.startTimer(mins * 60) },
+                                onClick = { viewModel.requestStartTimer(mins * 60) },
                                 label = { Text("$mins min") },
                             )
                         }
@@ -295,6 +303,27 @@ fun WantDetailScreen(
                     Spacer(Modifier.height(8.dp))
                 }
             }
+        }
+
+        state.pendingOverlap?.let { p ->
+            AlertDialog(
+                onDismissRequest = viewModel::dismissOverlap,
+                title = { Text("Replace running timer?") },
+                text = {
+                    val tail = if (p.elapsedMin >= 1) {
+                        "Starting a new one will log ${p.elapsedMin} min and end it."
+                    } else {
+                        "Starting a new one will discard it."
+                    }
+                    Text("You have a ${p.minutesLeft} min timer for ${p.otherWantName}. $tail")
+                },
+                confirmButton = {
+                    Button(onClick = viewModel::confirmReplace) { Text("Replace") }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::dismissOverlap) { Text("Keep") }
+                },
+            )
         }
     }
 }
@@ -478,4 +507,123 @@ private fun relativeDayLabel(date: LocalDate, today: LocalDate): String {
     if (date == today.minus(1, DateTimeUnit.DAY)) return "YESTERDAY"
     val month = date.month.name.take(3)
     return "$month ${date.dayOfMonth}"
+}
+
+@Composable
+private fun ActiveThisWantBanner(
+    remainingMmSs: String,
+    onBannerTap: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onBannerTap)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        "Timer running",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Text(
+                        remainingMmSs,
+                        fontSize = 22.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(76.dp)
+                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f))
+                    .clickable(onClick = onCancel),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.StopCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "Cancel",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IdleNonMinPlaceholder(unit: String) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = Color.Transparent,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.Block,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "No timer — \"$unit\" wants are logged manually.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
