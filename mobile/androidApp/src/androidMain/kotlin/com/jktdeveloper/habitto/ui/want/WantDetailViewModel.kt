@@ -1,5 +1,6 @@
 package com.jktdeveloper.habitto.ui.want
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.WantActivityRepository
@@ -54,7 +55,7 @@ data class PendingOverlap(
     val desiredDurationSec: Int,
 )
 
-class WantDetailViewModel private constructor(
+class WantDetailViewModel @VisibleForTesting internal constructor(
     private val activityId: String,
     private val wantActivityRepo: WantActivityRepository,
     private val wantLogRepo: WantLogRepository,
