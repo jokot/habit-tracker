@@ -86,7 +86,7 @@ class TimerIntegrationTest {
             getPointBalanceUseCase = getBalance,
             getUserStreakOnDayUseCase = getStreakOnDay,
         )
-        controller = WantTimerController(context, timerRepo, wantActivityRepo, logWantUseCase)
+        controller = WantTimerController(context, timerRepo, wantActivityRepo, logWantUseCase, getBalance)
 
         // Seed some data so we have a positive balance
         val now = Clock.System.now().toEpochMilliseconds()

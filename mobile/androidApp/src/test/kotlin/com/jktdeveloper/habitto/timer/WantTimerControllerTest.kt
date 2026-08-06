@@ -40,9 +40,28 @@ class WantTimerControllerTest {
         getPointBalanceUseCase = getBalance,
         getUserStreakOnDayUseCase = getStreakOnDay,
     )
-    private val controller = WantTimerController(context, repo, wantActivityRepo, logWantUseCase)
+    private val controller = WantTimerController(context, repo, wantActivityRepo, logWantUseCase, getBalance)
+
+    // WantTimerController.start() now requires a positive point balance; seed a habit log
+    // so `start()`-calling tests aren't blocked by InsufficientPointsException.
+    private fun seedPositiveBalance() {
+        val now = kotlinx.datetime.Clock.System.now()
+        db.habitTrackerDatabaseQueries.upsertHabit(
+            id = "seed-h1", userId = "u1", templateId = null,
+            name = "Seed habit", unit = "x",
+            thresholdPerPoint = 1.0, dailyTarget = 10,
+            createdAt = now.toEpochMilliseconds(), updatedAt = now.toEpochMilliseconds(),
+            effectiveFrom = null, effectiveTo = null,
+        )
+        db.habitTrackerDatabaseQueries.insertHabitLog(
+            id = "seed-hl1", userId = "u1", habitId = "seed-h1",
+            quantity = 100.0, loggedAt = now.toEpochMilliseconds(),
+            deletedAt = null, syncedAt = null,
+        )
+    }
 
     @Test fun `start creates a RUNNING timer row`() = runTest {
+        seedPositiveBalance()
         controller.start(userId = "u1", activityId = "a1", durationSec = 300)
         val active = repo.getActive("u1")
         assertEquals("a1", active?.activityId)
@@ -51,6 +70,7 @@ class WantTimerControllerTest {
     }
 
     @Test fun `cancelWithPartialLog flips active to CANCELLED when no want activity row exists`() = runTest {
+        seedPositiveBalance()
         controller.start(userId = "u1", activityId = "a1", durationSec = 300)
         controller.cancelWithPartialLog("u1")
         assertNull(repo.getActive("u1"))

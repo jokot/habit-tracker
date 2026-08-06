@@ -156,6 +156,7 @@ class AppContainer(context: Context) {
         repository = wantTimerRepository,
         wantActivityRepository = wantActivityRepository,
         logWantUseCase = logWantUseCase,
+        getPointBalanceUseCase = getPointBalanceUseCase,
     )
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)

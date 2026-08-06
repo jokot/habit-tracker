@@ -571,7 +571,6 @@ private fun ActiveThisWantBanner(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(76.dp)
-                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f))
                     .clickable(onClick = onCancel),
                 contentAlignment = Alignment.Center,
             ) {
@@ -579,7 +578,7 @@ private fun ActiveThisWantBanner(
                     Icon(
                         Icons.Default.StopCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.height(2.dp))
@@ -587,7 +586,7 @@ private fun ActiveThisWantBanner(
                         "Cancel",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }

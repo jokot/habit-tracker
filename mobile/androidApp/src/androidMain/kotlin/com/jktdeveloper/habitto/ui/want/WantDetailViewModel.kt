@@ -123,12 +123,16 @@ class WantDetailViewModel @VisibleForTesting internal constructor(
     }
 
     private suspend fun doStart(durationSec: Int) {
-        timerController.start(userIdProvider(), activityId, durationSec)
-        _state.update {
-            it.copy(
-                showDurationSheet = false,
-                navigateToTimerActivityId = activityId,
-            )
+        try {
+            timerController.start(userIdProvider(), activityId, durationSec)
+            _state.update {
+                it.copy(
+                    showDurationSheet = false,
+                    navigateToTimerActivityId = activityId,
+                )
+            }
+        } catch (e: com.habittracker.domain.usecase.InsufficientPointsException) {
+            _state.update { it.copy(showDurationSheet = false, toast = "No points left to spend") }
         }
     }
 
@@ -161,10 +165,11 @@ class WantDetailViewModel @VisibleForTesting internal constructor(
 
     private suspend fun snapshot(userId: String, active: WantTimer?): TimerSnapshot {
         if (active == null) return TimerSnapshot(null, null, 0, 0)
-        val remainSec = (active.endsAt - clock.now()).inWholeSeconds.coerceAtLeast(0).toInt()
-        val totalMin = (active.durationSec / 60).coerceAtLeast(1)
-        val minLeft = ((remainSec + 59) / 60)
-        val elapsedMin = (totalMin - minLeft).coerceAtLeast(0)
+        val totalSec = active.durationSec
+        val remainSec = (active.endsAt - clock.now()).inWholeSeconds.coerceIn(0, totalSec.toLong()).toInt()
+        val elapsedSec = totalSec - remainSec
+        val minLeft = (remainSec + 59) / 60
+        val elapsedMin = elapsedSec / 60
         val otherName = if (active.activityId == activityId) null else {
             wantActivityRepo.getAllWantActivitiesForUser(userId)
                 .firstOrNull { it.id == active.activityId }?.name

@@ -8,6 +8,8 @@ import com.habittracker.data.repository.WantTimerRepository
 import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantTimer
 import com.habittracker.domain.model.WantTimerState
+import com.habittracker.domain.usecase.GetPointBalanceUseCase
+import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogWantUseCase
 import kotlinx.datetime.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -19,11 +21,14 @@ class WantTimerController(
     private val repository: WantTimerRepository,
     private val wantActivityRepository: WantActivityRepository,
     private val logWantUseCase: LogWantUseCase,
+    private val getPointBalanceUseCase: GetPointBalanceUseCase,
     private val clock: Clock = Clock.System,
 ) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun start(userId: String, activityId: String, durationSec: Int) {
         require(durationSec in 1..(24 * 60 * 60))
+        val balance = getPointBalanceUseCase.execute(userId).getOrThrow().balance
+        if (balance <= 0) throw InsufficientPointsException(available = balance, required = 1)
         val now = clock.now()
         val timer = WantTimer(
             id = Uuid.random().toString(),
@@ -35,10 +40,13 @@ class WantTimerController(
             state = WantTimerState.RUNNING,
         )
         repository.startReplacing(timer)
-        startService(Intent(context, WantTimerService::class.java).apply {
-            action = WantTimerService.ACTION_START
-            putExtra(WantTimerService.EXTRA_TIMER_ID, timer.id)
-        })
+        startService(
+            Intent(context, WantTimerService::class.java).apply {
+                action = WantTimerService.ACTION_START
+                putExtra(WantTimerService.EXTRA_TIMER_ID, timer.id)
+            },
+            foreground = true,
+        )
     }
 
     /**
@@ -76,14 +84,21 @@ class WantTimerController(
     }
 
     fun signalServiceStop() {
-        startService(Intent(context, WantTimerService::class.java).apply {
-            action = WantTimerService.ACTION_STOP
-        })
+        // Not a new foreground promotion — the service is already foreground (or not running
+        // at all). Calling startForegroundService() here would require the STOP handler to also
+        // call startForeground(), which it doesn't, and Android kills the app with
+        // ForegroundServiceDidNotStartInTimeException if that contract isn't met.
+        startService(
+            Intent(context, WantTimerService::class.java).apply {
+                action = WantTimerService.ACTION_STOP
+            },
+            foreground = false,
+        )
     }
 
-    private fun startService(intent: Intent) {
+    private fun startService(intent: Intent, foreground: Boolean) {
         runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (foreground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)

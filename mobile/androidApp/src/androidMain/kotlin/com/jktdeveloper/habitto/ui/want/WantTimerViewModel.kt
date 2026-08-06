@@ -64,9 +64,11 @@ class WantTimerViewModel(
                         .getAllWantActivitiesForUser(userId)
                         .firstOrNull { it.id == active.activityId }
                     val now = clock.now()
-                    val remainingSec = (active.endsAt - now).inWholeSeconds.coerceAtLeast(0).toInt()
-                    val totalMin = (active.durationSec / 60).coerceAtLeast(1)
-                    val elapsedMin = (totalMin - ((remainingSec + 59) / 60)).coerceAtLeast(0)
+                    val totalSec = active.durationSec
+                    val remainingSec = (active.endsAt - now).inWholeSeconds.coerceIn(0, totalSec.toLong()).toInt()
+                    val elapsedSec = totalSec - remainingSec
+                    val totalMin = (totalSec / 60).coerceAtLeast(1)
+                    val elapsedMin = elapsedSec / 60
                     val unitsPerPoint = (want?.unitsPerPoint ?: 1).coerceAtLeast(1)
                     val pointsSpent = elapsedMin / unitsPerPoint
                     _state.update {
@@ -78,7 +80,7 @@ class WantTimerViewModel(
                             totalMin = totalMin,
                             elapsedMin = elapsedMin,
                             pointsSpentSoFar = pointsSpent,
-                            elapsedFraction = (elapsedMin.toFloat() / totalMin.toFloat()).coerceIn(0f, 1f),
+                            elapsedFraction = (elapsedSec.toFloat() / totalSec.toFloat()).coerceIn(0f, 1f),
                         )
                     }
                 }
