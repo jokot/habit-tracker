@@ -1,11 +1,18 @@
 package com.jktdeveloper.habitto.ui.want
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantLogRepository
+import com.habittracker.data.repository.WantTimerRepository
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.WantTimer
 import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.timer.CancelResult
+import com.jktdeveloper.habitto.timer.WantTimerController
+import com.jktdeveloper.habitto.timer.WantTimerService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,12 +38,29 @@ data class WantDetailUi(
     val timesLogged7d: Int = 0,
     val timeline: List<DayLogs> = emptyList(),
     val toast: String? = null,
+    val activeTimer: WantTimer? = null,
+    val timerRemainingMmSs: String? = null,
+    val activeTimerActivityName: String? = null,
+    val activeTimerElapsedMin: Int = 0,
+    val activeTimerMinutesLeft: Int = 0,
+    val showDurationSheet: Boolean = false,
+    val pendingOverlap: PendingOverlap? = null,
+    val navigateToTimerActivityId: String? = null,
 )
 
-class WantDetailViewModel private constructor(
+data class PendingOverlap(
+    val otherWantName: String,
+    val elapsedMin: Int,
+    val minutesLeft: Int,
+    val desiredDurationSec: Int,
+)
+
+class WantDetailViewModel @VisibleForTesting internal constructor(
     private val activityId: String,
     private val wantActivityRepo: WantActivityRepository,
     private val wantLogRepo: WantLogRepository,
+    private val timerController: WantTimerController,
+    private val timerRepo: WantTimerRepository,
     private val userIdProvider: () -> String,
     private val clock: Clock = Clock.System,
     private val tz: TimeZone = TimeZone.currentSystemDefault(),
@@ -49,10 +73,134 @@ class WantDetailViewModel private constructor(
         activityId = activityId,
         wantActivityRepo = container.wantActivityRepository,
         wantLogRepo = container.wantLogRepository,
+        timerController = container.wantTimerController,
+        timerRepo = container.wantTimerRepository,
         userIdProvider = { container.currentUserId() },
     )
 
-    init { reload() }
+    init { reload(); observeTimer() }
+
+    fun showDurationSheet() { _state.update { it.copy(showDurationSheet = true) } }
+    fun dismissDurationSheet() { _state.update { it.copy(showDurationSheet = false) } }
+    fun dismissOverlap() { _state.update { it.copy(pendingOverlap = null) } }
+    fun consumeNavigation() { _state.update { it.copy(navigateToTimerActivityId = null) } }
+
+    fun requestStartTimer(durationSec: Int) {
+        viewModelScope.launch {
+            val userId = userIdProvider()
+            val active = timerRepo.getActive(userId)
+            if (active != null && active.activityId != activityId) {
+                val otherWant = wantActivityRepo
+                    .getAllWantActivitiesForUser(userId)
+                    .firstOrNull { it.id == active.activityId }
+                val elapsedMin = ((clock.now() - active.startedAt).inWholeSeconds / 60).coerceAtLeast(0).toInt()
+                val minutesLeft = ((active.endsAt - clock.now()).inWholeSeconds / 60).coerceAtLeast(0).toInt()
+                _state.update {
+                    it.copy(
+                        showDurationSheet = false,
+                        pendingOverlap = PendingOverlap(
+                            otherWantName = otherWant?.name ?: "another want",
+                            elapsedMin = elapsedMin,
+                            minutesLeft = minutesLeft,
+                            desiredDurationSec = durationSec,
+                        ),
+                    )
+                }
+            } else {
+                doStart(durationSec)
+            }
+        }
+    }
+
+    fun confirmReplace() {
+        viewModelScope.launch {
+            val pending = _state.value.pendingOverlap ?: return@launch
+            timerController.cancelWithPartialLog(userIdProvider())
+            timerController.signalServiceStop()
+            _state.update { it.copy(pendingOverlap = null) }
+            doStart(pending.desiredDurationSec)
+        }
+    }
+
+    private suspend fun doStart(durationSec: Int) {
+        try {
+            timerController.start(userIdProvider(), activityId, durationSec)
+            _state.update {
+                it.copy(
+                    showDurationSheet = false,
+                    navigateToTimerActivityId = activityId,
+                )
+            }
+        } catch (e: com.habittracker.domain.usecase.InsufficientPointsException) {
+            _state.update { it.copy(showDurationSheet = false, toast = "No points left to spend") }
+        }
+    }
+
+    fun cancelTimer() {
+        viewModelScope.launch {
+            val result = timerController.cancelWithPartialLog(userIdProvider())
+            timerController.signalServiceStop()
+            val toast = when (result) {
+                is CancelResult.Logged -> "Logged ${result.minutes} min · −${result.pointsSpent} pt"
+                CancelResult.Discarded -> "Timer cancelled"
+                CancelResult.NoActiveTimer -> null
+            }
+            _state.update { it.copy(toast = toast) }
+        }
+    }
+
+    fun openTimerScreen() {
+        _state.update { it.copy(navigateToTimerActivityId = activityId) }
+    }
+
+    @Deprecated("Use requestStartTimer for overlap detection", ReplaceWith("requestStartTimer(durationSec)"))
+    fun startTimer(durationSec: Int) = requestStartTimer(durationSec)
+
+    private data class TimerSnapshot(
+        val remainingMmSs: String?,
+        val otherName: String?,
+        val elapsedMin: Int,
+        val minLeft: Int,
+    )
+
+    private suspend fun snapshot(userId: String, active: WantTimer?): TimerSnapshot {
+        if (active == null) return TimerSnapshot(null, null, 0, 0)
+        val totalSec = active.durationSec
+        val remainSec = (active.endsAt - clock.now()).inWholeSeconds.coerceIn(0, totalSec.toLong()).toInt()
+        val elapsedSec = totalSec - remainSec
+        val minLeft = (remainSec + 59) / 60
+        val elapsedMin = elapsedSec / 60
+        val otherName = if (active.activityId == activityId) null else {
+            wantActivityRepo.getAllWantActivitiesForUser(userId)
+                .firstOrNull { it.id == active.activityId }?.name
+        }
+        return TimerSnapshot(
+            remainingMmSs = WantTimerService.formatMmSs(remainSec),
+            otherName = otherName,
+            elapsedMin = elapsedMin,
+            minLeft = minLeft,
+        )
+    }
+
+    private fun observeTimer() {
+        viewModelScope.launch {
+            while (true) {
+                val userId = userIdProvider()
+                val active = timerRepo.getActive(userId)
+                val snap = snapshot(userId, active)
+                _state.update {
+                    it.copy(
+                        activeTimer = active,
+                        timerRemainingMmSs = snap.remainingMmSs,
+                        activeTimerActivityName = snap.otherName,
+                        activeTimerElapsedMin = snap.elapsedMin,
+                        activeTimerMinutesLeft = snap.minLeft,
+                    )
+                }
+                delay(1000L)
+            }
+        }
+    }
 
     fun reload() {
         viewModelScope.launch {
@@ -96,10 +244,6 @@ class WantDetailViewModel private constructor(
                 )
             }
         }
-    }
-
-    fun onTimerStub() {
-        _state.update { it.copy(toast = "Timer coming soon.") }
     }
 
     fun consumeToast() {

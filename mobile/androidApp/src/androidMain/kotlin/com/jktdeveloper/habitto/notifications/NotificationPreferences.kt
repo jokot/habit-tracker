@@ -17,22 +17,28 @@ private val Context.notificationDataStore: DataStore<Preferences> by preferences
 
 data class NotificationPrefs(
     val masterEnabled: Boolean,
-    val dailyReminderEnabled: Boolean,
-    val dailyReminderMinutes: Int,
-    val streakRiskEnabled: Boolean,
-    val streakRiskMinutes: Int,
-    val streakFrozenEnabled: Boolean,
-    val streakResetEnabled: Boolean,
+    private val enabledByType: Map<NotificationTypeId, Boolean>,
+    private val minutesByType: Map<NotificationTypeId, Int>,
 ) {
+    fun isEnabled(t: NotificationTypeId): Boolean =
+        enabledByType[t] ?: t.defaultEnabled
+
+    fun minutesOfDay(t: NotificationTypeId): Int? =
+        minutesByType[t] ?: t.defaultMinutesOfDay
+
+    // Back-compat accessors used by existing Phase 4 workers + tests.
+    val dailyReminderEnabled: Boolean get() = isEnabled(NotificationTypeId.DAILY_REMINDER)
+    val dailyReminderMinutes: Int get() = minutesOfDay(NotificationTypeId.DAILY_REMINDER) ?: (9 * 60)
+    val streakRiskEnabled: Boolean get() = isEnabled(NotificationTypeId.STREAK_RISK)
+    val streakRiskMinutes: Int get() = minutesOfDay(NotificationTypeId.STREAK_RISK) ?: (21 * 60)
+    val streakFrozenEnabled: Boolean get() = isEnabled(NotificationTypeId.STREAK_FROZEN)
+    val streakResetEnabled: Boolean get() = isEnabled(NotificationTypeId.STREAK_RESET)
+
     companion object {
         val DEFAULT = NotificationPrefs(
             masterEnabled = true,
-            dailyReminderEnabled = true,
-            dailyReminderMinutes = 9 * 60,   // 09:00
-            streakRiskEnabled = true,
-            streakRiskMinutes = 21 * 60,     // 21:00
-            streakFrozenEnabled = true,
-            streakResetEnabled = true,
+            enabledByType = emptyMap(),
+            minutesByType = emptyMap(),
         )
     }
 }
@@ -41,36 +47,49 @@ class NotificationPreferences(private val context: Context) {
 
     private object Keys {
         val MASTER_ENABLED = booleanPreferencesKey("master_enabled")
-        val DAILY_ENABLED = booleanPreferencesKey("daily_reminder_enabled")
-        val DAILY_MINUTES = intPreferencesKey("daily_reminder_minutes")
-        val RISK_ENABLED = booleanPreferencesKey("streak_risk_enabled")
-        val RISK_MINUTES = intPreferencesKey("streak_risk_minutes")
-        val FROZEN_ENABLED = booleanPreferencesKey("streak_frozen_enabled")
-        val RESET_ENABLED = booleanPreferencesKey("streak_reset_enabled")
+        fun enabled(t: NotificationTypeId) = booleanPreferencesKey("type_${t.key}_enabled")
+        fun minutes(t: NotificationTypeId) = intPreferencesKey("type_${t.key}_minutes")
     }
 
     val flow: Flow<NotificationPrefs> = context.notificationDataStore.data.map { p ->
-        val d = NotificationPrefs.DEFAULT
+        val enabled = NotificationTypeId.values().associateWith { t ->
+            p[Keys.enabled(t)] ?: t.defaultEnabled
+        }
+        val minutes = NotificationTypeId.values()
+            .filter { it.hasTime }
+            .associateWith { t -> p[Keys.minutes(t)] ?: (t.defaultMinutesOfDay!!) }
         NotificationPrefs(
-            masterEnabled = p[Keys.MASTER_ENABLED] ?: d.masterEnabled,
-            dailyReminderEnabled = p[Keys.DAILY_ENABLED] ?: d.dailyReminderEnabled,
-            dailyReminderMinutes = p[Keys.DAILY_MINUTES] ?: d.dailyReminderMinutes,
-            streakRiskEnabled = p[Keys.RISK_ENABLED] ?: d.streakRiskEnabled,
-            streakRiskMinutes = p[Keys.RISK_MINUTES] ?: d.streakRiskMinutes,
-            streakFrozenEnabled = p[Keys.FROZEN_ENABLED] ?: d.streakFrozenEnabled,
-            streakResetEnabled = p[Keys.RESET_ENABLED] ?: d.streakResetEnabled,
+            masterEnabled = p[Keys.MASTER_ENABLED] ?: true,
+            enabledByType = enabled,
+            minutesByType = minutes,
         )
     }
 
     suspend fun current(): NotificationPrefs = flow.first()
 
     suspend fun setMasterEnabled(enabled: Boolean) = update { it[Keys.MASTER_ENABLED] = enabled }
-    suspend fun setDailyReminderEnabled(enabled: Boolean) = update { it[Keys.DAILY_ENABLED] = enabled }
-    suspend fun setDailyReminderMinutes(minutes: Int) = update { it[Keys.DAILY_MINUTES] = minutes.coerceIn(0, 1439) }
-    suspend fun setStreakRiskEnabled(enabled: Boolean) = update { it[Keys.RISK_ENABLED] = enabled }
-    suspend fun setStreakRiskMinutes(minutes: Int) = update { it[Keys.RISK_MINUTES] = minutes.coerceIn(0, 1439) }
-    suspend fun setStreakFrozenEnabled(enabled: Boolean) = update { it[Keys.FROZEN_ENABLED] = enabled }
-    suspend fun setStreakResetEnabled(enabled: Boolean) = update { it[Keys.RESET_ENABLED] = enabled }
+
+    suspend fun setTypeEnabled(t: NotificationTypeId, enabled: Boolean) =
+        update { it[Keys.enabled(t)] = enabled }
+
+    suspend fun setTypeMinutesOfDay(t: NotificationTypeId, minutes: Int) {
+        require(t.hasTime) { "Type ${t.key} has no time" }
+        update { it[Keys.minutes(t)] = minutes.coerceIn(0, 1439) }
+    }
+
+    // Back-compat setters used by existing Phase 4 tests.
+    suspend fun setDailyReminderEnabled(enabled: Boolean) =
+        setTypeEnabled(NotificationTypeId.DAILY_REMINDER, enabled)
+    suspend fun setDailyReminderMinutes(minutes: Int) =
+        setTypeMinutesOfDay(NotificationTypeId.DAILY_REMINDER, minutes)
+    suspend fun setStreakRiskEnabled(enabled: Boolean) =
+        setTypeEnabled(NotificationTypeId.STREAK_RISK, enabled)
+    suspend fun setStreakRiskMinutes(minutes: Int) =
+        setTypeMinutesOfDay(NotificationTypeId.STREAK_RISK, minutes)
+    suspend fun setStreakFrozenEnabled(enabled: Boolean) =
+        setTypeEnabled(NotificationTypeId.STREAK_FROZEN, enabled)
+    suspend fun setStreakResetEnabled(enabled: Boolean) =
+        setTypeEnabled(NotificationTypeId.STREAK_RESET, enabled)
 
     private suspend fun update(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.notificationDataStore.edit { block(it) }

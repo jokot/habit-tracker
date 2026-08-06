@@ -26,6 +26,8 @@ class NotificationScheduler(
         wm.cancelUniqueWork(WORK_DAILY)
         wm.cancelUniqueWork(WORK_RISK)
         wm.cancelUniqueWork(WORK_DAY_BOUNDARY)
+        wm.cancelUniqueWork(WORK_MILESTONE)
+        wm.cancelAllWorkByTag(PerIdentityReminderScheduler.TAG)
     }
 
     suspend fun reschedule() {
@@ -37,29 +39,40 @@ class NotificationScheduler(
             return
         }
 
-        if (snap.dailyReminderEnabled)
+        if (snap.isEnabled(NotificationTypeId.DAILY_REMINDER))
             wm.enqueueUniquePeriodicWork(
                 WORK_DAILY,
                 ExistingPeriodicWorkPolicy.UPDATE,
-                periodicAt<DailyReminderWorker>(snap.dailyReminderMinutes),
+                periodicAt<DailyReminderWorker>(snap.minutesOfDay(NotificationTypeId.DAILY_REMINDER) ?: (9 * 60)),
             )
         else wm.cancelUniqueWork(WORK_DAILY)
 
-        if (snap.streakRiskEnabled)
+        if (snap.isEnabled(NotificationTypeId.STREAK_RISK))
             wm.enqueueUniquePeriodicWork(
                 WORK_RISK,
                 ExistingPeriodicWorkPolicy.UPDATE,
-                periodicAt<StreakRiskWorker>(snap.streakRiskMinutes),
+                periodicAt<StreakRiskWorker>(snap.minutesOfDay(NotificationTypeId.STREAK_RISK) ?: (21 * 60)),
             )
         else wm.cancelUniqueWork(WORK_RISK)
 
-        if (snap.streakFrozenEnabled || snap.streakResetEnabled)
+        val anyDayBoundary = snap.isEnabled(NotificationTypeId.STREAK_FROZEN)
+            || snap.isEnabled(NotificationTypeId.STREAK_RESET)
+            || snap.isEnabled(NotificationTypeId.TIER_ADVANCED)
+        if (anyDayBoundary)
             wm.enqueueUniquePeriodicWork(
                 WORK_DAY_BOUNDARY,
                 ExistingPeriodicWorkPolicy.UPDATE,
                 periodicAt<DayBoundaryWorker>(30),  // 00:30 local
             )
         else wm.cancelUniqueWork(WORK_DAY_BOUNDARY)
+
+        if (snap.isEnabled(NotificationTypeId.MILESTONE_STREAK))
+            wm.enqueueUniquePeriodicWork(
+                WORK_MILESTONE,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                periodicAt<MilestoneWorker>(35),  // 00:35 local
+            )
+        else wm.cancelUniqueWork(WORK_MILESTONE)
     }
 
     private inline fun <reified W : CoroutineWorker> periodicAt(minutesOfDay: Int): PeriodicWorkRequest {
@@ -78,5 +91,6 @@ class NotificationScheduler(
         const val WORK_DAILY = "phase4-daily-reminder"
         const val WORK_RISK = "phase4-streak-risk"
         const val WORK_DAY_BOUNDARY = "phase4-day-boundary"
+        const val WORK_MILESTONE = "phase9-milestone"
     }
 }

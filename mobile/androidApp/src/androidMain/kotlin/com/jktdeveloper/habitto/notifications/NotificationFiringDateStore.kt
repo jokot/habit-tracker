@@ -29,5 +29,14 @@ class NotificationFiringDateStore(private val context: Context) {
     companion object {
         const val EVENT_FROZEN = "day_boundary_frozen"
         const val EVENT_RESET = "day_boundary_reset"
+        const val EVENT_TIER_ADVANCED = "tier_advanced"
+        const val EVENT_MILESTONE_7 = "milestone_streak_7"
+        const val EVENT_MILESTONE_30 = "milestone_streak_30"
+        const val EVENT_MILESTONE_100 = "milestone_streak_100"
+        const val EVENT_MILESTONE_365 = "milestone_streak_365"
+        const val EVENT_CLOUD_RESTORE = "cloud_restore_complete"
+
+        /** Per-identity event key for daily_reminder_per_identity. */
+        fun perIdentityKey(identityId: String) = "per_identity_$identityId"
     }
 }

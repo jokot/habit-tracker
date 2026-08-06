@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,12 +23,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +55,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -81,10 +88,12 @@ fun HomeScreen(
     onIdentitiesClick: () -> Unit,
     onOpenExchangeRate: () -> Unit = {},
     onOpenWantDetail: (String) -> Unit = {},
+    onOpenTimer: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
     val pendingWantMap by viewModel.pendingWants.collectAsState()
+    val homeTimer by viewModel.homeTimer.collectAsState()
     val currentRate by viewModel.currentRate.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val showLogoutDialog by viewModel.showLogoutDialog.collectAsState()
@@ -167,6 +176,18 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
             ) {
+
+                // ── Active Want-timer banner — active point-drain outranks the
+                //    one-time migration notice below, so it sits above it. ────
+                homeTimer?.let { timer ->
+                    item {
+                        HomeTimerBanner(
+                            timer = timer,
+                            onTap = { onOpenTimer(timer.activityId) },
+                            onCancel = viewModel::cancelActiveTimer,
+                        )
+                    }
+                }
 
                 // ── Rate-ladder migration banner ──────────────────────────────
                 item {
@@ -330,6 +351,100 @@ fun HomeScreen(
             ) { content() }
         } else {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) { content() }
+        }
+    }
+}
+
+// ── Home timer banner ────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeTimerBanner(
+    timer: HomeTimerUi,
+    onTap: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onTap)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Timer,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                Text(
+                    "${timer.wantName} · Timer running",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                )
+                Text(
+                    timer.remainingMmSs,
+                    fontSize = 19.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        val dividerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.16f)
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(72.dp)
+                .drawBehind {
+                    drawLine(
+                        color = dividerColor,
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(0f, size.height),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                }
+                .clickable(onClick = onCancel),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.StopCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Cancel",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }

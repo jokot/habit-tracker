@@ -78,6 +78,11 @@ sealed class Screen(val route: String) {
         const val ARG_ID = "wantId"
         fun route(id: String? = null) = if (id == null) "want_form" else "want_form?wantId=$id"
     }
+    object NotificationsSettings : Screen("notifications-settings")
+    object WantTimer : Screen("want-timer/{activityId}") {
+        const val ARG_ID = "activityId"
+        fun route(activityId: String) = "want-timer/$activityId"
+    }
 }
 
 @Composable
@@ -185,6 +190,7 @@ fun AppNavigation(container: AppContainer) {
                     onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
                     onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
                     onOpenWantDetail = { id -> navController.navigate(Screen.WantDetail.route(id)) },
+                    onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },
                 )
             }
 
@@ -227,9 +233,20 @@ fun AppNavigation(container: AppContainer) {
                     onSignOut = { vm.beginSignOut() },
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onBack = { navController.popBackStack() },
+                    onOpenNotificationsSettings = { navController.navigate(Screen.NotificationsSettings.route) },
                     onOpenDevTools = if (com.jktdeveloper.habitto.BuildConfig.DEBUG) {
                         { navController.navigate(Screen.DevTools.route) }
                     } else null,
+                )
+            }
+
+            composable(Screen.NotificationsSettings.route) {
+                val vm = androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.jktdeveloper.habitto.ui.settings.NotificationsSettingsViewModel(container)
+                }
+                com.jktdeveloper.habitto.ui.settings.NotificationsSettingsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -285,6 +302,7 @@ fun AppNavigation(container: AppContainer) {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(Screen.WantForm.route(wantId)) },
+                    onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },
                 )
             }
 
@@ -312,6 +330,25 @@ fun AppNavigation(container: AppContainer) {
                 com.jktdeveloper.habitto.ui.want.WantFormScreen(
                     viewModel = vm,
                     onClose = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.WantTimer.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument(Screen.WantTimer.ARG_ID) {
+                        type = androidx.navigation.NavType.StringType
+                    },
+                ),
+                deepLinks = listOf(
+                    androidx.navigation.navDeepLink { uriPattern = "com.jktdeveloper.habitto://want-timer/{activityId}" },
+                ),
+            ) { entry ->
+                val activityId = entry.arguments?.getString(Screen.WantTimer.ARG_ID).orEmpty()
+                val vm = remember { com.jktdeveloper.habitto.ui.want.WantTimerViewModel(container) }
+                com.jktdeveloper.habitto.ui.want.WantTimerScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
 

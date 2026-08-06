@@ -334,3 +334,35 @@ INNER JOIN LocalHabitIdentity li ON li.habitId = h.id
 WHERE h.userId = ? AND li.identityId = ?
   AND li.effectiveTo IS NULL
   AND h.effectiveTo IS NULL;
+
+CREATE TABLE IF NOT EXISTS LocalWantTimer (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    activityId TEXT NOT NULL,
+    durationSec INTEGER NOT NULL,
+    startedAt INTEGER NOT NULL,
+    endsAt INTEGER NOT NULL,
+    state TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_wanttimer_user_state ON LocalWantTimer(userId, state);
+
+-- LocalWantTimer queries
+insertWantTimer:
+INSERT INTO LocalWantTimer (id, userId, activityId, durationSec, startedAt, endsAt, state)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+getActiveWantTimer:
+SELECT * FROM LocalWantTimer WHERE userId = ? AND state = 'RUNNING' LIMIT 1;
+
+getWantTimerById:
+SELECT * FROM LocalWantTimer WHERE id = ? LIMIT 1;
+
+getAllRunningTimers:
+SELECT * FROM LocalWantTimer WHERE state = 'RUNNING';
+
+updateWantTimerState:
+UPDATE LocalWantTimer SET state = ? WHERE id = ?;
+
+deleteFinishedTimersBefore:
+DELETE FROM LocalWantTimer WHERE state != 'RUNNING' AND endsAt < ?;

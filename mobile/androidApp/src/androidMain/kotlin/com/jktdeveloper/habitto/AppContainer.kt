@@ -14,6 +14,8 @@ import com.habittracker.data.repository.LocalHabitRepository
 import com.habittracker.data.repository.LocalIdentityRepository
 import com.habittracker.data.repository.LocalWantActivityRepository
 import com.habittracker.data.repository.LocalWantLogRepository
+import com.habittracker.data.repository.LocalWantTimerRepository
+import com.habittracker.data.repository.WantTimerRepository
 import com.habittracker.data.repository.SupabaseAuthRepository
 import com.habittracker.data.sync.PostgrestSupabaseSyncClient
 import com.habittracker.data.sync.SupabaseSyncClient
@@ -46,10 +48,18 @@ import com.habittracker.domain.usecase.UpdateIdentityWhyUseCase
 import com.habittracker.domain.usecase.AddIdentityWithHabitsUseCase
 import com.habittracker.domain.usecase.DeleteHabitUseCase
 import com.habittracker.domain.usecase.SaveHabitUseCase
+import com.jktdeveloper.habitto.notifications.NotificationTypeId
+import com.jktdeveloper.habitto.notifications.PerIdentityReminderScheduler
+import com.jktdeveloper.habitto.notifications.SyncFailureCounter
+import com.jktdeveloper.habitto.notifications.NotificationChannels
 import com.jktdeveloper.habitto.notifications.NotificationFiringDateStore
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
+import com.jktdeveloper.habitto.notifications.PermissionUtils
 import com.habittracker.data.sync.SyncReason
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import kotlinx.datetime.toLocalDateTime
 import com.jktdeveloper.habitto.preferences.AppFlagsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +70,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
@@ -87,6 +98,9 @@ class AppContainer(context: Context) {
     val habitLogRepository = LocalHabitLogRepository(db)
     val wantActivityRepository = LocalWantActivityRepository(db)
     val wantLogRepository = LocalWantLogRepository(db)
+    val wantTimerRepository: WantTimerRepository = LocalWantTimerRepository(db)
+    val perIdentityReminderScheduler = PerIdentityReminderScheduler(appContext)
+    val syncFailureCounter = SyncFailureCounter(appContext)
 
     val notificationPreferences = NotificationPreferences(appContext)
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
@@ -136,6 +150,13 @@ class AppContainer(context: Context) {
         wantActivityRepository = wantActivityRepository,
         getPointBalanceUseCase = getPointBalanceUseCase,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
+    val wantTimerController = com.jktdeveloper.habitto.timer.WantTimerController(
+        context = appContext,
+        repository = wantTimerRepository,
+        wantActivityRepository = wantActivityRepository,
+        logWantUseCase = logWantUseCase,
+        getPointBalanceUseCase = getPointBalanceUseCase,
     )
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
@@ -317,6 +338,86 @@ class AppContainer(context: Context) {
         _sessionExpiredEvents.tryEmit(Unit)
     }
 
+    private fun startSyncNotifier() {
+        applicationScope.launch {
+            var sawAnyPullSinceLogin = false
+            syncEngine.syncState.collect { state ->
+                val prefs = notificationPreferences.current()
+                if (!prefs.masterEnabled) return@collect
+                if (!PermissionUtils.hasNotificationPermission(appContext)) return@collect
+                when (state) {
+                    is SyncState.Synced -> {
+                        syncFailureCounter.reset()
+                        if (!sawAnyPullSinceLogin && state.pulled > 0
+                            && prefs.isEnabled(NotificationTypeId.CLOUD_RESTORE_COMPLETE)
+                        ) {
+                            val today = kotlinx.datetime.Clock.System.now()
+                                .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
+                            val key = NotificationFiringDateStore.EVENT_CLOUD_RESTORE
+                            if (notificationFiringDateStore.getLastFired(key) != today) {
+                                fireSystemNotif(NOTIF_CLOUD_RESTORE,
+                                    "Cloud restore complete — your data is back.")
+                                notificationFiringDateStore.setLastFired(key, today)
+                            }
+                        }
+                        sawAnyPullSinceLogin = true
+                    }
+                    is SyncState.Error -> {
+                        if (state.message == "Session expired"
+                            && prefs.isEnabled(NotificationTypeId.SESSION_EXPIRED)
+                        ) {
+                            fireSystemNotif(NOTIF_SESSION_EXPIRED,
+                                "Signed out — please sign in again to keep syncing.")
+                        } else if (state.message != "Session expired"
+                            && prefs.isEnabled(NotificationTypeId.SYNC_FAILED_PERSISTENT)
+                        ) {
+                            if (syncFailureCounter.incrementAndShouldFire()) {
+                                fireSystemNotif(NOTIF_SYNC_FAILED,
+                                    "Sync has been failing — check your connection.")
+                            }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    private fun startPerIdentityReconciler() {
+        applicationScope.launch {
+            var previous: Set<String> = emptySet()
+            combine(
+                identityRepository.observeUserIdentities(currentUserId()),
+                notificationPreferences.flow,
+            ) { ids, prefs -> ids to prefs }
+                .collect { (identities, prefs) ->
+                    val active = if (
+                        prefs.masterEnabled
+                        && prefs.isEnabled(NotificationTypeId.DAILY_REMINDER_PER_IDENTITY)
+                    ) identities.map { it.id }.toSet() else emptySet()
+                    val minutes = prefs.minutesOfDay(NotificationTypeId.DAILY_REMINDER_PER_IDENTITY) ?: (17 * 60 + 30)
+                    perIdentityReminderScheduler.reconcile(active, minutes, previous)
+                    previous = active
+                }
+        }
+    }
+
+    private fun fireSystemNotif(id: Int, body: String) {
+        val builder = NotificationCompat.Builder(appContext, NotificationChannels.SYSTEM)
+            .setSmallIcon(com.jktdeveloper.habitto.R.drawable.ic_notification)
+            .setContentTitle("Habitto")
+            .setContentText(body)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+        NotificationManagerCompat.from(appContext).notify(id, builder.build())
+    }
+
+    private companion object {
+        const val NOTIF_SESSION_EXPIRED = 4101
+        const val NOTIF_CLOUD_RESTORE = 4102
+        const val NOTIF_SYNC_FAILED = 4103
+    }
+
     init {
         // If the DB was wiped due to a schema version bump (dev-only migration path),
         // reset sync watermarks so the next pull fetches everything from the server.
@@ -324,5 +425,7 @@ class AppContainer(context: Context) {
             watermarks.reset()
         }
         startSessionGuard()
+        startSyncNotifier()
+        startPerIdentityReconciler()
     }
 }

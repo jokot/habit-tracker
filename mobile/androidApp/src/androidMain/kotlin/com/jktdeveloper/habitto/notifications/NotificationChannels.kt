@@ -7,27 +7,63 @@ import android.os.Build
 import androidx.core.content.getSystemService
 
 object NotificationChannels {
-    const val DAILY_REMINDER = "daily_reminder"
-    const val STREAK_RISK = "streak_risk"
-    const val STREAK_STATUS = "streak_status"
+    // Grouped channels per canvas v5
+    const val REMINDER = "reminder"
+    const val ALERT = "alert"
+    const val STATUS = "status"
+    const val SYSTEM = "system"
+
+    // Timer-specific channels (kept separate so users can mute the live countdown
+    // without losing the completion alert).
+    const val WANT_TIMER_RUNNING = "want_timer_running"
+    const val WANT_TIMER_END = "want_timer_end"
+
+    // Legacy Phase 4 ids — aliases so still-in-flight code compiles during rebind.
+    @Deprecated("Use REMINDER", ReplaceWith("REMINDER"))
+    const val DAILY_REMINDER = REMINDER
+    @Deprecated("Use ALERT", ReplaceWith("ALERT"))
+    const val STREAK_RISK = ALERT
+    @Deprecated("Use STATUS", ReplaceWith("STATUS"))
+    const val STREAK_STATUS = STATUS
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService<NotificationManager>() ?: return
+        val mgr = context.getSystemService<NotificationManager>() ?: return
 
-        manager.createNotificationChannel(
-            NotificationChannel(DAILY_REMINDER, "Daily reminder", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Reminds you each day to log your habits."
+        mgr.createNotificationChannel(
+            NotificationChannel(REMINDER, "Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Gentle daily nudges to log habits."
             }
         )
-        manager.createNotificationChannel(
-            NotificationChannel(STREAK_RISK, "Streak alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Late-day reminder when your streak is about to break."
+        mgr.createNotificationChannel(
+            NotificationChannel(ALERT, "Alerts", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Time-sensitive alerts: streak risk, want-timer end."
+                enableVibration(true)
             }
         )
-        manager.createNotificationChannel(
-            NotificationChannel(STREAK_STATUS, "Streak status", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Quiet updates when your streak is frozen or has reset."
+        mgr.createNotificationChannel(
+            NotificationChannel(STATUS, "Status updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Streak frozen/reset, tier advances, milestones."
+                setSound(null, null)
+            }
+        )
+        mgr.createNotificationChannel(
+            NotificationChannel(SYSTEM, "System", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Session expired, cloud restore complete, sync failures."
+                setSound(null, null)
+            }
+        )
+        mgr.createNotificationChannel(
+            NotificationChannel(WANT_TIMER_RUNNING, "Want timer (running)", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Live countdown while a want timer is running."
+                setShowBadge(false)
+                setSound(null, null)
+            }
+        )
+        mgr.createNotificationChannel(
+            NotificationChannel(WANT_TIMER_END, "Want timer (end)", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Alert when a want timer finishes."
+                enableVibration(true)
             }
         )
     }

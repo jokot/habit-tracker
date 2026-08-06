@@ -23,7 +23,8 @@ class DailyReminderWorker(
         val app = applicationContext.applicationContext as HabitTrackerApplication
         val container = app.container
         val prefs = container.notificationPreferences.current()
-        if (!prefs.dailyReminderEnabled) return@runCatching Result.success()
+        if (!prefs.masterEnabled) return@runCatching Result.success()
+        if (!prefs.isEnabled(NotificationTypeId.DAILY_REMINDER)) return@runCatching Result.success()
         if (!PermissionUtils.hasNotificationPermission(applicationContext)) return@runCatching Result.success()
 
         val userId = container.currentUserId()
@@ -33,20 +34,17 @@ class DailyReminderWorker(
         val end = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
 
         val count = container.habitLogRepository.countActiveLogsBetween(userId, start, end)
-        if (count == 0) {
-            fireDailyReminder(applicationContext)
-        }
+        if (count == 0) fireDailyReminder(applicationContext)
         Result.success()
     }.getOrElse { Result.retry() }
 
     companion object {
         const val NOTIF_ID = 4001
-
         fun fireDailyReminder(context: Context) {
-            val builder = NotificationCompat.Builder(context, NotificationChannels.DAILY_REMINDER)
+            val builder = NotificationCompat.Builder(context, NotificationChannels.REMINDER)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("Habitto")
-                .setContentText("Log your habits to keep your streak alive.")
+                .setContentText("Time to log today's habits.")
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             NotificationManagerCompat.from(context).notify(NOTIF_ID, builder.build())
