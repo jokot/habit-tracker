@@ -16,6 +16,8 @@ import com.habittracker.domain.usecase.ExchangeRateCalculator
 import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogHabitStatus
 import com.habittracker.domain.usecase.PointCalculator
+import com.jktdeveloper.habitto.timer.CancelResult
+import com.jktdeveloper.habitto.timer.WantTimerService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -67,6 +69,13 @@ data class PendingWantLog(
 sealed interface HomeEvent {
     data class Message(val text: String) : HomeEvent
 }
+
+/** Active Want timer, surfaced on Home regardless of which want it belongs to. */
+data class HomeTimerUi(
+    val activityId: String,
+    val wantName: String,
+    val remainingMmSs: String,
+)
 
 private const val PENDING_WINDOW_SECONDS = 3
 
@@ -143,6 +152,48 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
     /** One countdown coroutine per want activity. */
     private val wantTimers = mutableMapOf<String, Job>()
+
+    private val _homeTimer = MutableStateFlow<HomeTimerUi?>(null)
+    val homeTimer: StateFlow<HomeTimerUi?> = _homeTimer.asStateFlow()
+
+    private var homeTimerJob: Job? = null
+
+    private fun observeActiveWantTimer() {
+        homeTimerJob = viewModelScope.launch {
+            while (true) {
+                val userId = container.currentUserId()
+                val active = container.wantTimerRepository.getActive(userId)
+                if (active == null) {
+                    _homeTimer.value = null
+                } else {
+                    val want = container.wantActivityRepository
+                        .getAllWantActivitiesForUser(userId)
+                        .firstOrNull { it.id == active.activityId }
+                    val remainingSec = (active.endsAt - kotlinx.datetime.Clock.System.now())
+                        .inWholeSeconds.coerceAtLeast(0).toInt()
+                    _homeTimer.value = HomeTimerUi(
+                        activityId = active.activityId,
+                        wantName = want?.name ?: "Want",
+                        remainingMmSs = WantTimerService.formatMmSs(remainingSec),
+                    )
+                }
+                delay(1000L)
+            }
+        }
+    }
+
+    fun cancelActiveTimer() {
+        viewModelScope.launch {
+            val result = container.wantTimerController.cancelWithPartialLog(container.currentUserId())
+            container.wantTimerController.signalServiceStop()
+            val msg = when (result) {
+                is CancelResult.Logged -> "Logged ${result.minutes} min · −${result.pointsSpent} pt"
+                CancelResult.Discarded -> "Timer cancelled"
+                CancelResult.NoActiveTimer -> null
+            }
+            msg?.let { _events.tryEmit(HomeEvent.Message(it)) }
+        }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observeHomeUiState() {
@@ -250,6 +301,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         observeHomeUiState()
         observeStreaks()
         observePinnedIdentity()
+        observeActiveWantTimer()
     }
 
     /** Tap handler: bump pending count for this habit and (re)start its 3s countdown. */
@@ -408,6 +460,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         timers.clear()
         wantTimers.values.forEach { it.cancel() }
         wantTimers.clear()
+        homeTimerJob?.cancel()
     }
 }
 

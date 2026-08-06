@@ -190,6 +190,7 @@ fun AppNavigation(container: AppContainer) {
                     onIdentitiesClick = { navController.navigate(Screen.IdentityList.route) },
                     onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
                     onOpenWantDetail = { id -> navController.navigate(Screen.WantDetail.route(id)) },
+                    onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },
                 )
             }
 
