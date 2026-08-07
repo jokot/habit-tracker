@@ -28,6 +28,7 @@ import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
 import com.habittracker.domain.usecase.ComputePerHabitStreakUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetDayPointsUseCase
+import com.habittracker.domain.usecase.GetTodayHabitsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
 import com.habittracker.domain.usecase.GetUserStreakOnDayUseCase
@@ -106,6 +107,7 @@ class AppContainer(context: Context) {
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
     val appFlagsPreferences = AppFlagsPreferences(appContext)
     val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository, habitRepository)
+    val getTodayHabitsUseCase = GetTodayHabitsUseCase(habitRepository, habitLogRepository)
     val notificationScheduler = NotificationScheduler(appContext, notificationPreferences)
 
     private val syncPreferences = SyncPreferences(appContext)
