@@ -216,7 +216,9 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                             // Exclude soft-deleted habits — only currently active ones surface in UI / progress.
                             val habits = habitsRaw.filter { it.effectiveTo == null }
                             val habitsById = habits.associateBy { it.id }
-                            val habitsWithProgress = container.getTodayHabitsUseCase.execute(userId)
+                            val habitsWithProgress = container.getTodayHabitsUseCase.execute(
+                                habits, habitLogs, dayStart, dayEnd,
+                            )
 
                             val earned = habitLogs
                                 .filter { it.loggedAt >= weekStart }
