@@ -44,5 +44,16 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="want_timer_countdown" />
         </service>
+        <receiver
+            android:name=".widget.HabitWidgetReceiver"
+            android:exported="true"
+            android:label="@string/habit_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habit_widget_info" />
+        </receiver>
     </application>
 </manifest>
