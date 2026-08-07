@@ -30,6 +30,7 @@ import com.jktdeveloper.habitto.HabitTrackerApplication
 import com.jktdeveloper.habitto.MainActivity
 import com.jktdeveloper.habitto.ui.theme.DarkColorScheme
 import com.jktdeveloper.habitto.ui.theme.LightColorScheme
+import kotlin.math.nextUp
 
 class HabitWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -75,7 +76,12 @@ private fun WidgetContent(habits: List<HabitWithProgress>, balance: Int) {
 @Composable
 private fun HabitRow(hp: HabitWithProgress) {
     val habit = hp.habit
-    val logQuantity = habit.dailyTarget * habit.thresholdPerPoint
+    // ponytail: dailyTarget * thresholdPerPoint can double-round just under the true
+    // value (e.g. 3 * 0.7 -> 2.0999999999999996), which then floors one point short in
+    // PointCalculator.pointsEarned. nextUp() nudges by a single ULP to clear that noise
+    // without perturbing the logged quantity — verified dailyTarget=3/threshold=0.7,
+    // dailyTarget=7/threshold=1/3, dailyTarget=6/threshold=0.7 all recover exactly.
+    val logQuantity = (habit.dailyTarget * habit.thresholdPerPoint).nextUp()
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
