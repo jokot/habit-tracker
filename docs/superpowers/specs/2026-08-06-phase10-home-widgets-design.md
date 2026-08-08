@@ -1,5 +1,7 @@
 # Phase 10 — Home-screen widget: design
 
+> **Superseded** by `2026-08-08-phase10-home-widgets-v2-design.md`. The single habits+balance widget described here is replaced by four widgets (balance, quick-log list, quick-log grid, streak), wants are added, and the periodic-refresh decision below is reversed. Kept for history; do not implement from this document.
+
 ## Why
 
 Want-timer status already surfaces on the app's Home screen so points-draining is never invisible. Daily habit logging has no equivalent outside the app — a user has to open Habitto to log anything. An Android home-screen widget puts the daily-logging core loop (today's habits + point balance) one tap away from the device home screen, no app launch required.
