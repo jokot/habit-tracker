@@ -59,16 +59,21 @@ Existing, replaced: `HabitWidget.kt` and `HabitWidgetReceiver.kt` become four wi
 Actions:
 
 - `LogHabitAction` — unchanged behavior, now shared by widgets 2 and 3.
-- `StartWantTimerAction` — new. For a want with `unit == "min"`, calls `container.wantTimerController` to start a timer, which starts `WantTimerService` and thereby the per-minute widget tick.
-- `LogWantAction` — new. For a want with any other unit (`cups`, etc.), calls the existing `LogWantUseCase` directly. An instant want is not a timer.
+- `LogWantAction` — new. For a want with `unit != "min"`, calls the existing `LogWantUseCase` directly with `taps = 1`. An instant want is not a timer; one tap spends one point.
+- **Minute-unit wants do not start a timer from the widget.** Tapping one opens the app at the existing want-timer deep link, `com.jktdeveloper.habitto://want-timer/$activityId` (registered at `AndroidManifest.xml:36`, already used by `WantTimerService`'s notification). Two reasons: `WantTimerController.start` requires a `durationSec` the widget has no sensible way to invent, and a timer is an open-ended point drain — a mis-tap on the home screen would start spending with no in-widget way to see or stop it. The user picks the duration on the screen that exists for it. This uses `actionStartActivity` with the URI; no new action class is needed.
 
 Data access stays `(applicationContext as HabitTrackerApplication).container`. No new DI surface.
 
 ### Streak data
 
-Widget 4 needs per-day streak state across 36 cells (min) or 60 (expanded), reusing the Phase 4 model (`COMPLETE` / `FROZEN` / `BROKEN` / `EMPTY` / `TODAY_PENDING`) and the colors already in `ui/theme/Color.kt`. `ComputeStreakUseCase`, `GetUserStreakOnDayUseCase`, and `GetDayPointsUseCase` all exist on `AppContainer`.
+Widget 4 needs per-day streak state across 36 cells (min) or 60 (expanded), reusing the Phase 4 model (`COMPLETE` / `FROZEN` / `BROKEN` / `EMPTY` / `TODAY_PENDING` / `FUTURE`) and the colors already in `ui/theme/Color.kt`.
 
-If the multi-day history computation turns out to live inline in the streak-history ViewModel rather than in a use case, extract it to `commonMain` first — the same extraction `GetTodayHabitsUseCase` got in v1, and for the same reason: two callers of one business rule must not drift.
+No extraction is needed — `ComputeStreakUseCase` already exposes both suspend entry points in `commonMain`, which is exactly what `provideGlance` needs:
+
+- `computeNow(userId: String, range: DateRange): StreakRangeResult` → `days: List<StreakDay>`, each with `date`, `state`, `heatLevel`
+- `computeSummaryNow(userId: String): StreakSummary` → `currentStreak`, `longestStreak`, `totalDaysComplete`, `firstLogDate`
+
+`DateRange` is half-open `[start, endExclusive)`.
 
 ## Widget content rules
 
@@ -76,14 +81,15 @@ If the multi-day history computation turns out to live inline in the streak-hist
 
 **Item selection.** Widgets can't show 14 seeded wants. Widget 2 min shows one habit row and no wants; expanded shows two habits and three wants. Widget 3 min is a fixed 3×1, expanded 3×2. Selection is most-used, stable ordering.
 
-**Affordability.** A want the balance can't cover renders unavailable. The affordability test must branch on unit:
+**Affordability.** *(Corrected 2026-08-08 against the real domain model — see "Model corrections" below.)* There is no per-want cost. `PointCalculator.pointsSpent(taps) = taps`: one tap is one point for every want, and `WantActivity.unitsPerPoint` controls how many *units* one point buys, not what it costs. Affordability is therefore uniform:
 
-```
-val cost = if (want.unit == "min") want.cost * ESTIMATED_SESSION_MINUTES else want.cost
-val unaffordable = cost > balance
+```kotlin
+val unaffordable = balance <= 0
 ```
 
-A flat `cost * 5` is wrong for instant wants — a 1-point coffee reads as locked at a 3-point balance despite being affordable. (This bug is present in the current mockup and must not be carried into the implementation.)
+This is exactly the gate `WantTimerController.start` already enforces (`if (balance <= 0) throw InsufficientPointsException(available = balance, required = 1)`). The widget must render the same rule, not invent a second one. At zero balance every want renders unavailable; above zero, none do.
+
+The mockup's mixed lock state (one want locked, another free at the same balance) is not reproducible and must not be implemented.
 
 **Widget 3 at min size omits the balance header** to fit three 48dp tiles in a 110dp cell. At min it is a quick-log widget only; the balance returns when expanded.
 
@@ -109,11 +115,15 @@ These are platform limits, and three of them are violated by the current mockup 
 
 ## Testing
 
-- **Affordability branch** — shared `commonTest`. It has a real bug class (the unit branch above) and pure inputs. Cover: minute-unit want affordable and not, instant want affordable and not, zero balance.
-- **Streak history extraction**, if extracted — `commonTest`, same style as `PointCalculatorTest`.
+- **Widget item selection** — shared `commonTest`, over a pure function taking habits, wants, balance and a slot count, returning the rows to render with their enabled/disabled state. This is where the affordability rule and the truncation rule live, and it is the only widget logic with enough branching to be worth testing. Cover: zero balance disables every want, positive balance disables none, fewer items than slots, more items than slots.
+- **Streak** — no new test. `ComputeStreakUseCase` is already covered and the widget only reads it.
 - **Widget rendering and action callbacks** — no automated test. Glance widgets aren't practically unit-testable and this codebase has no Compose screenshot tests. Manual device QA, same as v1 and Phase 9.
 - **Manual QA must cover the refresh model specifically**, since it is the part most likely to be wrong and the least visible in code review: log a habit in-app and confirm the widget updates without waiting; start a want timer and confirm per-minute drain on the widget; kill the app process and confirm the widget still reconciles within 30 minutes.
 
-## Open question
+## Model corrections
 
-`ESTIMATED_SESSION_MINUTES` is a guess at how long a want session runs, used only to decide whether to grey out a minute-unit want. Five minutes is the mockup's implicit value and is adopted as the default. If it reads wrong on device, the alternative is to test affordability against one minute (can the user afford to start at all?) rather than a session estimate — a smaller, more defensible rule. Worth settling during QA.
+Three things in the first draft of this spec came from the design canvas rather than the codebase, and were corrected on 2026-08-08 after reading the domain layer. Recorded here because the mockup still shows the old behavior:
+
+1. **`want.cost` does not exist.** `WantActivity` is `(id, name, unit, unitsPerPoint, isCustom, createdByUserId, iconKey, hiddenAt, updatedAt, syncedAt)`. Spend is `PointCalculator.pointsSpent(taps) = taps` — one tap, one point, every want. `unitsPerPoint` (scaled by the streak exchange rate via `effectiveUnitsPerPoint`) sets how many units a point buys.
+2. **`ESTIMATED_SESSION_MINUTES` was fictional** and is dropped along with the per-want affordability formula. See "Affordability".
+3. **Widget row copy.** Because every want costs 1 point per tap, a want row shows `−1 pt` uniformly. The differentiator worth surfacing is the rate — how many units that point buys (e.g. `5 min` vs `1 cup`), which is what `effectiveUnitsPerPoint` returns and what varies between wants.
