@@ -10,10 +10,16 @@ import androidx.glance.appwidget.updateAll
  * widgets itself.
  */
 object WidgetUpdates {
+    /**
+     * Each widget is guarded on its own. Unguarded and sequential, a throw from the first
+     * pinned widget's render — a DB read inside `provideGlance`, a launcher that has gone
+     * away — silently skips every widget after it, which reads on the home screen as "only
+     * some of my widgets update".
+     */
     suspend fun updateAll(context: Context) {
-        BalanceWidget().updateAll(context)
-        QuickLogListWidget().updateAll(context)
-        QuickLogGridWidget().updateAll(context)
-        StreakWidget().updateAll(context)
+        runCatching { BalanceWidget().updateAll(context) }
+        runCatching { QuickLogListWidget().updateAll(context) }
+        runCatching { QuickLogGridWidget().updateAll(context) }
+        runCatching { StreakWidget().updateAll(context) }
     }
 }

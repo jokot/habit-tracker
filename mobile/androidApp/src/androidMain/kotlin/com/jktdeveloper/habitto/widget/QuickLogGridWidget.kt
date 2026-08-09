@@ -1,7 +1,6 @@
 package com.jktdeveloper.habitto.widget
 
 import android.content.Context
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -20,6 +19,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.material3.ColorProviders
 import com.habittracker.domain.usecase.WidgetData
 import com.jktdeveloper.habitto.HabitTrackerApplication
@@ -34,20 +34,28 @@ private data class GridEntry(
     val action: Action,
 )
 
+/**
+ * Habits and wants as square tiles.
+ *
+ * Column count, row count and tile edge are all derived from the real widget size —
+ * Glance has no `aspectRatio` and no flowing grid, so a square tile only happens if the
+ * caller computes the edge itself. The gutter lives on a wrapper [Box] rather than on
+ * the tile: Glance applies `padding` inside a view's background, so padding on the tile
+ * shrinks its fill instead of separating it from its neighbour.
+ */
 class QuickLogGridWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Responsive(setOf(MIN_SIZE, EXPANDED_SIZE))
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as HabitTrackerApplication).container
         val data: WidgetData = container.getWidgetDataUseCase.execute(
             userId = container.currentUserId(),
-            habitSlots = 3,
-            wantSlots = 3,
+            habitSlots = Int.MAX_VALUE,
+            wantSlots = Int.MAX_VALUE,
         )
         provideContent {
             GlanceTheme(colors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)) {
-                val expanded = LocalSize.current.height > MIN_SIZE.height
                 val context = LocalContext.current
                 val tiles = buildList {
                     data.items.habits.forEach { h ->
@@ -86,33 +94,42 @@ class QuickLogGridWidget : GlanceAppWidget() {
                         )
                     }
                 }
+                val size = LocalSize.current
+                val innerWidth = size.width - SURFACE_PADDING * 2
+                val innerHeight = size.height - SURFACE_PADDING * 2
+                val showHeader = size.height >= 170.dp
+                val gridHeight = if (showHeader) innerHeight - HEADER_HEIGHT else innerHeight
+                val columns = (innerWidth / TARGET_TILE).toInt().coerceIn(2, 5)
+                val slot = innerWidth / columns
+                val rows = (gridHeight / slot).toInt().coerceAtLeast(1)
+                val visible = tiles.take(columns * rows)
+
                 WidgetSurface {
                     if (tiles.isEmpty()) {
                         WidgetEmpty("No habits yet — open app")
                     } else {
-                        if (expanded) {
+                        if (showHeader) {
                             BalanceHeader(
                                 balance = data.balance,
                                 currentStreak = data.currentStreak,
                                 compact = true,
                             )
                         }
-                        repeat(if (expanded) 2 else 1) { rowIndex ->
+                        repeat(rows) { rowIndex ->
                             Row(modifier = GlanceModifier.fillMaxWidth()) {
-                                repeat(COLUMNS) { col ->
-                                    val entry = tiles.getOrNull(rowIndex * COLUMNS + col)
-                                    if (entry == null) {
-                                        Box(modifier = GlanceModifier.defaultWeight()) {}
-                                    } else {
-                                        GridTile(
-                                            label = entry.label,
-                                            caption = entry.caption,
-                                            enabled = entry.enabled,
-                                            action = entry.action,
-                                            modifier = GlanceModifier
-                                                .defaultWeight()
-                                                .padding(2.dp),
-                                        )
+                                repeat(columns) { col ->
+                                    val entry = visible.getOrNull(rowIndex * columns + col)
+                                    Box(
+                                        modifier = GlanceModifier.size(slot).padding(GUTTER),
+                                    ) {
+                                        if (entry != null) {
+                                            GridTile(
+                                                label = entry.label,
+                                                caption = entry.caption,
+                                                enabled = entry.enabled,
+                                                action = entry.action,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -123,9 +140,10 @@ class QuickLogGridWidget : GlanceAppWidget() {
         }
     }
 
-    companion object {
-        val MIN_SIZE = DpSize(250.dp, 110.dp)
-        val EXPANDED_SIZE = DpSize(250.dp, 250.dp)
-        private const val COLUMNS = 3
+    private companion object {
+        /** Smallest tile edge worth rendering; column count is `innerWidth / this`. */
+        val TARGET_TILE = 70.dp
+        val GUTTER = 4.dp
+        val HEADER_HEIGHT = 28.dp
     }
 }

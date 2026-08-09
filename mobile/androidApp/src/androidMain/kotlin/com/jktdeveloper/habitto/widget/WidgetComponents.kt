@@ -63,6 +63,8 @@ import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
 @Composable
 fun WidgetSurface(
     modifier: GlanceModifier = GlanceModifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    verticalAlignment: Alignment.Vertical = Alignment.Top,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -70,11 +72,16 @@ fun WidgetSurface(
             .fillMaxSize()
             .background(GlanceTheme.colors.background)
             .cornerRadius(24.dp)
-            .padding(12.dp),
+            .padding(SURFACE_PADDING),
+        horizontalAlignment = horizontalAlignment,
+        verticalAlignment = verticalAlignment,
     ) {
         content()
     }
 }
+
+/** Padding [WidgetSurface] applies on every edge. Widgets subtract it when sizing their content. */
+val SURFACE_PADDING = 12.dp
 
 /** Shown when a widget has nothing to render. Tapping it opens the app. */
 @Composable
@@ -232,6 +239,10 @@ fun WantRow(item: WidgetWantItem) {
  * One icon-sized tile. The glyph is the item name's first letter — Glance cannot
  * render the app's ImageVector icons, and a bare letter reads better at tile size
  * than a truncated name. See the plan's Global Constraints.
+ *
+ * The tile fills whatever square its caller sized for it; the caller owns both the
+ * tile's dimensions and the gutter between tiles (Glance has no aspectRatio, and
+ * padding applied here would land inside the background rather than between tiles).
  */
 @Composable
 fun GridTile(
@@ -244,7 +255,7 @@ fun GridTile(
     val fg = if (enabled) GlanceTheme.colors.onSurface else GlanceTheme.colors.onSurfaceVariant
     Column(
         modifier = modifier
-            .height(72.dp)
+            .fillMaxSize()
             .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(12.dp)
             .padding(6.dp)
