@@ -45,15 +45,51 @@
                 android:value="want_timer_countdown" />
         </service>
         <receiver
-            android:name=".widget.HabitWidgetReceiver"
+            android:name=".widget.BalanceWidgetReceiver"
             android:exported="true"
-            android:label="@string/habit_widget_description">
+            android:label="@string/balance_widget_description">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/habit_widget_info" />
+                android:resource="@xml/balance_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickLogListWidgetReceiver"
+            android:exported="true"
+            android:label="@string/quick_log_list_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_log_list_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickLogGridWidgetReceiver"
+            android:exported="true"
+            android:label="@string/quick_log_grid_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_log_grid_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.StreakWidgetReceiver"
+            android:exported="true"
+            android:label="@string/streak_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/streak_widget_info" />
         </receiver>
     </application>
 </manifest>

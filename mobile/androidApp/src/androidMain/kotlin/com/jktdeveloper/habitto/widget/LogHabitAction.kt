@@ -23,6 +23,6 @@ class LogHabitAction : ActionCallback {
             container.logHabitUseCase.execute(container.currentUserId(), habitId, quantity)
         }
 
-        HabitWidget().update(context, glanceId)
+        WidgetUpdates.updateAll(context)
     }
 }

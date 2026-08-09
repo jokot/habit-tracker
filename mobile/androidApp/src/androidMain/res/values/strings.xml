@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="habit_widget_description">Today\'s habits</string>
+    <string name="balance_widget_description">Point balance</string>
+    <string name="quick_log_list_widget_description">Quick log — list</string>
+    <string name="quick_log_grid_widget_description">Quick log — grid</string>
+    <string name="streak_widget_description">Streak history</string>
 </resources>
