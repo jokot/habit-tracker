@@ -37,11 +37,10 @@ Device: ______  Android version: ______  Date: ______
 - [ ] Min: 36 cells at 12 columns
 - [ ] Expanded: 60 cells at 15 columns
 - [ ] Cell colors match the in-app streak history for the same days
-- [ ] No history → "Start a streak"
-- [ ] `ComputeStreakUseCase.computeNow` always returns a full 60-day list, so a
-      brand-new user with no logs gets 60 grey `HeatL0` cells rather than the "Start a
-      streak" message. The empty state is effectively unreachable in normal use — if a
-      fresh install shows a full grey grid, that is expected, not a bug to file.
+- [ ] No history → 60 grey `HeatL0` cells, NOT "Start a streak". `ComputeStreakUseCase.computeNow`
+      always returns a full 60-day list — missing history comes back as `EMPTY`-state days, not a
+      shorter list — so the empty state is effectively unreachable in normal use. A fresh install
+      showing a full grey grid is expected, not a bug to file.
 - [ ] Dark mode
 
 ## Refresh model — the part most likely to be wrong
@@ -64,14 +63,12 @@ Device: ______  Android version: ______  Date: ______
 - [ ] Disabled wants are dimmed by color, not opacity — Glance has no opacity modifier.
 - [ ] Every want reads `−1 pt`; there is no per-want cost in the domain model. The
       differentiator shown is the rate (`5 min`, `1 cup`).
-- [ ] Items shown are the first N in the app's own order, not the most-used ones.
-      Confirm the widget shows the same leading habits/wants as Home and the Want list.
-- [ ] The spec asked for "most-used, stable ordering", but the domain layer has no usage
-      count and neither the habit nor the want-activity query carries an `ORDER BY`, so
-      both return insertion order and `WidgetItemSelector` takes the first N. Verify the
-      widgets show the same leading habits and wants as the Home screen and the Want
-      list, in the same order. This is a known, accepted deviation from the spec —
-      record it as such, not as a bug.
+- [ ] Items shown are the first N in the app's own order, not the most-used ones. Confirm the
+      widgets show the same leading habits and wants as the Home screen and the Want list, in the
+      same order. The spec asked for "most-used, stable ordering", but the domain layer has no
+      usage count and neither the habit nor the want-activity query carries an `ORDER BY`, so both
+      return insertion order and `WidgetItemSelector` takes the first N. This is a known, accepted
+      deviation from the spec — record it as such, not as a bug.
 
 ## Behavior change from v1 to confirm deliberately
 - [ ] A widget habit tap logs one point. v1 logged the full daily target in one tap.
