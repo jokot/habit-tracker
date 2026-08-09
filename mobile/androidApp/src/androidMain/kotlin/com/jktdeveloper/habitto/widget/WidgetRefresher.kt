@@ -5,11 +5,13 @@ import com.jktdeveloper.habitto.AppContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 
 /**
@@ -44,6 +46,15 @@ class WidgetRefresher(
                     ) { _, _, _, _ -> Unit }
                 }
                 .debounce(DEBOUNCE_MS)
+                // The runCatching below guards only the render. A throw from any of the four
+                // SQLDelight Flows — or from combine/flatMapLatest — would escape .collect into
+                // this GlobalScope launch, which has no parent job and no CoroutineExceptionHandler,
+                // and kill the process. Retrying re-subscribes instead, so a transient DB fault
+                // costs one refresh rather than the app.
+                .retry {
+                    delay(RETRY_DELAY_MS)
+                    true
+                }
                 .collect {
                     runCatching { WidgetUpdates.updateAll(context) }
                 }
@@ -52,5 +63,10 @@ class WidgetRefresher(
 
     private companion object {
         const val DEBOUNCE_MS = 300L
+
+        // ponytail: flat delay, no backoff — a persistently failing read costs one wakeup per 5s
+        // and the 30-min updatePeriodMillis backstop still renders. Add backoff if it ever shows
+        // up in battery stats.
+        const val RETRY_DELAY_MS = 5_000L
     }
 }
