@@ -46,8 +46,10 @@ import kotlinx.datetime.toLocalDateTime
  * Cell edge, column count and row count are all computed from the real widget size so
  * the grid spans the frame instead of sitting in a corner of it. [HISTORY_DAYS] is the
  * ceiling a very large widget could ask for; smaller frames render the tail of it.
+ *
+ * [withHeader] false is the "pure items" variant — the heat grid alone, no streak line.
  */
-class StreakWidget : GlanceAppWidget() {
+open class StreakWidget(private val withHeader: Boolean = true) : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Exact
 
@@ -68,11 +70,13 @@ class StreakWidget : GlanceAppWidget() {
                 val size = LocalSize.current
                 val innerWidth = size.width - SURFACE_PADDING * 2
                 val innerHeight = size.height - SURFACE_PADDING * 2
-                val showHeader = size.height >= 140.dp
+                val showHeader = withHeader && size.height >= 140.dp
                 val gridHeight = if (showHeader) innerHeight - HEADER_HEIGHT else innerHeight
-                val columns = (innerWidth / TARGET_CELL).toInt().coerceIn(4, 20)
+                // EPSILON absorbs float division landing a hair under a whole cell — at 2×2
+                // the row count divides out to exactly 5, and without it can floor to 4.
+                val columns = (innerWidth / TARGET_CELL + EPSILON).toInt().coerceIn(5, 20)
                 val slot = innerWidth / columns
-                val maxRows = (gridHeight / slot).toInt().coerceAtLeast(1)
+                val maxRows = (gridHeight / slot + EPSILON).toInt().coerceAtLeast(1)
                 val rows = minOf(maxRows, days.size / columns).coerceAtLeast(1)
                 val visible = days.takeLast(columns * rows)
 
@@ -132,8 +136,14 @@ class StreakWidget : GlanceAppWidget() {
     private companion object {
         /** Ceiling on history fetched; the largest sensible widget renders roughly this many. */
         const val HISTORY_DAYS = 120
+
+        /** Preferred cell edge; five columns is the floor, which is what a 2×2 lands on. */
         val TARGET_CELL = 28.dp
         val GAP = 2.dp
         val HEADER_HEIGHT = 30.dp
+        const val EPSILON = 0.02f
     }
 }
+
+/** Same heat grid, no streak line — the "pure items" variant. */
+class StreakPlainWidget : StreakWidget(withHeader = false)

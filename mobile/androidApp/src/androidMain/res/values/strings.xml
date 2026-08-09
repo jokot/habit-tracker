@@ -4,4 +4,7 @@
     <string name="quick_log_list_widget_description">Quick log — list</string>
     <string name="quick_log_grid_widget_description">Quick log — grid</string>
     <string name="streak_widget_description">Streak history</string>
+    <string name="quick_log_list_plain_widget_description">Quick log — list only</string>
+    <string name="quick_log_grid_plain_widget_description">Quick log — grid only</string>
+    <string name="streak_plain_widget_description">Streak history — grid only</string>
 </resources>

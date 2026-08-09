@@ -20,6 +20,8 @@ data class WidgetWantItem(
     val rateText: String,
     val isTimed: Boolean,
     val enabled: Boolean,
+    /** Carried through so a widget can draw the same glyph the want lists draw. */
+    val iconKey: String? = null,
 )
 
 data class WidgetItems(
@@ -85,6 +87,7 @@ object WidgetItemSelector {
                     rateText = "$units ${want.unit}",
                     isTimed = want.unit == MINUTE_UNIT,
                     enabled = affordable,
+                    iconKey = want.iconKey,
                 )
             }
 

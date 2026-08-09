@@ -4,10 +4,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.action.Action
 import androidx.glance.action.actionStartActivity
@@ -26,6 +31,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -236,47 +242,69 @@ fun WantRow(item: WidgetWantItem) {
 }
 
 /**
- * One icon-sized tile. The glyph is the item name's first letter — Glance cannot
- * render the app's ImageVector icons, and a bare letter reads better at tile size
- * than a truncated name. See the plan's Global Constraints.
+ * One icon-sized tile carrying the same glyph the Home list shows for the item.
+ * [iconBitmap] rasterises it — Glance draws bitmaps, not ImageVectors — and the tint
+ * follows the theme. [hue] is [HABIT_HUE] or [WANT_HUE]; the circle mirrors `HabitGlyph`.
  *
  * The tile fills whatever square its caller sized for it; the caller owns both the
  * tile's dimensions and the gutter between tiles (Glance has no aspectRatio, and
  * padding applied here would land inside the background rather than between tiles).
+ * [tileSize] is that square's edge: the glyph scales with it and the text lines drop
+ * out on tiles too small to hold them legibly.
  */
 @Composable
 fun GridTile(
+    icon: ImageVector,
+    hue: Float,
     label: String,
     caption: String,
     enabled: Boolean,
     action: Action,
+    tileSize: Dp,
     modifier: GlanceModifier = GlanceModifier,
 ) {
     val fg = if (enabled) GlanceTheme.colors.onSurface else GlanceTheme.colors.onSurfaceVariant
+    val glyph = (tileSize * 0.46f).coerceIn(20.dp, 44.dp)
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(12.dp)
-            .padding(6.dp)
+            .padding(4.dp)
             .clickable(action),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            label.take(1).uppercase(),
-            style = TextStyle(color = fg, fontSize = 20.sp, fontWeight = FontWeight.Bold),
-        )
-        Text(
-            label,
-            maxLines = 1,
-            style = TextStyle(color = fg, fontSize = 10.sp),
-        )
-        Text(
-            caption,
-            maxLines = 1,
-            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
-        )
+        Box(
+            modifier = GlanceModifier
+                .size(glyph)
+                .background(if (enabled) glyphBackground(hue) else GlanceTheme.colors.background)
+                .cornerRadius(glyph / 2),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                provider = ImageProvider(iconBitmap(icon)),
+                contentDescription = label,
+                colorFilter = ColorFilter.tint(
+                    if (enabled) glyphForeground(hue) else GlanceTheme.colors.onSurfaceVariant,
+                ),
+                modifier = GlanceModifier.size(glyph * 0.58f),
+            )
+        }
+        if (tileSize >= 62.dp) {
+            Text(
+                label,
+                maxLines = 1,
+                style = TextStyle(color = fg, fontSize = 10.sp),
+            )
+        }
+        if (tileSize >= 80.dp) {
+            Text(
+                caption,
+                maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
+            )
+        }
     }
 }
 

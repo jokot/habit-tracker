@@ -31,8 +31,10 @@ import com.jktdeveloper.habitto.ui.theme.LightColorScheme
  *
  * [SizeMode.Exact] for the same reason [BalanceWidget] uses it — Responsive lays out for
  * the nearest declared size, not the real one.
+ *
+ * [withHeader] false is the "pure items" variant — the same list, no balance line.
  */
-class QuickLogListWidget : GlanceAppWidget() {
+open class QuickLogListWidget(private val withHeader: Boolean = true) : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Exact
 
@@ -50,11 +52,13 @@ class QuickLogListWidget : GlanceAppWidget() {
                     if (data.items.habits.isEmpty() && data.items.wants.isEmpty()) {
                         WidgetEmpty("No habits yet — open app")
                     } else {
-                        BalanceHeader(
-                            balance = data.balance,
-                            currentStreak = data.currentStreak,
-                            compact = compactHeader,
-                        )
+                        if (withHeader) {
+                            BalanceHeader(
+                                balance = data.balance,
+                                currentStreak = data.currentStreak,
+                                compact = compactHeader,
+                            )
+                        }
                         LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                             items(
                                 items = data.items.habits,
@@ -82,3 +86,6 @@ class QuickLogListWidget : GlanceAppWidget() {
         const val DIVIDER_ITEM_ID = -1L
     }
 }
+
+/** Same list, no balance header — the "pure items" variant. */
+class QuickLogListPlainWidget : QuickLogListWidget(withHeader = false)

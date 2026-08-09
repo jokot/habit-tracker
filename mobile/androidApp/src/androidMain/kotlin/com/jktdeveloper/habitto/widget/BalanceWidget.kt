@@ -73,7 +73,9 @@ class BalanceWidget : GlanceAppWidget() {
                                 fontWeight = FontWeight.Bold,
                             ),
                         )
-                        if (shortEdge >= 60.dp) {
+                        // `pts` is the first thing to go. At 1×1 the numeral and the flame
+                        // are the whole widget, and the unit is inferable from the app.
+                        if (shortEdge >= 90.dp) {
                             Text(
                                 " pts",
                                 style = TextStyle(
@@ -83,7 +85,8 @@ class BalanceWidget : GlanceAppWidget() {
                             )
                         }
                     }
-                    if (data.currentStreak > 0 && shortEdge >= 90.dp) {
+                    // The flame survives every size — it is half of what a 1×1 is for.
+                    if (data.currentStreak > 0) {
                         Text(
                             "🔥 ${data.currentStreak}",
                             style = TextStyle(
