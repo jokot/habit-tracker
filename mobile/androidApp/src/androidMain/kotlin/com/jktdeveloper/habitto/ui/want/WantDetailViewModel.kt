@@ -234,8 +234,11 @@ class WantDetailViewModel @VisibleForTesting internal constructor(
                 DayLogs(date = d, items = items)
             }
             val totalSpent = days.sumOf { it.items.sumOf { item -> item.pointsAtLog } }
+            // copy, not a fresh WantDetailUi: reload runs on every resume, and building a new
+            // state here threw away everything it does not name — an open duration sheet, the
+            // running-timer fields, a pending overlap, a toast.
             _state.update {
-                WantDetailUi(
+                it.copy(
                     isLoading = false,
                     want = want,
                     totalSpent7d = totalSpent,

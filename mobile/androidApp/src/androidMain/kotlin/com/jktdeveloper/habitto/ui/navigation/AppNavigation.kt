@@ -1,12 +1,16 @@
 package com.jktdeveloper.habitto.ui.navigation
 
+import android.content.ContextWrapper
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -70,9 +75,12 @@ sealed class Screen(val route: String) {
     object ExchangeRate : Screen("exchange_rate")
     object DevTools : Screen("dev_tools")
     object WantList : Screen("want_list")
-    object WantDetail : Screen("want_detail/{wantId}") {
+    object WantDetail : Screen("want_detail/{wantId}?openTimer={openTimer}") {
         const val ARG_ID = "wantId"
-        fun route(id: String) = "want_detail/$id"
+
+        /** Set by the widget: land on the detail with the duration sheet already up. */
+        const val ARG_OPEN_TIMER = "openTimer"
+        fun route(id: String, openTimer: Boolean = false) = "want_detail/$id?openTimer=$openTimer"
     }
     object WantForm : Screen("want_form?wantId={wantId}") {
         const val ARG_ID = "wantId"
@@ -135,6 +143,19 @@ fun AppNavigation(container: AppContainer) {
             CircularProgressIndicator()
         }
         return
+    }
+
+    // MainActivity is singleTop, so a deep link fired while the app is already running never
+    // re-runs onCreate — it arrives in onNewIntent, and NavHost only ever reads the intent its
+    // activity was created with. Without this, widget and notification links are silently
+    // dropped on a warm start. Registered below the startDestination gate so the graph exists.
+    DisposableEffect(navController) {
+        val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<ComponentActivity>()
+            .first()
+        val listener = Consumer<Intent> { navController.handleDeepLink(it) }
+        activity.addOnNewIntentListener(listener)
+        onDispose { activity.removeOnNewIntentListener(listener) }
     }
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -292,14 +313,25 @@ fun AppNavigation(container: AppContainer) {
                     androidx.navigation.navArgument(Screen.WantDetail.ARG_ID) {
                         type = androidx.navigation.NavType.StringType
                     },
+                    androidx.navigation.navArgument(Screen.WantDetail.ARG_OPEN_TIMER) {
+                        type = androidx.navigation.NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
+                deepLinks = listOf(
+                    androidx.navigation.navDeepLink {
+                        uriPattern = "com.jktdeveloper.habitto://want-detail/{wantId}?openTimer={openTimer}"
+                    },
                 ),
             ) { entry ->
                 val wantId = entry.arguments?.getString(Screen.WantDetail.ARG_ID).orEmpty()
+                val openTimer = entry.arguments?.getBoolean(Screen.WantDetail.ARG_OPEN_TIMER) == true
                 val vm = androidx.lifecycle.viewmodel.compose.viewModel {
                     com.jktdeveloper.habitto.ui.want.WantDetailViewModel(wantId, container)
                 }
                 com.jktdeveloper.habitto.ui.want.WantDetailScreen(
                     viewModel = vm,
+                    autoOpenTimer = openTimer,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(Screen.WantForm.route(wantId)) },
                     onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },

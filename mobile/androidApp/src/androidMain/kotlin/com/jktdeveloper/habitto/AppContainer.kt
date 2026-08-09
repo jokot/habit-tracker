@@ -28,7 +28,10 @@ import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
 import com.habittracker.domain.usecase.ComputePerHabitStreakUseCase
 import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetDayPointsUseCase
+import com.habittracker.domain.usecase.GetTodayHabitsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
+import com.habittracker.domain.usecase.GetWidgetDataUseCase
+import com.habittracker.domain.usecase.WidgetData
 import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
 import com.habittracker.domain.usecase.GetUserStreakOnDayUseCase
 import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
@@ -63,10 +66,12 @@ import kotlinx.datetime.toLocalDateTime
 import com.jktdeveloper.habitto.preferences.AppFlagsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,6 +79,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Observable snapshot of who the app is currently acting as. */
@@ -106,6 +114,7 @@ class AppContainer(context: Context) {
     val notificationFiringDateStore = NotificationFiringDateStore(appContext)
     val appFlagsPreferences = AppFlagsPreferences(appContext)
     val computeStreakUseCase = ComputeStreakUseCase(habitLogRepository, habitRepository)
+    val getTodayHabitsUseCase = GetTodayHabitsUseCase(habitRepository, habitLogRepository)
     val notificationScheduler = NotificationScheduler(appContext, notificationPreferences)
 
     private val syncPreferences = SyncPreferences(appContext)
@@ -151,6 +160,15 @@ class AppContainer(context: Context) {
         getPointBalanceUseCase = getPointBalanceUseCase,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
     )
+    val getWidgetDataUseCase = GetWidgetDataUseCase(
+        getTodayHabitsUseCase = getTodayHabitsUseCase,
+        wantActivityRepository = wantActivityRepository,
+        getPointBalanceUseCase = getPointBalanceUseCase,
+        computeStreakUseCase = computeStreakUseCase,
+        habitRepository = habitRepository,
+        habitLogRepository = habitLogRepository,
+        wantLogRepository = wantLogRepository,
+    )
     val wantTimerController = com.jktdeveloper.habitto.timer.WantTimerController(
         context = appContext,
         repository = wantTimerRepository,
@@ -195,6 +213,28 @@ class AppContainer(context: Context) {
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * What every home-screen widget renders, shared by all of them.
+     *
+     * Widgets collect this inside their Glance composition, so a log repaints them
+     * directly instead of each tap having to push an update at all seven widgets.
+     *
+     * Shared, not per-widget: seven live compositions must not mean seven sets of DB
+     * observers and seven streak computations. `WhileSubscribed` also means no work at
+     * all while nothing is collecting — the common case, since most users pin none.
+     *
+     * Slots are unbounded here because widgets slice to their own size at layout time,
+     * and that size is only knowable inside the composition.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val widgetData: StateFlow<WidgetData?> = authState
+        .map { it.userId }
+        .distinctUntilChanged()
+        .flatMapLatest { userId ->
+            getWidgetDataUseCase.observe(userId, habitSlots = Int.MAX_VALUE, wantSlots = Int.MAX_VALUE)
+        }
+        .stateIn(applicationScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val sessionExpiredEvents: SharedFlow<Unit> = _sessionExpiredEvents.asSharedFlow()

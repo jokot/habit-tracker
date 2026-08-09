@@ -59,6 +59,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.compose.activity)
     implementation(libs.lifecycle.viewmodel)

@@ -35,6 +35,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.jktdeveloper.habitto" android:host="want-timer" />
             </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.jktdeveloper.habitto" android:host="want-detail" />
+            </intent-filter>
         </activity>
         <service
             android:name=".timer.WantTimerService"
@@ -44,5 +50,93 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="want_timer_countdown" />
         </service>
+        <receiver
+            android:name=".widget.BalanceWidgetReceiver"
+            android:exported="true"
+            android:label="@string/balance_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/balance_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickLogListWidgetReceiver"
+            android:exported="true"
+            android:label="@string/quick_log_list_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_log_list_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickLogGridWidgetReceiver"
+            android:exported="true"
+            android:label="@string/quick_log_grid_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_log_grid_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.StreakWidgetReceiver"
+            android:exported="true"
+            android:label="@string/streak_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/streak_widget_info" />
+        </receiver>
+
+        <!--
+            The "plain" trio renders the same content as the three above with the balance
+            and streak headers omitted. They are separate receivers because a launcher pins
+            a provider, not a configuration: one receiver can only ever offer one layout.
+        -->
+        <receiver
+            android:name=".widget.QuickLogListPlainWidgetReceiver"
+            android:exported="true"
+            android:label="@string/quick_log_list_plain_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_log_list_plain_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickLogGridPlainWidgetReceiver"
+            android:exported="true"
+            android:label="@string/quick_log_grid_plain_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_log_grid_plain_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.StreakPlainWidgetReceiver"
+            android:exported="true"
+            android:label="@string/streak_plain_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/streak_plain_widget_info" />
+        </receiver>
     </application>
 </manifest>

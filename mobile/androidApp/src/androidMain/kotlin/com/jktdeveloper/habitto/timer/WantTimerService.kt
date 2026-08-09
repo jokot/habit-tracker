@@ -18,6 +18,7 @@ import com.jktdeveloper.habitto.R
 import com.jktdeveloper.habitto.notifications.NotificationChannels
 import com.jktdeveloper.habitto.notifications.NotificationTypeId
 import com.jktdeveloper.habitto.notifications.PermissionUtils
+import com.jktdeveloper.habitto.widget.WidgetUpdates
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -107,6 +108,7 @@ class WantTimerService : LifecycleService() {
                         pointsSpent = pointsSpent,
                     ),
                 )
+            runCatching { WidgetUpdates.updateAll(applicationContext) }
             val tickDelay = ((remainingSec % 60).coerceAtLeast(1) * 1000L).coerceAtMost(60_000L)
             delay(tickDelay)
         }
