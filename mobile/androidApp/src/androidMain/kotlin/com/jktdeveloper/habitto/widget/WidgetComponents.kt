@@ -29,11 +29,28 @@ import androidx.glance.layout.padding
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider as GlanceColorProvider
+import com.habittracker.domain.model.StreakDay
+import com.habittracker.domain.model.StreakDayState
 import com.habittracker.domain.usecase.WidgetHabitItem
 import com.habittracker.domain.usecase.WidgetWantItem
 import com.jktdeveloper.habitto.MainActivity
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
+import com.jktdeveloper.habitto.ui.theme.HeatL0
+import com.jktdeveloper.habitto.ui.theme.HeatL0Dark
+import com.jktdeveloper.habitto.ui.theme.HeatL1
+import com.jktdeveloper.habitto.ui.theme.HeatL1Dark
+import com.jktdeveloper.habitto.ui.theme.HeatL2
+import com.jktdeveloper.habitto.ui.theme.HeatL2Dark
+import com.jktdeveloper.habitto.ui.theme.HeatL3
+import com.jktdeveloper.habitto.ui.theme.HeatL3Dark
+import com.jktdeveloper.habitto.ui.theme.HeatL4
+import com.jktdeveloper.habitto.ui.theme.HeatL4Dark
+import com.jktdeveloper.habitto.ui.theme.StreakBroken
+import com.jktdeveloper.habitto.ui.theme.StreakBrokenDark
+import com.jktdeveloper.habitto.ui.theme.StreakFrozen
+import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
 
 /**
  * The card every widget draws inside.
@@ -250,4 +267,23 @@ fun GridTile(
             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
         )
     }
+}
+
+/**
+ * Heat-grid cell color, reusing the Phase 4 palette so the widget and the in-app
+ * streak history read identically for the same day.
+ */
+fun heatColor(day: StreakDay): GlanceColorProvider = when (day.state) {
+    StreakDayState.FROZEN -> ColorProvider(day = StreakFrozen, night = StreakFrozenDark)
+    StreakDayState.BROKEN -> ColorProvider(day = StreakBroken, night = StreakBrokenDark)
+    StreakDayState.COMPLETE -> when (day.heatLevel) {
+        1 -> ColorProvider(day = HeatL1, night = HeatL1Dark)
+        2 -> ColorProvider(day = HeatL2, night = HeatL2Dark)
+        3 -> ColorProvider(day = HeatL3, night = HeatL3Dark)
+        else -> ColorProvider(day = HeatL4, night = HeatL4Dark)
+    }
+    StreakDayState.EMPTY,
+    StreakDayState.TODAY_PENDING,
+    StreakDayState.FUTURE,
+    -> ColorProvider(day = HeatL0, night = HeatL0Dark)
 }
