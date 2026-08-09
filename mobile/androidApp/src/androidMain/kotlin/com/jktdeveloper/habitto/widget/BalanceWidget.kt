@@ -5,8 +5,11 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
+import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.LocalSize
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
@@ -17,6 +20,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.habittracker.domain.usecase.WidgetData
 import com.jktdeveloper.habitto.HabitTrackerApplication
+import com.jktdeveloper.habitto.MainActivity
 import com.jktdeveloper.habitto.ui.theme.DarkColorScheme
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
@@ -36,7 +40,15 @@ class BalanceWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme(colors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)) {
                 val compactWidth = LocalSize.current.width <= MIN_SIZE.width
-                WidgetSurface {
+                WidgetSurface(
+                    // BalanceHeader (expanded branch) already carries its own clickable Row;
+                    // the compact branch is bare Text, so the surface itself is the tap target.
+                    modifier = if (compactWidth) {
+                        GlanceModifier.clickable(actionStartActivity<MainActivity>())
+                    } else {
+                        GlanceModifier
+                    },
+                ) {
                     if (compactWidth) {
                         // 110dp cannot hold numeral, unit and flame on one line — stack them.
                         Text(
