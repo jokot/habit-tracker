@@ -41,12 +41,9 @@ class BalanceWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as HabitTrackerApplication).container
-        val data: WidgetData = container.getWidgetDataUseCase.execute(
-            userId = container.currentUserId(),
-            habitSlots = 0,
-            wantSlots = 0,
-        )
+        val initial = awaitWidgetData(container)
         provideContent {
+            val data: WidgetData = liveWidgetData(container, initial)
             GlanceTheme(colors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)) {
                 val size = LocalSize.current
                 // The numeral is bounded by the shorter edge — a 4×1 strip has as little

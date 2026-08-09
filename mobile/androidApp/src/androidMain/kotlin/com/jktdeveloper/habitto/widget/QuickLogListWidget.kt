@@ -40,12 +40,9 @@ open class QuickLogListWidget(private val withHeader: Boolean = true) : GlanceAp
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as HabitTrackerApplication).container
-        val data: WidgetData = container.getWidgetDataUseCase.execute(
-            userId = container.currentUserId(),
-            habitSlots = Int.MAX_VALUE,
-            wantSlots = Int.MAX_VALUE,
-        )
+        val initial = awaitWidgetData(container)
         provideContent {
+            val data: WidgetData = liveWidgetData(container, initial)
             GlanceTheme(colors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)) {
                 val compactHeader = LocalSize.current.height < 200.dp
                 WidgetSurface {

@@ -19,10 +19,12 @@ class LogHabitAction : ActionCallback {
 
         // System-triggered callback with no in-widget error UI — swallow failures,
         // the next periodic refresh reconciles state (spec: Error handling).
+        // One local write and nothing else. Android delivers broadcasts to a receiver
+        // serially, so anything done here delays the *next* tap — updating all seven widgets
+        // from here made every tap after the first wait behind seven re-renders. Widgets
+        // collect the data flow this write feeds, so they repaint themselves.
         runCatching {
             container.logHabitUseCase.execute(container.currentUserId(), habitId, quantity)
         }
-
-        WidgetUpdates.updateAll(context)
     }
 }

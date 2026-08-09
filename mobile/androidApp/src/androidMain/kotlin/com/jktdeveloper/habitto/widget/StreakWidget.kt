@@ -26,26 +26,19 @@ import androidx.glance.material3.ColorProviders
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.habittracker.domain.model.DateRange
 import com.jktdeveloper.habitto.HabitTrackerApplication
 import com.jktdeveloper.habitto.MainActivity
 import com.jktdeveloper.habitto.ui.theme.DarkColorScheme
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
 import com.jktdeveloper.habitto.ui.theme.LightColorScheme
-import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
-import kotlinx.datetime.plus
-import kotlinx.datetime.toLocalDateTime
 
 /**
  * Streak count plus a heat grid of recent days.
  *
  * Cell edge, column count and row count are all computed from the real widget size so
- * the grid spans the frame instead of sitting in a corner of it. [HISTORY_DAYS] is the
- * ceiling a very large widget could ask for; smaller frames render the tail of it.
+ * the grid spans the frame instead of sitting in a corner of it. The history it draws
+ * from is a ceiling a very large widget could ask for; smaller frames render its tail.
  *
  * [withHeader] false is the "pure items" variant — the heat grid alone, no streak line.
  */
@@ -55,17 +48,13 @@ open class StreakWidget(private val withHeader: Boolean = true) : GlanceAppWidge
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as HabitTrackerApplication).container
-        val userId = container.currentUserId()
-        val data = container.getWidgetDataUseCase.execute(userId, habitSlots = 0, wantSlots = 0)
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val range = DateRange(
-            start = today.minus(HISTORY_DAYS - 1, DateTimeUnit.DAY),
-            endExclusive = today.plus(1, DateTimeUnit.DAY),
-        )
-        val days = runCatching { container.computeStreakUseCase.computeNow(userId, range).days }
-            .getOrDefault(emptyList())
+        val initial = awaitWidgetData(container)
 
         provideContent {
+            val data = liveWidgetData(container, initial)
+            // The history comes with the rest of the widget data so it is computed once
+            // for every widget rather than once per streak widget, and updates live.
+            val days = data.streakDays
             GlanceTheme(colors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)) {
                 val size = LocalSize.current
                 val innerWidth = size.width - SURFACE_PADDING * 2
@@ -134,9 +123,6 @@ open class StreakWidget(private val withHeader: Boolean = true) : GlanceAppWidge
     }
 
     private companion object {
-        /** Ceiling on history fetched; the largest sensible widget renders roughly this many. */
-        const val HISTORY_DAYS = 120
-
         /** Preferred cell edge; five columns is the floor, which is what a 2×2 lands on. */
         val TARGET_CELL = 28.dp
         val GAP = 2.dp

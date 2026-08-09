@@ -58,12 +58,9 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as HabitTrackerApplication).container
-        val data: WidgetData = container.getWidgetDataUseCase.execute(
-            userId = container.currentUserId(),
-            habitSlots = Int.MAX_VALUE,
-            wantSlots = Int.MAX_VALUE,
-        )
+        val initial = awaitWidgetData(container)
         provideContent {
+            val data: WidgetData = liveWidgetData(container, initial)
             GlanceTheme(colors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)) {
                 val context = LocalContext.current
                 val tiles = buildList {

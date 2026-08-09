@@ -24,6 +24,8 @@ class LogWantAction : ActionCallback {
         // the next periodic refresh reconciles state (spec: Error handling).
         // LogWantUseCase.execute already refuses unaffordable spend via Result, so a
         // stale widget tapped at zero balance fails safely on its own.
+        // One local write and nothing else — see [LogHabitAction] for why updating the
+        // widgets does not belong on this path.
         runCatching {
             container.logWantUseCase.execute(
                 userId = container.currentUserId(),
@@ -32,7 +34,5 @@ class LogWantAction : ActionCallback {
                 deviceMode = DeviceMode.OTHER,
             )
         }
-
-        WidgetUpdates.updateAll(context)
     }
 }

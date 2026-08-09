@@ -15,12 +15,17 @@ import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 
 /**
- * Refresh source (1) of 3: DB writes.
+ * Backstop for widgets whose Glance session is gone.
  *
- * Watches the repository Flows the app already exposes and re-renders all four widgets
- * whenever any of them change, instead of every mutation site (LogHabitAction, ViewModels,
- * timer start/cancel, ...) poking the widgets itself. A burst of writes from a single user
- * action that touches several tables coalesces into one update via [debounce].
+ * Widgets normally repaint themselves: they collect `AppContainer.widgetData` inside their
+ * composition, so a DB write reaches them with nothing pushed at them from outside. That is
+ * the fast path, and it is the one that matters — re-provisioning every widget on the tap
+ * path is what made each tap queue behind the previous tap's renders.
+ *
+ * Glance only holds a session open while the widget is live, though. A widget the launcher
+ * re-provisions after a process death has no collector until something calls `updateAll`,
+ * which is this class. The debounce is deliberately slack: this path is correctness
+ * insurance, not latency, and a live widget has repainted long before it fires.
  *
  * This intentionally does NOT cover the want-timer's live point drain while it is running —
  * that's time-derived, not DB-derived (points are only written when the timer ends), so this
@@ -62,7 +67,8 @@ class WidgetRefresher(
     }
 
     private companion object {
-        const val DEBOUNCE_MS = 300L
+        /** Slack on purpose: live widgets have already repainted themselves by now. */
+        const val DEBOUNCE_MS = 1_000L
 
         // ponytail: flat delay, no backoff — a persistently failing read costs one wakeup per 5s
         // and the 30-min updatePeriodMillis backstop still renders. Add backoff if it ever shows

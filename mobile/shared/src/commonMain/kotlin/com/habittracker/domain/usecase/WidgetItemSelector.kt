@@ -1,6 +1,7 @@
 package com.habittracker.domain.usecase
 
 import com.habittracker.domain.model.HabitWithProgress
+import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.WantActivity
 import kotlin.math.nextUp
 
@@ -33,6 +34,11 @@ data class WidgetData(
     val balance: Int,
     val currentStreak: Int,
     val items: WidgetItems,
+    /**
+     * Recent days for the streak heat grid. Assembled here rather than fetched by the
+     * streak widget so all widgets share one computation of it.
+     */
+    val streakDays: List<StreakDay> = emptyList(),
 )
 
 /**

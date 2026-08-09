@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,8 +39,10 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider as GlanceColorProvider
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
+import com.habittracker.domain.usecase.WidgetData
 import com.habittracker.domain.usecase.WidgetHabitItem
 import com.habittracker.domain.usecase.WidgetWantItem
+import com.jktdeveloper.habitto.AppContainer
 import com.jktdeveloper.habitto.MainActivity
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
@@ -57,6 +60,39 @@ import com.jktdeveloper.habitto.ui.theme.StreakBroken
 import com.jktdeveloper.habitto.ui.theme.StreakBrokenDark
 import com.jktdeveloper.habitto.ui.theme.StreakFrozen
 import com.jktdeveloper.habitto.ui.theme.StreakFrozenDark
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+
+/**
+ * The first widget data, awaited before the composition starts so the widget never
+ * renders an empty frame on its way to the real numbers.
+ *
+ * The timeout is the escape hatch: if the shared flow somehow never emits, a widget that
+ * kept waiting would sit on its loading layout forever, so fall back to a direct read.
+ */
+suspend fun awaitWidgetData(container: AppContainer): WidgetData =
+    withTimeoutOrNull(FIRST_DATA_TIMEOUT_MS) { container.widgetData.filterNotNull().first() }
+        ?: container.getWidgetDataUseCase.execute(
+            userId = container.currentUserId(),
+            habitSlots = Int.MAX_VALUE,
+            wantSlots = Int.MAX_VALUE,
+        )
+
+/**
+ * The same data, live, for the body of a widget's composition.
+ *
+ * This is what makes the widgets real-time. Glance keeps the session open for as long as
+ * `provideContent` stays suspended, so collecting here repaints the widget on every
+ * emission — a log written by the app, by another widget, or by this one. Nothing has to
+ * push an update at the widget, which is what used to make each tap wait behind seven
+ * re-renders before the next tap could be handled.
+ */
+@Composable
+fun liveWidgetData(container: AppContainer, initial: WidgetData): WidgetData =
+    container.widgetData.collectAsState().value ?: initial
+
+private const val FIRST_DATA_TIMEOUT_MS = 3_000L
 
 /**
  * The card every widget draws inside.
