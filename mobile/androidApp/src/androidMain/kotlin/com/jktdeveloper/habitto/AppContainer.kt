@@ -30,6 +30,7 @@ import com.habittracker.domain.usecase.GetHabitTemplatesForIdentitiesUseCase
 import com.habittracker.domain.usecase.GetDayPointsUseCase
 import com.habittracker.domain.usecase.GetTodayHabitsUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
+import com.habittracker.domain.usecase.GetWidgetDataUseCase
 import com.habittracker.domain.usecase.GetUserIdentitiesUseCase
 import com.habittracker.domain.usecase.GetUserStreakOnDayUseCase
 import com.habittracker.domain.usecase.LinkOnboardingHabitsToIdentitiesUseCase
@@ -152,6 +153,12 @@ class AppContainer(context: Context) {
         wantActivityRepository = wantActivityRepository,
         getPointBalanceUseCase = getPointBalanceUseCase,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+    )
+    val getWidgetDataUseCase = GetWidgetDataUseCase(
+        getTodayHabitsUseCase = getTodayHabitsUseCase,
+        wantActivityRepository = wantActivityRepository,
+        getPointBalanceUseCase = getPointBalanceUseCase,
+        computeStreakUseCase = computeStreakUseCase,
     )
     val wantTimerController = com.jktdeveloper.habitto.timer.WantTimerController(
         context = appContext,
