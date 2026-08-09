@@ -70,9 +70,12 @@ sealed class Screen(val route: String) {
     object ExchangeRate : Screen("exchange_rate")
     object DevTools : Screen("dev_tools")
     object WantList : Screen("want_list")
-    object WantDetail : Screen("want_detail/{wantId}") {
+    object WantDetail : Screen("want_detail/{wantId}?openTimer={openTimer}") {
         const val ARG_ID = "wantId"
-        fun route(id: String) = "want_detail/$id"
+
+        /** Set by the widget: land on the detail with the duration sheet already up. */
+        const val ARG_OPEN_TIMER = "openTimer"
+        fun route(id: String, openTimer: Boolean = false) = "want_detail/$id?openTimer=$openTimer"
     }
     object WantForm : Screen("want_form?wantId={wantId}") {
         const val ARG_ID = "wantId"
@@ -292,14 +295,25 @@ fun AppNavigation(container: AppContainer) {
                     androidx.navigation.navArgument(Screen.WantDetail.ARG_ID) {
                         type = androidx.navigation.NavType.StringType
                     },
+                    androidx.navigation.navArgument(Screen.WantDetail.ARG_OPEN_TIMER) {
+                        type = androidx.navigation.NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
+                deepLinks = listOf(
+                    androidx.navigation.navDeepLink {
+                        uriPattern = "com.jktdeveloper.habitto://want-detail/{wantId}?openTimer={openTimer}"
+                    },
                 ),
             ) { entry ->
                 val wantId = entry.arguments?.getString(Screen.WantDetail.ARG_ID).orEmpty()
+                val openTimer = entry.arguments?.getBoolean(Screen.WantDetail.ARG_OPEN_TIMER) == true
                 val vm = androidx.lifecycle.viewmodel.compose.viewModel {
                     com.jktdeveloper.habitto.ui.want.WantDetailViewModel(wantId, container)
                 }
                 com.jktdeveloper.habitto.ui.want.WantDetailScreen(
                     viewModel = vm,
+                    autoOpenTimer = openTimer,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(Screen.WantForm.route(wantId)) },
                     onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },

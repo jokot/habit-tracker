@@ -185,11 +185,18 @@ fun BalanceHeader(balance: Int, currentStreak: Int, compact: Boolean = false) {
     }
 }
 
-/** Deep link to the want-timer screen; intent-filter registered in AndroidManifest.xml:36. */
-fun wantTimerIntent(context: Context, activityId: String): Intent =
+/**
+ * Deep link to a want's detail with its duration sheet already open; intent-filter
+ * registered in AndroidManifest.xml.
+ *
+ * The detail screen rather than the running-timer screen: the widget cannot invent a
+ * duration, and the sheet is where one gets picked. The running-timer screen keeps its own
+ * `want-timer` deep link — that is what the ongoing notification opens.
+ */
+fun wantDetailTimerIntent(context: Context, activityId: String): Intent =
     Intent(
         Intent.ACTION_VIEW,
-        Uri.parse("com.jktdeveloper.habitto://want-timer/$activityId"),
+        Uri.parse("com.jktdeveloper.habitto://want-detail/$activityId?openTimer=true"),
     ).apply {
         setPackage(context.packageName)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -234,8 +241,8 @@ fun HabitRow(item: WidgetHabitItem) {
 }
 
 /**
- * One want. A minute-unit want opens the want-timer screen — the widget has no
- * sensible way to invent a duration, and an unattended drain started by a mis-tap is
+ * One want. A minute-unit want opens its detail with the duration sheet up — the widget has
+ * no sensible way to invent a duration, and an unattended drain started by a mis-tap is
  * not recoverable from the home screen.
  *
  * Disabled state is a dimmer color, not opacity: Glance has no opacity modifier on a
@@ -246,7 +253,7 @@ fun WantRow(item: WidgetWantItem) {
     val context = LocalContext.current
     val action = when {
         !item.enabled -> actionStartActivity<MainActivity>()
-        item.isTimed -> actionStartActivity(wantTimerIntent(context, item.activityId))
+        item.isTimed -> actionStartActivity(wantDetailTimerIntent(context, item.activityId))
         else -> actionRunCallback<LogWantAction>(
             actionParametersOf(LogWantAction.activityIdKey to item.activityId),
         )

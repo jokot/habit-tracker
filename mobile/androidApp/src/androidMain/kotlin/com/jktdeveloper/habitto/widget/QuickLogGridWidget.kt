@@ -15,11 +15,13 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.lazy.GridCells
+import androidx.glance.appwidget.lazy.LazyVerticalGrid
+import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
-import androidx.glance.layout.Row
-import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.height
 import androidx.glance.layout.size
 import androidx.glance.layout.width
@@ -33,6 +35,7 @@ import com.jktdeveloper.habitto.ui.theme.DarkColorScheme
 import com.jktdeveloper.habitto.ui.theme.LightColorScheme
 
 private class GridEntry(
+    val id: Long,
     val icon: ImageVector,
     val hue: Float,
     val label: String,
@@ -67,6 +70,7 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                     data.items.habits.forEach { h ->
                         add(
                             GridEntry(
+                                id = h.habitId.hashCode().toLong(),
                                 icon = habitIcon(h.name),
                                 hue = HABIT_HUE,
                                 label = h.name,
@@ -84,6 +88,7 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                     data.items.wants.forEach { w ->
                         add(
                             GridEntry(
+                                id = w.activityId.hashCode().toLong(),
                                 icon = resolveWantIcon(w.iconKey, w.name),
                                 hue = WANT_HUE,
                                 label = w.name,
@@ -92,7 +97,7 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                                 action = when {
                                     !w.enabled -> actionStartActivity<MainActivity>()
                                     w.isTimed -> actionStartActivity(
-                                        wantTimerIntent(context, w.activityId),
+                                        wantDetailTimerIntent(context, w.activityId),
                                     )
                                     else -> actionRunCallback<LogWantAction>(
                                         actionParametersOf(
@@ -118,7 +123,6 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                 val cellWidth = innerWidth / columns
                 val cellHeight = gridHeight / rows
                 val tile = minOf(cellWidth, cellHeight) - GUTTER * 2
-                val visible = tiles.take(columns * rows)
 
                 WidgetSurface {
                     if (tiles.isEmpty()) {
@@ -131,29 +135,30 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                                 compact = true,
                             )
                         }
-                        repeat(rows) { rowIndex ->
-                            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                                repeat(columns) { col ->
-                                    val entry = visible.getOrNull(rowIndex * columns + col)
-                                    Box(
-                                        modifier = GlanceModifier
-                                            .width(cellWidth)
-                                            .height(cellHeight),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        if (entry != null) {
-                                            Box(modifier = GlanceModifier.size(tile)) {
-                                                GridTile(
-                                                    icon = entry.icon,
-                                                    hue = entry.hue,
-                                                    label = entry.label,
-                                                    caption = entry.caption,
-                                                    enabled = entry.enabled,
-                                                    action = entry.action,
-                                                    tileSize = tile,
-                                                )
-                                            }
-                                        }
+                        // Every tile, scrollable: [rows] now only sets how tall a cell is, it
+                        // no longer decides which tiles get dropped. Glance caps a fixed grid
+                        // at five columns, which is also where [columns] is coerced.
+                        LazyVerticalGrid(
+                            GridCells.Fixed(columns),
+                            modifier = GlanceModifier.fillMaxSize(),
+                        ) {
+                            items(items = tiles, itemId = { it.id }) { entry ->
+                                Box(
+                                    modifier = GlanceModifier
+                                        .width(cellWidth)
+                                        .height(cellHeight),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Box(modifier = GlanceModifier.size(tile)) {
+                                        GridTile(
+                                            icon = entry.icon,
+                                            hue = entry.hue,
+                                            label = entry.label,
+                                            caption = entry.caption,
+                                            enabled = entry.enabled,
+                                            action = entry.action,
+                                            tileSize = tile,
+                                        )
                                     }
                                 }
                             }

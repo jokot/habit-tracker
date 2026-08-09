@@ -9,7 +9,8 @@ import com.jktdeveloper.habitto.HabitTrackerApplication
 
 /**
  * Logs one tap on a non-timed want. Minute-unit wants never reach this action — they
- * deep-link the want-timer screen instead (see [wantTimerIntent]).
+ * deep-link the want detail with its duration sheet open instead (see
+ * [wantDetailTimerIntent]).
  */
 class LogWantAction : ActionCallback {
     companion object {

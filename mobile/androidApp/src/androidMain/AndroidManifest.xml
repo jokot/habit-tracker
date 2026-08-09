@@ -35,6 +35,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.jktdeveloper.habitto" android:host="want-timer" />
             </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.jktdeveloper.habitto" android:host="want-detail" />
+            </intent-filter>
         </activity>
         <service
             android:name=".timer.WantTimerService"

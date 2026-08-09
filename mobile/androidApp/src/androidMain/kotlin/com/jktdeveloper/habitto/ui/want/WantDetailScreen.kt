@@ -53,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
@@ -79,9 +80,20 @@ fun WantDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenTimer: (activityId: String) -> Unit,
+    autoOpenTimer: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    // Arriving from a widget tap on a minute-unit want: the tap already said "start a
+    // timer", so skip the button. Waits for the load — a timer already running on this
+    // want shows its banner instead, and a duration sheet on top of that would be wrong.
+    var autoOpened by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.isLoading) {
+        if (autoOpenTimer && !autoOpened && !state.isLoading) {
+            autoOpened = true
+            if (state.activeTimer == null) viewModel.showDurationSheet()
+        }
+    }
     LifecycleResumeEffect(Unit) {
         viewModel.reload()
         onPauseOrDispose {}
