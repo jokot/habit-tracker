@@ -3,10 +3,12 @@ package com.jktdeveloper.habitto
 import android.app.Application
 import com.jktdeveloper.habitto.notifications.NotificationChannels
 import com.jktdeveloper.habitto.timer.WantTimerRecovery
+import com.jktdeveloper.habitto.widget.WidgetRefresher
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 
 @OptIn(DelicateCoroutinesApi::class)
 class HabitTrackerApplication : Application() {
@@ -26,5 +28,10 @@ class HabitTrackerApplication : Application() {
         GlobalScope.launch(Dispatchers.Default) {
             runCatching { recovery.scanOnStart() }
         }
+        WidgetRefresher(
+            context = this,
+            container = container,
+            scope = GlobalScope + Dispatchers.Default,
+        ).start()
     }
 }
