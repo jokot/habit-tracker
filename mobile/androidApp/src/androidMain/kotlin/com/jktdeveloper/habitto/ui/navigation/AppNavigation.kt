@@ -1,12 +1,16 @@
 package com.jktdeveloper.habitto.ui.navigation
 
+import android.content.ContextWrapper
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.core.util.Consumer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -138,6 +143,19 @@ fun AppNavigation(container: AppContainer) {
             CircularProgressIndicator()
         }
         return
+    }
+
+    // MainActivity is singleTop, so a deep link fired while the app is already running never
+    // re-runs onCreate — it arrives in onNewIntent, and NavHost only ever reads the intent its
+    // activity was created with. Without this, widget and notification links are silently
+    // dropped on a warm start. Registered below the startDestination gate so the graph exists.
+    DisposableEffect(navController) {
+        val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<ComponentActivity>()
+            .first()
+        val listener = Consumer<Intent> { navController.handleDeepLink(it) }
+        activity.addOnNewIntentListener(listener)
+        onDispose { activity.removeOnNewIntentListener(listener) }
     }
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
