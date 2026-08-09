@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
+import androidx.glance.action.Action
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
@@ -206,6 +207,47 @@ fun WantRow(item: WidgetWantItem) {
         Text(
             if (item.enabled) "  −1 pt" else "  no pts",
             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+        )
+    }
+}
+
+/**
+ * One icon-sized tile. The glyph is the item name's first letter — Glance cannot
+ * render the app's ImageVector icons, and a bare letter reads better at tile size
+ * than a truncated name. See the plan's Global Constraints.
+ */
+@Composable
+fun GridTile(
+    label: String,
+    caption: String,
+    enabled: Boolean,
+    action: Action,
+    modifier: GlanceModifier = GlanceModifier,
+) {
+    val fg = if (enabled) GlanceTheme.colors.onSurface else GlanceTheme.colors.onSurfaceVariant
+    Column(
+        modifier = modifier
+            .height(72.dp)
+            .background(GlanceTheme.colors.surfaceVariant)
+            .cornerRadius(12.dp)
+            .padding(6.dp)
+            .clickable(action),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label.take(1).uppercase(),
+            style = TextStyle(color = fg, fontSize = 20.sp, fontWeight = FontWeight.Bold),
+        )
+        Text(
+            label,
+            maxLines = 1,
+            style = TextStyle(color = fg, fontSize = 10.sp),
+        )
+        Text(
+            caption,
+            maxLines = 1,
+            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
         )
     }
 }
