@@ -168,6 +168,9 @@ class TimerIntegrationTest {
 
         // 2. Start timer A
         detailVMA.requestStartTimer(300) // 5 mins
+        // start() reads the notification prefs off DataStore's own dispatcher before it
+        // touches the repo, so the nav flag lands after this scheduler has drained.
+        awaitCondition { detailVMA.state.value.navigateToTimerActivityId != null }
         val stateA2 = detailVMA.state.first()
         assertEquals("Should auto-nav to timer screen", "w1", stateA2.navigateToTimerActivityId)
 
@@ -207,7 +210,9 @@ class TimerIntegrationTest {
         // SQLDelight Flow built with mapToList(Dispatchers.Default) — a REAL background thread,
         // outside the test scheduler. runCurrent() can't force that thread to run; give it real
         // wall-clock time to post its result back onto our test dispatcher, then drain.
-        awaitCondition { detailVMB.state.value.pendingOverlap == null }
+        // Nav is the last thing confirmReplace sets, so it's the condition that covers
+        // both the real-thread use-case work and start()'s DataStore read.
+        awaitCondition { detailVMB.state.value.navigateToTimerActivityId != null }
 
         val stateB2 = detailVMB.state.first()
         assertNull("Overlap prompt dismissed", stateB2.pendingOverlap)

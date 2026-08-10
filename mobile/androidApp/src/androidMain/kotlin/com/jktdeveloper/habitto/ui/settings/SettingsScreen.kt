@@ -42,25 +42,11 @@ fun SettingsScreen(
 ) {
     val notificationSummary by viewModel.notificationSummary.collectAsState()
     val context = LocalContext.current
-    var permissionGranted by remember { mutableStateOf(PermissionUtils.hasNotificationPermission(context)) }
+    val permissionGranted = rememberNotificationPermissionGranted()
 
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                permissionGranted = PermissionUtils.hasNotificationPermission(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         // ── Top bar ──────────────────────────────────────────────────────────
+        // Outside the scrolling column so it stays put.
         Row(
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -75,94 +61,100 @@ fun SettingsScreen(
             )
         }
 
-        // ── Notifications section ─────────────────────────────────────────────
-        // All per-type detail lives in NotificationsSettingsScreen; this row is the
-        // only entry point, so the two can't drift.
-        SettingsGroup(title = "Notifications") {
-            SettingsRow(
-                title = "Notifications",
-                supporting = if (permissionGranted) notificationSummary else "Blocked by system",
-                leading = Icons.Default.Notifications,
-                leadingColor = if (isSystemInDarkTheme()) FlameOrangeDark else FlameOrange,
-                trailing = {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                onClick = {
-                    if (permissionGranted) {
-                        onOpenNotificationsSettings?.invoke()
-                    } else {
-                        PermissionUtils.openAppNotificationSettings(context)
-                    }
-                },
-            )
-        }
-
-        // ── Account section ───────────────────────────────────────────────────
-        SettingsGroup(title = "Account") {
-            if (isAuthenticated) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            // ── Notifications section ─────────────────────────────────────────────
+            // All per-type detail lives in NotificationsSettingsScreen; this row is the
+            // only entry point, so the two can't drift.
+            SettingsGroup(title = "Notifications") {
                 SettingsRow(
-                    title = accountEmail ?: "Signed in",
-                    supporting = if (accountEmail != null) "Signed in" else null,
-                    leading = Icons.Default.AccountCircle,
+                    title = "Notifications",
+                    supporting = if (permissionGranted) notificationSummary else "Blocked by system",
+                    leading = Icons.Default.Notifications,
+                    leadingColor = if (isSystemInDarkTheme()) FlameOrangeDark else FlameOrange,
+                    trailing = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    onClick = {
+                        if (permissionGranted) {
+                            onOpenNotificationsSettings?.invoke()
+                        } else {
+                            PermissionUtils.openAppNotificationSettings(context)
+                        }
+                    },
+                )
+            }
+
+            // ── Account section ───────────────────────────────────────────────────
+            SettingsGroup(title = "Account") {
+                if (isAuthenticated) {
+                    SettingsRow(
+                        title = accountEmail ?: "Signed in",
+                        supporting = if (accountEmail != null) "Signed in" else null,
+                        leading = Icons.Default.AccountCircle,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingsRow(
+                        title = "Sign out",
+                        titleColor = MaterialTheme.colorScheme.error,
+                        leading = Icons.AutoMirrored.Filled.Logout,
+                        leadingColor = MaterialTheme.colorScheme.error,
+                        onClick = onSignOut,
+                    )
+                } else {
+                    SettingsRow(
+                        title = "Sign in to sync",
+                        supporting = "Local data stays put",
+                        leading = Icons.AutoMirrored.Filled.Login,
+                        onClick = onSignIn,
+                    )
+                }
+            }
+
+            // ── Developer section (debug only) ────────────────────────────────────
+            if (onOpenDevTools != null) {
+                SettingsGroup(title = "Developer") {
+                    SettingsRow(
+                        title = "Dev tools",
+                        supporting = "Seed test data — debug builds only",
+                        leading = Icons.Default.Build,
+                        onClick = onOpenDevTools,
+                    )
+                }
+            }
+
+            // ── About section ─────────────────────────────────────────────────────
+            SettingsGroup(title = "About") {
+                SettingsRow(
+                    title = "Version",
+                    supporting = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsRow(
-                    title = "Sign out",
-                    titleColor = MaterialTheme.colorScheme.error,
-                    leading = Icons.AutoMirrored.Filled.Logout,
-                    leadingColor = MaterialTheme.colorScheme.error,
-                    onClick = onSignOut,
-                )
-            } else {
-                SettingsRow(
-                    title = "Sign in to sync",
-                    supporting = "Local data stays put",
-                    leading = Icons.AutoMirrored.Filled.Login,
-                    onClick = onSignIn,
+                    title = "Privacy policy",
+                    trailing = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    onClick = { /* TODO open privacy URL */ },
                 )
             }
-        }
 
-        // ── Developer section (debug only) ────────────────────────────────────
-        if (onOpenDevTools != null) {
-            SettingsGroup(title = "Developer") {
-                SettingsRow(
-                    title = "Dev tools",
-                    supporting = "Seed test data — debug builds only",
-                    leading = Icons.Default.Build,
-                    onClick = onOpenDevTools,
-                )
-            }
+            // ── Bottom spacer ─────────────────────────────────────────────────────
+            Spacer(Modifier.height(32.dp))
         }
-
-        // ── About section ─────────────────────────────────────────────────────
-        SettingsGroup(title = "About") {
-            SettingsRow(
-                title = "Version",
-                supporting = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            SettingsRow(
-                title = "Privacy policy",
-                trailing = {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                onClick = { /* TODO open privacy URL */ },
-            )
-        }
-
-        // ── Bottom spacer ─────────────────────────────────────────────────────
-        Spacer(Modifier.height(32.dp))
     }
 }
 

@@ -11,6 +11,8 @@ import com.habittracker.domain.model.WantTimerState
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogWantUseCase
+import com.jktdeveloper.habitto.notifications.NotificationPreferences
+import com.jktdeveloper.habitto.notifications.NotificationTypeId
 import kotlinx.datetime.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -22,6 +24,7 @@ class WantTimerController(
     private val wantActivityRepository: WantActivityRepository,
     private val logWantUseCase: LogWantUseCase,
     private val getPointBalanceUseCase: GetPointBalanceUseCase,
+    private val notificationPreferences: NotificationPreferences = NotificationPreferences(context),
     private val clock: Clock = Clock.System,
 ) {
     @OptIn(ExperimentalUuidApi::class)
@@ -40,13 +43,30 @@ class WantTimerController(
             state = WantTimerState.RUNNING,
         )
         repository.startReplacing(timer)
-        startService(
-            Intent(context, WantTimerService::class.java).apply {
-                action = WantTimerService.ACTION_START
-                putExtra(WantTimerService.EXTRA_TIMER_ID, timer.id)
-            },
-            foreground = true,
-        )
+        if (timerNotificationsAllowed()) {
+            startService(
+                Intent(context, WantTimerService::class.java).apply {
+                    action = WantTimerService.ACTION_START
+                    putExtra(WantTimerService.EXTRA_TIMER_ID, timer.id)
+                },
+                foreground = true,
+            )
+        } else {
+            // No service means no mandatory ongoing notification — but also no ticker
+            // to finish the timer, so hand that to WorkManager.
+            WantTimerFinalizeWorker.enqueue(context, durationSec)
+        }
+    }
+
+    /**
+     * A running foreground service always shows a notification, so "timer notifications
+     * off" has to mean "no foreground service". Deliberately not gated on
+     * POST_NOTIFICATIONS: without that permission nothing is displayed anyway, and the
+     * service is the more reliable way to finish the timer.
+     */
+    private suspend fun timerNotificationsAllowed(): Boolean {
+        val prefs = notificationPreferences.current()
+        return prefs.masterEnabled && prefs.isEnabled(NotificationTypeId.WANT_TIMER_END)
     }
 
     /**
@@ -84,6 +104,9 @@ class WantTimerController(
     }
 
     fun signalServiceStop() {
+        // The no-service path has a pending worker instead; cancelling the timer has to
+        // cancel that too, or it fires late and finalizes a timer that's already gone.
+        runCatching { WantTimerFinalizeWorker.cancel(context) }
         // Not a new foreground promotion — the service is already foreground (or not running
         // at all). Calling startForegroundService() here would require the STOP handler to also
         // call startForeground(), which it doesn't, and Android kills the app with
