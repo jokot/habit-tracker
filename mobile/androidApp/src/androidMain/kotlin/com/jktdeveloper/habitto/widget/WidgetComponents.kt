@@ -292,21 +292,20 @@ fun WantRow(item: WidgetWantItem) {
  * The tile fills whatever square its caller sized for it; the caller owns both the
  * tile's dimensions and the gutter between tiles (Glance has no aspectRatio, and
  * padding applied here would land inside the background rather than between tiles).
- * [tileSize] is that square's edge: the glyph scales with it and the text lines drop
- * out on tiles too small to hold them legibly.
+ * [tileSize] is that square's edge and the glyph scales with it. The tile carries no
+ * text at any size — [label] is the glyph's content description, so a screen reader
+ * still names it.
  */
 @Composable
 fun GridTile(
     icon: ImageVector,
     hue: Float,
     label: String,
-    caption: String,
     enabled: Boolean,
     action: Action,
     tileSize: Dp,
     modifier: GlanceModifier = GlanceModifier,
 ) {
-    val fg = if (enabled) GlanceTheme.colors.onSurface else GlanceTheme.colors.onSurfaceVariant
     val glyph = (tileSize * 0.46f).coerceIn(20.dp, 44.dp)
     Column(
         modifier = modifier
@@ -332,20 +331,6 @@ fun GridTile(
                     if (enabled) glyphForeground(hue) else GlanceTheme.colors.onSurfaceVariant,
                 ),
                 modifier = GlanceModifier.size(glyph * 0.58f),
-            )
-        }
-        if (tileSize >= 62.dp) {
-            Text(
-                label,
-                maxLines = 1,
-                style = TextStyle(color = fg, fontSize = 10.sp),
-            )
-        }
-        if (tileSize >= 80.dp) {
-            Text(
-                caption,
-                maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
             )
         }
     }
