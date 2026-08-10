@@ -52,7 +52,7 @@ class WantTimerRecovery(
                     )
                 } else ""
                 postFinishedNotif(activity?.name ?: "Timer", pointsSegment)
-            } else {
+            } else if (timerNotificationsAllowed()) {
                 val intent = Intent(context, WantTimerService::class.java).apply {
                     action = WantTimerService.ACTION_START
                     putExtra(WantTimerService.EXTRA_TIMER_ID, t.id)
@@ -64,14 +64,24 @@ class WantTimerRecovery(
                         context.startService(intent)
                     }
                 }
+            } else {
+                // Same deal as WantTimerController.start: a foreground service would post
+                // an ongoing notification the user switched off, so finish by worker.
+                WantTimerFinalizeWorker.enqueue(
+                    context,
+                    (t.endsAt - now).inWholeSeconds.coerceAtLeast(1).toInt(),
+                )
             }
         }
     }
 
-    private suspend fun postFinishedNotif(activityName: String, pointsSegment: String) {
+    private suspend fun timerNotificationsAllowed(): Boolean {
         val prefs = notificationPreferences.current()
-        if (!prefs.masterEnabled) return
-        if (!prefs.isEnabled(NotificationTypeId.WANT_TIMER_END)) return
+        return prefs.masterEnabled && prefs.isEnabled(NotificationTypeId.WANT_TIMER_END)
+    }
+
+    private suspend fun postFinishedNotif(activityName: String, pointsSegment: String) {
+        if (!timerNotificationsAllowed()) return
         if (!PermissionUtils.hasNotificationPermission(context)) return
         val builder = NotificationCompat.Builder(context, NotificationChannels.WANT_TIMER_END)
             .setSmallIcon(R.drawable.ic_notification)

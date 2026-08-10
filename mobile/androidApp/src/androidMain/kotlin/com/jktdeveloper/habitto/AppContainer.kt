@@ -175,6 +175,14 @@ class AppContainer(context: Context) {
         wantActivityRepository = wantActivityRepository,
         logWantUseCase = logWantUseCase,
         getPointBalanceUseCase = getPointBalanceUseCase,
+        notificationPreferences = notificationPreferences,
+    )
+    val wantTimerRecovery = com.jktdeveloper.habitto.timer.WantTimerRecovery(
+        context = appContext,
+        timerRepo = wantTimerRepository,
+        wantActivityRepo = wantActivityRepository,
+        logWantUseCase = logWantUseCase,
+        notificationPreferences = notificationPreferences,
     )
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)
     val undoWantLogUseCase = UndoWantLogUseCase(wantLogRepository)
