@@ -99,6 +99,7 @@ class AppContainer(context: Context) {
     private val driverFactory = DatabaseDriverFactory(context)
     private val db = HabitTrackerDatabase(driverFactory.createDriver())
     private val localUserIdStore = LocalUserIdStore(context)
+    private val lastAuthUserStore = LastAuthUserStore(context)
 
     val authRepository = SupabaseAuthRepository(supabase)
     val identityRepository = LocalIdentityRepository(db)
@@ -257,7 +258,13 @@ class AppContainer(context: Context) {
     }
 
     private fun snapshotAuthState(): AuthState = AuthState(
-        userId = userIdentityProvider.currentUserId(),
+        // Same fallback chain as UserIdentityProvider.currentUserId(), with the last
+        // authenticated id in between: in a cold process — a widget update, a reminder
+        // worker — supabase-kt hasn't restored the session yet, and dropping straight to
+        // the guest id queries rows that sign-in migrated away. See LastAuthUserStore.
+        userId = lastAuthUserStore.resolve(authRepository.currentUserId()) {
+            userIdentityProvider.localUserId()
+        },
         isAuthenticated = userIdentityProvider.isAuthenticated(),
     )
 
@@ -360,6 +367,9 @@ class AppContainer(context: Context) {
         // Reset pull watermarks so the next sign-in pulls everything from
         // the cloud instead of skipping rows older than the cached watermark.
         watermarks.reset()
+        // We just deleted this user's local rows, so stop claiming to be them on the
+        // next cold start. Covers every sign-out path — they all come through here.
+        lastAuthUserStore.clear()
     }
 
     private fun startSessionGuard() {
