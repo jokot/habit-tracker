@@ -213,6 +213,9 @@ fun AppNavigation(container: AppContainer) {
                     onOpenWantDetail = { id -> navController.navigate(Screen.WantDetail.route(id)) },
                     onOpenTimer = { id -> navController.navigate(Screen.WantTimer.route(id)) },
                 )
+                // Ask here, after onboarding: the user has habits by now, so the
+                // notifications on offer mean something.
+                com.jktdeveloper.habitto.ui.onboarding.NotificationPermissionPromptHost()
             }
 
             composable(Screen.Settings.route) {

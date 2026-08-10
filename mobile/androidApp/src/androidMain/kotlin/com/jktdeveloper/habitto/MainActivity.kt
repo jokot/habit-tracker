@@ -21,8 +21,10 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { container.notificationScheduler.reschedule() }
         setContent {
             HabitTrackerTheme {
+                // The notification prompt lives on the Home route, not here — asking
+                // over the first onboarding step interrupts a user who hasn't yet seen
+                // what they'd be notified about.
                 AppNavigation(container = container)
-                com.jktdeveloper.habitto.ui.onboarding.NotificationPermissionPromptHost()
             }
         }
     }

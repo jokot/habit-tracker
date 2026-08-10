@@ -55,6 +55,15 @@ val SyncSyncedFgDark = Color(0xFFD7E8FF)
 val SyncErrorBgDark = Color(0xFF5A1A1A)
 val SyncErrorFgDark = Color(0xFFFFD9D9)
 
+// ─── Warning container — same amber as a running sync, named for its second role ───
+val WarnContainer = SyncRunningBg
+val OnWarnContainer = SyncRunningFg
+val WarnContainerDark = SyncRunningBgDark
+val OnWarnContainerDark = SyncRunningFgDark
+
+// ─── Notification category accent M3's scheme has no slot for ───
+val SystemPurple = Color(0xFF6E56CF)
+
 // ─── Custom surface ramp (warm-calm direction) ───
 val Surface1Light = Color(0xFFF4F1EC)
 val Surface2Light = Color(0xFFECE7DF)

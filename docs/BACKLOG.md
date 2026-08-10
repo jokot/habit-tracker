@@ -25,44 +25,48 @@ Two items previously carried as open notes are **done**: `habit.effectiveFrom` i
 implemented across the domain model, schema, streak use cases and sync; the onboarding
 redesign cleanup landed (a single `OnboardingScreen.kt` remains).
 
-## Phase 11 — You hub + settings redesign (in progress, blocked)
+## Phase 12 — Notifications settings + permission prompt (in progress)
 
-Branch `feature/phase11-you-settings-redesign`, worktree
-`.worktrees/phase11-you-settings-redesign`. Nothing implemented yet.
+Branch `feature/phase12-notifications-redesign`, worktree
+`.worktrees/phase12-notifications-redesign`. Code complete, device QA outstanding.
 
-**Goal:** redesign the You hub and the settings screens to match the Claude Design
-canvas. Behavior and ViewModels stay; only the UI layer changes.
+Same design canvas, file `notifications.html` / `components/notifications.jsx`.
 
-**Design source:** project `019dd32e-8a8d-7707-b080-fc31a631b693`
-(<https://claude.ai/design/p/019dd32e-8a8d-7707-b080-fc31a631b693?file=you-hub.html>),
-read through the `claude_design` MCP (`DesignSync`), auth via `/design-login`.
+Landed: per-type labels and icons (`ui/settings/NotificationTypeUi.kt`) replacing the
+raw-enum-key rows; category group cards via `SettingsGroup(prominent, dimmed)`; blocked
+and paused banners; `rememberNotificationPermissionGranted()` fixing the stale banner
+after a trip to system settings; permission prompt redrawn as a `ModalBottomSheet` and
+moved off onboarding step 1 onto the Home route; pinned top bars on both settings
+screens.
 
-Files to read: `you-hub.html`, `components/you-hub.jsx`, `shared.jsx`, `tokens.css`.
-`frames/design-canvas.jsx` is canvas chrome only (pan/zoom, artboard drag) — skip it.
+Not done: manual device pass (grouping, tinted/filled icons, time chips, dim state,
+permission-revoke round trip, prompt sheet on fresh install, light + dark). Out of
+scope by decision: posted notification copy in the workers, `bar_raised`/`bar_dropped`
+(feature never built), per-category master switches, iOS.
 
-**Blocker (2026-08-10):** `you-hub.html` and `components/you-hub.jsx` return an expired
-cache reference — `Entry not found (CCR TTL: 1800 seconds)`. Large MCP results are
-swapped for a content-hash reference; those two aged out mid-session, and re-fetching
-returns the same dead reference instead of re-storing. Not fixable in-session.
-**Fetch them from a fresh session**, where they come back clean, or work from
-screenshots. `tokens.css` and `frames/design-canvas.jsx` fetched fine as new content.
+## Known bugs
 
-**What exists today:**
+1. **Widgets go empty after the app is swept from recents** — all four Glance widgets
+   lose their data; only relaunching the app repaints them. Widget state presumably
+   depends on process-lifetime state rather than being re-read from the DB inside the
+   Glance worker. Hits every cold start, so it outranks remaining polish work.
+2. **No way to start a timer for a timed want from Home** — `HomeViewModel.tapWant`
+   (`HomeViewModel.kt:349`) always runs the pending-count/undo path, whatever the want
+   is. The timer is reachable only via long-press → want detail, or from the quick-log
+   grid widget, which does open the duration sheet for timed wants. Home should match.
 
-| File | Lines |
-|---|---|
-| `ui/you/YouHubScreen.kt` | 186 |
-| `ui/you/YouHubViewModel.kt` | 54 |
-| `ui/settings/SettingsScreen.kt` | 415 |
-| `ui/settings/SettingsViewModel.kt` | 98 |
-| `ui/settings/NotificationsSettingsScreen.kt` | 156 |
-| `ui/settings/NotificationsSettingsViewModel.kt` | 42 |
+## Phase 11 — You hub + settings redesign (shipped, PR #25)
 
-`YouHubScreen` structure: `IdentityHubCard`, then sections `Tracking` (Habits),
-`Earn & spend` (point exchange rate, shown as `Nx · earned by N-day streak`, and Wants),
-`Account` (email + sign out, or a sign-in row when unauthenticated), `App` (Settings).
-Every row is a bare M3 `ListItem` — no card, elevation or colour treatment. That
-flatness is what the redesign is meant to fix.
+Merged 2026-08-10. You hub and Settings moved off bare M3 `ListItem`s onto the shared
+`SettingsGroup` card + `SettingsRow` primitives; `SettingsViewModel.summarize` now
+reports `"All on"` / `"N of M on"` / `"Off"` (the old `"All on · N paused"` contradicted
+itself on a fresh install, where `DAILY_REMINDER_PER_IDENTITY` defaults off).
+
+Design source for both this phase and Phase 12: project
+`019dd32e-8a8d-7707-b080-fc31a631b693`, read through the `claude_design` MCP
+(`DesignSync`), auth via `/design-login`. Large files come back as content-hash
+references with a 1800s TTL — if one expires mid-session it stays dead on re-fetch, so
+pull design files early or from a fresh session.
 
 ## Open work, not started
 
