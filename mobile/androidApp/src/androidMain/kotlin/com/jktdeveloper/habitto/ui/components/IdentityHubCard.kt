@@ -18,7 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -38,7 +39,11 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Identity
 
 @Composable
-fun IdentityHubCard(identities: List<Identity>, onClick: () -> Unit) {
+fun IdentityHubCard(
+    identities: List<Identity>,
+    pinnedIdentityName: String? = null,
+    onClick: () -> Unit,
+) {
     if (identities.isEmpty()) {
         EmptyHubCard(onClick = onClick)
         return
@@ -91,12 +96,39 @@ fun IdentityHubCard(identities: List<Identity>, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.height(10.dp))
-                Text(
-                    "Tap to manage",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val pinned = identities.firstOrNull { it.name == pinnedIdentityName }
+                    if (pinned != null) {
+                        Icon(
+                            Icons.Outlined.PushPin,
+                            contentDescription = null,
+                            tint = Color.hsl(
+                                IdentityHue.forIdentity(pinned),
+                                0.50f,
+                                if (isDark) 0.70f else 0.32f,
+                            ),
+                            modifier = Modifier.size(13.dp),
+                        )
+                        Spacer(Modifier.size(4.dp))
+                        Text(
+                            "${pinned.name} pinned",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            " · ",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                    Text(
+                        "Tap to manage",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -108,10 +140,15 @@ private fun EmptyHubCard(onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = null,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .dashedBorder(
+                color = MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(20.dp),
+                strokeWidth = 2.dp,
+            ),
     ) {
         Row(
             modifier = Modifier.padding(18.dp),
@@ -120,23 +157,23 @@ private fun EmptyHubCard(onClick: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Person,
+                    imageVector = Icons.Outlined.PersonAdd,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Pick your identities",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -162,7 +199,7 @@ private fun StackedAvatars(identities: List<Identity>) {
         visible.forEachIndexed { i, identity ->
             Box(
                 modifier = Modifier
-                    .offset(x = (16 * i).dp)
+                    .offset(x = (30 * i).dp)
                     .size(40.dp)
                     .clip(CircleShape)
                     .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),

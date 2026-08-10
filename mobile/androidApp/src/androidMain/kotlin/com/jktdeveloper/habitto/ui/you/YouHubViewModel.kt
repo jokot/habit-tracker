@@ -6,10 +6,12 @@ import com.habittracker.domain.model.Identity
 import com.habittracker.domain.usecase.ExchangeRateCalculator
 import com.jktdeveloper.habitto.AppContainer
 import com.jktdeveloper.habitto.AuthState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -34,21 +36,31 @@ class YouHubViewModel(
         .map { it.currentStreak }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    fun currentEmail(): String? = container.currentAccountEmail()
+    /** Active habits — same `effectiveTo == null` rule the habit list screen applies. */
+    val habitCount: StateFlow<Int> = container.habitRepository
+        .observeHabitsForUser(container.currentUserId())
+        .map { habits -> habits.count { it.effectiveTo == null } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    private val _isSigningOut = MutableStateFlow(false)
-    val isSigningOut: StateFlow<Boolean> = _isSigningOut.asStateFlow()
+    val wantCount: StateFlow<Int> = container.wantActivityRepository
+        .observeWantActivities(container.currentUserId())
+        .map { wants -> wants.count { it.hiddenAt == null } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    fun signOut(onComplete: () -> Unit) {
-        if (_isSigningOut.value) return
+    private val _pinnedIdentityName = MutableStateFlow<String?>(null)
+    val pinnedIdentityName: StateFlow<String?> = _pinnedIdentityName.asStateFlow()
+
+    init { observePinnedIdentity() }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observePinnedIdentity() {
         viewModelScope.launch {
-            _isSigningOut.value = true
-            try {
-                container.signOutFromSettings()
-                onComplete()
-            } finally {
-                _isSigningOut.value = false
-            }
+            container.authState.flatMapLatest { auth ->
+                container.identityRepository.observeUserIdentities(auth.userId).map { identities ->
+                    val pinnedId = container.identityRepository.getPinnedIdentityIdForUser(auth.userId)
+                    identities.firstOrNull { it.id == pinnedId }?.name
+                }
+            }.collect { _pinnedIdentityName.value = it }
         }
     }
 }

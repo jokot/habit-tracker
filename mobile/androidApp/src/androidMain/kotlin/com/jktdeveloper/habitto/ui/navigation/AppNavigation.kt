@@ -397,12 +397,6 @@ fun AppNavigation(container: AppContainer) {
                 com.jktdeveloper.habitto.ui.you.YouHubScreen(
                     viewModel = vm,
                     onOpenSettings = { navController.navigate(Screen.Settings.route) },
-                    onSignIn = { navController.navigate(Screen.Auth.route) },
-                    onSignOutComplete = {
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(navController.graph.id) { inclusive = true }
-                        }
-                    },
                     onOpenIdentities = { navController.navigate(Screen.IdentityList.route) },
                     onHabitsClick = { navController.navigate(Screen.HabitList.route) },
                     onOpenExchangeRate = { navController.navigate(Screen.ExchangeRate.route) },
