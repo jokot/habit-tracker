@@ -17,6 +17,7 @@ import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
+import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
@@ -36,9 +37,11 @@ import com.jktdeveloper.habitto.ui.theme.LightColorScheme
 /**
  * Streak count plus a heat grid of recent days.
  *
- * Cell edge, column count and row count are all computed from the real widget size so
- * the grid spans the frame instead of sitting in a corner of it. The history it draws
- * from is a ceiling a very large widget could ask for; smaller frames render its tail.
+ * The cell edge is fixed at [SLOT]; the real widget size decides how many columns and
+ * rows fit, and the grid is centred in whatever is left over. A bigger frame therefore
+ * shows more days at the same size rather than the same days blown up or shrunk. The
+ * history it draws from is a ceiling a very large widget could ask for; smaller frames
+ * render its tail.
  *
  * [withHeader] false is the "pure items" variant — the heat grid alone, no streak line.
  */
@@ -61,15 +64,19 @@ open class StreakWidget(private val withHeader: Boolean = true) : GlanceAppWidge
                 val innerHeight = size.height - SURFACE_PADDING * 2
                 val showHeader = withHeader && size.height >= 140.dp
                 val gridHeight = if (showHeader) innerHeight - HEADER_HEIGHT else innerHeight
-                // EPSILON absorbs float division landing a hair under a whole cell — at 2×2
-                // the row count divides out to exactly 5, and without it can floor to 4.
-                val columns = (innerWidth / TARGET_CELL + EPSILON).toInt().coerceIn(5, 20)
-                val slot = innerWidth / columns
+                // The cell is a fixed edge, so a day reads the same on a 2×2 as on a 4×2 and
+                // only the number of them changes with the frame. EPSILON absorbs float
+                // division landing a hair under a whole cell and flooring a column away.
+                val slot = SLOT
+                val columns = (innerWidth / slot + EPSILON).toInt().coerceAtLeast(3)
                 val maxRows = (gridHeight / slot + EPSILON).toInt().coerceAtLeast(1)
                 val rows = minOf(maxRows, days.size / columns).coerceAtLeast(1)
                 val visible = days.takeLast(columns * rows)
 
-                WidgetSurface {
+                WidgetSurface(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (visible.isEmpty()) {
                         WidgetEmpty("Start a streak")
                     } else {
@@ -100,18 +107,38 @@ open class StreakWidget(private val withHeader: Boolean = true) : GlanceAppWidge
                                 )
                             }
                         }
-                        visible.chunked(columns).forEach { week ->
-                            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                                week.forEach { day ->
-                                    // The gutter is the outer Box's padding — padding on the
-                                    // coloured Box would shrink its fill, not separate cells.
-                                    Box(modifier = GlanceModifier.size(slot).padding(GAP)) {
-                                        Box(
-                                            modifier = GlanceModifier
-                                                .fillMaxSize()
-                                                .background(heatColor(day))
-                                                .cornerRadius(4.dp),
-                                        ) {}
+                        // Rows wrap their cells instead of filling the width, so the
+                        // surface's centre alignment lands the block in the middle of the
+                        // frame on both axes, whatever size the launcher hands us.
+                        //
+                        // The nesting is not decoration: a Glance container renders at most
+                        // MAX_CHILDREN children, silently dropping the rest, which is what
+                        // pinned every size to a 10×10 grid however much room it had.
+                        visible.chunked(columns).chunked(MAX_CHILDREN).forEach { rowGroup ->
+                            Column {
+                                rowGroup.forEach { week ->
+                                    Row {
+                                        week.chunked(MAX_CHILDREN).forEach { cellGroup ->
+                                            Row {
+                                                cellGroup.forEach { day ->
+                                                    // The gutter is the outer Box's padding —
+                                                    // padding on the coloured Box would shrink
+                                                    // its fill, not separate cells.
+                                                    Box(
+                                                        modifier = GlanceModifier
+                                                            .size(slot)
+                                                            .padding(GAP),
+                                                    ) {
+                                                        Box(
+                                                            modifier = GlanceModifier
+                                                                .fillMaxSize()
+                                                                .background(heatColor(day))
+                                                                .cornerRadius(4.dp),
+                                                        ) {}
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -123,8 +150,18 @@ open class StreakWidget(private val withHeader: Boolean = true) : GlanceAppWidge
     }
 
     private companion object {
-        /** Preferred cell edge; five columns is the floor, which is what a 2×2 lands on. */
-        val TARGET_CELL = 28.dp
+        /**
+         * Cell edge including its gutter, the same at every widget size — a bigger frame
+         * buys more days, not bigger days. [GAP] comes off it, so the coloured square is
+         * 24dp.
+         */
+        val SLOT = 28.dp
+
+        /**
+         * How many children a Glance container actually renders. Anything past this is
+         * dropped without a warning, so rows and cells are nested in groups of it.
+         */
+        const val MAX_CHILDREN = 10
         val GAP = 2.dp
         val HEADER_HEIGHT = 30.dp
         const val EPSILON = 0.02f
