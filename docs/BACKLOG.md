@@ -25,12 +25,10 @@ Two items previously carried as open notes are **done**: `habit.effectiveFrom` i
 implemented across the domain model, schema, streak use cases and sync; the onboarding
 redesign cleanup landed (a single `OnboardingScreen.kt` remains).
 
-## Phase 12 — Notifications settings + permission prompt (in progress)
+## Phase 12 — Notifications settings + permission prompt (shipped, PR #26)
 
-Branch `feature/phase12-notifications-redesign`, worktree
-`.worktrees/phase12-notifications-redesign`. Code complete, device QA outstanding.
-
-Same design canvas, file `notifications.html` / `components/notifications.jsx`.
+Merged 2026-08-10. Same design canvas, file `notifications.html` /
+`components/notifications.jsx`.
 
 Landed: per-type labels and icons (`ui/settings/NotificationTypeUi.kt`) replacing the
 raw-enum-key rows; category group cards via `SettingsGroup(prominent, dimmed)`; blocked
@@ -39,18 +37,16 @@ after a trip to system settings; permission prompt redrawn as a `ModalBottomShee
 moved off onboarding step 1 onto the Home route; pinned top bars on both settings
 screens.
 
-Not done: manual device pass (grouping, tinted/filled icons, time chips, dim state,
-permission-revoke round trip, prompt sheet on fresh install, light + dark). Out of
-scope by decision: posted notification copy in the workers, `bar_raised`/`bar_dropped`
-(feature never built), per-category master switches, iOS.
+Also shipped in the same PR: want timers no longer post an ongoing notification when
+timer notifications are off — the foreground service is skipped and
+`WantTimerFinalizeWorker` finishes the timer instead.
+
+Out of scope by decision: posted notification copy in the workers,
+`bar_raised`/`bar_dropped` (feature never built), per-category master switches, iOS.
 
 ## Known bugs
 
-1. **Widgets go empty after the app is swept from recents** — all four Glance widgets
-   lose their data; only relaunching the app repaints them. Widget state presumably
-   depends on process-lifetime state rather than being re-read from the DB inside the
-   Glance worker. Hits every cold start, so it outranks remaining polish work.
-2. **No way to start a timer for a timed want from Home** — `HomeViewModel.tapWant`
+1. **No way to start a timer for a timed want from Home** — `HomeViewModel.tapWant`
    (`HomeViewModel.kt:349`) always runs the pending-count/undo path, whatever the want
    is. The timer is reachable only via long-press → want detail, or from the quick-log
    grid widget, which does open the duration sheet for timed wants. Home should match.

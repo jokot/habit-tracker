@@ -39,7 +39,6 @@ private class GridEntry(
     val icon: ImageVector,
     val hue: Float,
     val label: String,
-    val caption: String,
     val enabled: Boolean,
     val action: Action,
 )
@@ -74,7 +73,6 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                                 icon = habitIcon(h.name),
                                 hue = HABIT_HUE,
                                 label = h.name,
-                                caption = "+1",
                                 enabled = true,
                                 action = actionRunCallback<LogHabitAction>(
                                     actionParametersOf(
@@ -92,7 +90,6 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                                 icon = resolveWantIcon(w.iconKey, w.name),
                                 hue = WANT_HUE,
                                 label = w.name,
-                                caption = if (w.enabled) "−1 pt" else "no pts",
                                 enabled = w.enabled,
                                 action = when {
                                     !w.enabled -> actionStartActivity<MainActivity>()
@@ -113,14 +110,19 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                 val innerWidth = size.width - SURFACE_PADDING * 2
                 val innerHeight = size.height - SURFACE_PADDING * 2
                 val showHeader = withHeader && size.height >= HEADER_MIN_HEIGHT
-                val gridHeight = if (showHeader) innerHeight - HEADER_HEIGHT else innerHeight
+                // Same balance type as the list widget, switching to the small line at the
+                // same height, so the two read as one family on the same home screen.
+                val compactHeader = size.height < COMPACT_HEADER_HEIGHT
+                val headerHeight = if (compactHeader) HEADER_HEIGHT else HEADER_HEIGHT_LARGE
+                val gridHeight = if (showHeader) innerHeight - headerHeight else innerHeight
                 // EPSILON absorbs float division landing a hair under a whole cell — without it
                 // a frame that fits exactly three rows can floor to two.
                 val columns = (innerWidth / TARGET_TILE + EPSILON).toInt().coerceIn(2, 5)
-                val rows = (gridHeight / TARGET_TILE + EPSILON).toInt().coerceAtLeast(1)
-                // Cells divide the frame; the tile is the largest square that fits one, so a
-                // wide-and-short frame yields squares rather than stretched rectangles.
                 val cellWidth = innerWidth / columns
+                val rows = (gridHeight / TARGET_TILE + EPSILON).toInt().coerceAtLeast(1)
+                // Cells divide the frame and the tile is the largest square that fits one, so
+                // both variants fill their frame edge to edge — with a header the rows simply
+                // share what is left after the balance line.
                 val cellHeight = gridHeight / rows
                 val tile = minOf(cellWidth, cellHeight) - GUTTER * 2
 
@@ -132,12 +134,12 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                             BalanceHeader(
                                 balance = data.balance,
                                 currentStreak = data.currentStreak,
-                                compact = true,
+                                compact = compactHeader,
                             )
                         }
-                        // Every tile, scrollable: [rows] now only sets how tall a cell is, it
-                        // no longer decides which tiles get dropped. Glance caps a fixed grid
-                        // at five columns, which is also where [columns] is coerced.
+                        // Every tile, scrollable: the frame decides how many are in view, not
+                        // which ones exist. Glance caps a fixed grid at five columns, which is
+                        // also where [columns] is coerced.
                         LazyVerticalGrid(
                             GridCells.Fixed(columns),
                             modifier = GlanceModifier.fillMaxSize(),
@@ -154,7 +156,6 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
                                             icon = entry.icon,
                                             hue = entry.hue,
                                             label = entry.label,
-                                            caption = entry.caption,
                                             enabled = entry.enabled,
                                             action = entry.action,
                                             tileSize = tile,
@@ -178,8 +179,18 @@ open class QuickLogGridWidget(private val withHeader: Boolean = true) : GlanceAp
         val GUTTER = 3.dp
         val HEADER_HEIGHT = 28.dp
 
-        /** Above this the balance line earns its space; a 2×3 frame is shorter and skips it. */
-        val HEADER_MIN_HEIGHT = 220.dp
+        /** What the balance line costs once it is drawing the list widget's larger numeral. */
+        val HEADER_HEIGHT_LARGE = 52.dp
+
+        /** Below this the balance drops to the small line — the list widget's threshold. */
+        val COMPACT_HEADER_HEIGHT = 200.dp
+
+        /**
+         * Above this the balance line earns its space — two cells tall and up, matching the
+         * list widget. Only a one-cell-tall frame skips it, where the header would leave no
+         * room for a row of tiles.
+         */
+        val HEADER_MIN_HEIGHT = 180.dp
         const val EPSILON = 0.02f
     }
 }
