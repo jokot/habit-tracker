@@ -9,7 +9,9 @@ import androidx.work.Configuration
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
+import com.jktdeveloper.habitto.notifications.NotificationPrefs
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import com.jktdeveloper.habitto.notifications.NotificationTypeId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -74,5 +76,20 @@ class SettingsViewModelTest {
             while (prefs.flow.first().dailyReminderMinutes != 1439) delay(20)
         }
         assertEquals(1439, prefs.flow.first().dailyReminderMinutes)
+    }
+
+    @Test
+    fun `summarize covers all on, some off, and muted`() {
+        val types = NotificationTypeId.entries
+        fun prefs(masterEnabled: Boolean, enabled: Map<NotificationTypeId, Boolean>) =
+            NotificationPrefs(masterEnabled, enabled, emptyMap())
+
+        val allOn = prefs(true, types.associateWith { true })
+        assertEquals("All on", SettingsViewModel.summarize(allOn))
+
+        val oneOff = prefs(true, types.associateWith { it != NotificationTypeId.STREAK_RISK })
+        assertEquals("${types.size - 1} of ${types.size} on", SettingsViewModel.summarize(oneOff))
+
+        assertEquals("Off", SettingsViewModel.summarize(prefs(false, types.associateWith { true })))
     }
 }

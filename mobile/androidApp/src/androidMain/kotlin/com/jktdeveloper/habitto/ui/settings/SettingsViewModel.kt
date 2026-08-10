@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.jktdeveloper.habitto.notifications.NotificationPrefs
 import com.jktdeveloper.habitto.notifications.NotificationScheduler
+import com.jktdeveloper.habitto.notifications.NotificationTypeId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -25,6 +27,15 @@ class SettingsViewModel(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = NotificationPrefs.DEFAULT,
     )
+
+    /** Subtitle for the single Notifications row on the Settings screen. */
+    val notificationSummary: StateFlow<String> = prefs
+        .map { summarize(it) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = summarize(NotificationPrefs.DEFAULT),
+        )
 
     fun setMasterEnabled(enabled: Boolean) = update {
         notificationPrefs.setMasterEnabled(enabled)
@@ -93,6 +104,16 @@ class SettingsViewModel(
         viewModelScope.launch {
             block()
             scheduler.reschedule()
+        }
+    }
+
+    companion object {
+        /** "Off" when muted, otherwise "All on" or "N of M on". */
+        fun summarize(prefs: NotificationPrefs): String {
+            if (!prefs.masterEnabled) return "Off"
+            val types = NotificationTypeId.entries
+            val on = types.count { prefs.isEnabled(it) }
+            return if (on == types.size) "All on" else "$on of ${types.size} on"
         }
     }
 }

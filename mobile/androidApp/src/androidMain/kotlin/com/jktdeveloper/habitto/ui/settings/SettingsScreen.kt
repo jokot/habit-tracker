@@ -1,13 +1,9 @@
 package com.jktdeveloper.habitto.ui.settings
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,7 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,10 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.BuildConfig
 import com.jktdeveloper.habitto.notifications.PermissionUtils
-import com.jktdeveloper.habitto.ui.theme.SyncRunningBg
-import com.jktdeveloper.habitto.ui.theme.SyncRunningBgDark
-import com.jktdeveloper.habitto.ui.theme.SyncRunningFg
-import com.jktdeveloper.habitto.ui.theme.SyncRunningFgDark
+import com.jktdeveloper.habitto.ui.components.SettingsGroup
+import com.jktdeveloper.habitto.ui.theme.FlameOrange
+import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
 
 @Composable
 fun SettingsScreen(
@@ -45,15 +40,9 @@ fun SettingsScreen(
     onOpenNotificationsSettings: (() -> Unit)? = null,
     onOpenDevTools: (() -> Unit)? = null,
 ) {
-    val prefs by viewModel.prefs.collectAsState()
+    val notificationSummary by viewModel.notificationSummary.collectAsState()
     val context = LocalContext.current
     var permissionGranted by remember { mutableStateOf(PermissionUtils.hasNotificationPermission(context)) }
-
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        permissionGranted = granted
-    }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -86,84 +75,35 @@ fun SettingsScreen(
             )
         }
 
-        // ── Permission banner ─────────────────────────────────────────────────
-        if (!permissionGranted) {
-            PermissionBanner(
-                onOpenSettings = { PermissionUtils.openAppNotificationSettings(context) },
-            )
-        }
-
         // ── Notifications section ─────────────────────────────────────────────
-        SettingsSection(title = "Notifications") {
-            if (onOpenNotificationsSettings != null) {
-                SettingsRow(
-                    title = "Notifications",
-                    supporting = "Daily reminders, alerts, status, system",
-                    trailing = {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                    onClick = onOpenNotificationsSettings,
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
-            val masterParentEnabled = permissionGranted
+        // All per-type detail lives in NotificationsSettingsScreen; this row is the
+        // only entry point, so the two can't drift.
+        SettingsGroup(title = "Notifications") {
             SettingsRow(
-                title = "All notifications",
+                title = "Notifications",
+                supporting = if (permissionGranted) notificationSummary else "Blocked by system",
+                leading = Icons.Default.Notifications,
+                leadingColor = if (isSystemInDarkTheme()) FlameOrangeDark else FlameOrange,
                 trailing = {
-                    Switch(
-                        checked = prefs.masterEnabled,
-                        enabled = masterParentEnabled,
-                        onCheckedChange = viewModel::setMasterEnabled,
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
                     )
                 },
-            )
-
-            val parentEnabled = permissionGranted && prefs.masterEnabled
-
-            NotifRow(
-                title = "Daily reminder",
-                timeMinutes = prefs.dailyReminderMinutes,
-                enabled = prefs.dailyReminderEnabled,
-                parentEnabled = parentEnabled,
-                onToggle = viewModel::setDailyReminderEnabled,
-                onTimeChange = viewModel::setDailyReminderMinutes,
-            )
-
-            NotifRow(
-                title = "Streak at risk",
-                timeMinutes = prefs.streakRiskMinutes,
-                enabled = prefs.streakRiskEnabled,
-                parentEnabled = parentEnabled,
-                onToggle = viewModel::setStreakRiskEnabled,
-                onTimeChange = viewModel::setStreakRiskMinutes,
-            )
-
-            NotifRow(
-                title = "Streak frozen alerts",
-                timeMinutes = null,
-                enabled = prefs.streakFrozenEnabled,
-                parentEnabled = parentEnabled,
-                onToggle = viewModel::setStreakFrozenEnabled,
-                onTimeChange = {},
-            )
-
-            NotifRow(
-                title = "Streak reset alerts",
-                timeMinutes = null,
-                enabled = prefs.streakResetEnabled,
-                parentEnabled = parentEnabled,
-                onToggle = viewModel::setStreakResetEnabled,
-                onTimeChange = {},
+                onClick = {
+                    if (permissionGranted) {
+                        onOpenNotificationsSettings?.invoke()
+                    } else {
+                        PermissionUtils.openAppNotificationSettings(context)
+                    }
+                },
             )
         }
 
         // ── Account section ───────────────────────────────────────────────────
-        SettingsSection(title = "Account") {
+        SettingsGroup(title = "Account") {
             if (isAuthenticated) {
                 SettingsRow(
                     title = accountEmail ?: "Signed in",
@@ -190,7 +130,7 @@ fun SettingsScreen(
 
         // ── Developer section (debug only) ────────────────────────────────────
         if (onOpenDevTools != null) {
-            SettingsSection(title = "Developer") {
+            SettingsGroup(title = "Developer") {
                 SettingsRow(
                     title = "Dev tools",
                     supporting = "Seed test data — debug builds only",
@@ -201,7 +141,7 @@ fun SettingsScreen(
         }
 
         // ── About section ─────────────────────────────────────────────────────
-        SettingsSection(title = "About") {
+        SettingsGroup(title = "About") {
             SettingsRow(
                 title = "Version",
                 supporting = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
@@ -226,26 +166,6 @@ fun SettingsScreen(
     }
 }
 
-// ─── Section primitive ────────────────────────────────────────────────────────
-
-@Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier = Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp)) {
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
-        )
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Column(content = content)
-        }
-    }
-}
 
 // ─── Row primitive ────────────────────────────────────────────────────────────
 
@@ -296,120 +216,3 @@ private fun SettingsRow(
     }
 }
 
-// ─── Permission banner ────────────────────────────────────────────────────────
-
-@Composable
-private fun PermissionBanner(onOpenSettings: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
-    val bannerBg = if (isDark) SyncRunningBgDark else SyncRunningBg
-    val bannerFg = if (isDark) SyncRunningFgDark else SyncRunningFg
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp)
-            .clickable(onClick = onOpenSettings),
-        color = bannerBg,
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.NotificationsOff,
-                contentDescription = null,
-                tint = bannerFg,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = "Notifications blocked. Tap to open system settings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = bannerFg,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(10.dp))
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = bannerFg,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
-}
-
-// ─── NotifRow ─────────────────────────────────────────────────────────────────
-
-@Composable
-private fun NotifRow(
-    title: String,
-    timeMinutes: Int?,
-    enabled: Boolean,
-    parentEnabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-    onTimeChange: (Int) -> Unit,
-) {
-    var showPicker by remember { mutableStateOf(false) }
-
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-    SettingsRow(
-        title = title,
-        supporting = if (timeMinutes != null && enabled) formatMinutes(timeMinutes) else null,
-        trailing = {
-            Switch(checked = enabled, enabled = parentEnabled, onCheckedChange = onToggle)
-        },
-        onClick = if (parentEnabled && enabled && timeMinutes != null) {
-            { showPicker = true }
-        } else null,
-    )
-
-    if (showPicker && timeMinutes != null) {
-        TimePickerDialogStub(
-            initialMinutes = timeMinutes,
-            onDismiss = { showPicker = false },
-            onConfirm = { newMinutes ->
-                onTimeChange(newMinutes)
-                showPicker = false
-            },
-        )
-    }
-}
-
-// ─── Time picker dialog ───────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimePickerDialogStub(
-    initialMinutes: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
-) {
-    val state = rememberTimePickerState(
-        initialHour = initialMinutes / 60,
-        initialMinute = initialMinutes % 60,
-        is24Hour = false,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Pick time") },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text("OK") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-private fun formatMinutes(minutes: Int): String {
-    val h = minutes / 60
-    val m = minutes % 60
-    val period = if (h < 12) "AM" else "PM"
-    val h12 = ((h + 11) % 12) + 1
-    val mm = m.toString().padStart(2, '0')
-    return "$h12:$mm $period"
-}
