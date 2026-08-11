@@ -12,6 +12,7 @@ import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.isTimed
 import com.habittracker.domain.usecase.ExchangeRateCalculator
 import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogHabitStatus
@@ -345,8 +346,14 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
             }
     }
 
-    /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
+    /**
+     * Tap handler: bump pending count for this want activity and (re)start its 3s countdown.
+     *
+     * Timed wants never belong here — Home routes them to the duration sheet instead, and
+     * spending their point outright would log a want that was never actually done.
+     */
     fun tapWant(activity: WantActivity) {
+        if (activity.isTimed) return
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
         val projectedCost = newCount  // 1 tap = 1 pt
         val balance = _uiState.value.pointBalance.balance

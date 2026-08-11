@@ -65,6 +65,7 @@ import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.isTimed
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
@@ -87,7 +88,7 @@ fun HomeScreen(
     onIdentityClick: (String) -> Unit,
     onIdentitiesClick: () -> Unit,
     onOpenExchangeRate: () -> Unit = {},
-    onOpenWantDetail: (String) -> Unit = {},
+    onOpenWantDetail: (id: String, openTimer: Boolean) -> Unit = { _, _ -> },
     onOpenTimer: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -332,9 +333,20 @@ fun HomeScreen(
                                 pending = pendingWantMap[activity.id],
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
-                                onTap = { viewModel.tapWant(activity) },
+                                onTap = {
+                                    when {
+                                        !activity.isTimed -> viewModel.tapWant(activity)
+                                        // Already running on this want: the duration
+                                        // sheet would be wrong, so go to the timer.
+                                        homeTimer?.activityId == activity.id ->
+                                            onOpenTimer(activity.id)
+                                        // Want detail auto-opens the duration sheet,
+                                        // the same route a widget tap takes.
+                                        else -> onOpenWantDetail(activity.id, true)
+                                    }
+                                },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
-                                onLongPress = { onOpenWantDetail(activity.id) },
+                                onLongPress = { onOpenWantDetail(activity.id, false) },
                             )
                         }
                     }
@@ -658,13 +670,17 @@ private fun WantActivityCard(
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        // Trailing: count pill when pending, Remove icon when idle
+                        // Trailing: count pill when pending, otherwise the action a tap
+                        // actually takes — a timed want starts its timer, it does not
+                        // spend a point outright.
                         if (pending != null) {
                             WantCountPill(pending.count)
                         } else {
                             Icon(
-                                imageVector = Icons.Default.Remove,
-                                contentDescription = "Spend points",
+                                imageVector = if (activity.isTimed) Icons.Default.Timer
+                                else Icons.Default.Remove,
+                                contentDescription = if (activity.isTimed) "Start timer"
+                                else "Spend points",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )
