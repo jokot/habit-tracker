@@ -10,6 +10,7 @@ import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.WantTimer
 import com.jktdeveloper.habitto.AppContainer
 import com.jktdeveloper.habitto.timer.CancelResult
+import com.jktdeveloper.habitto.timer.StartTimerOutcome
 import com.jktdeveloper.habitto.timer.WantTimerController
 import com.jktdeveloper.habitto.timer.WantTimerService
 import kotlinx.coroutines.delay
@@ -87,52 +88,45 @@ class WantDetailViewModel @VisibleForTesting internal constructor(
 
     fun requestStartTimer(durationSec: Int) {
         viewModelScope.launch {
-            val userId = userIdProvider()
-            val active = timerRepo.getActive(userId)
-            if (active != null && active.activityId != activityId) {
-                val otherWant = wantActivityRepo
-                    .getAllWantActivitiesForUser(userId)
-                    .firstOrNull { it.id == active.activityId }
-                val elapsedMin = ((clock.now() - active.startedAt).inWholeSeconds / 60).coerceAtLeast(0).toInt()
-                val minutesLeft = ((active.endsAt - clock.now()).inWholeSeconds / 60).coerceAtLeast(0).toInt()
-                _state.update {
-                    it.copy(
-                        showDurationSheet = false,
-                        pendingOverlap = PendingOverlap(
-                            otherWantName = otherWant?.name ?: "another want",
-                            elapsedMin = elapsedMin,
-                            minutesLeft = minutesLeft,
-                            desiredDurationSec = durationSec,
-                        ),
-                    )
-                }
-            } else {
-                doStart(durationSec)
-            }
+            apply(
+                timerController.startUnlessOverlapping(userIdProvider(), activityId, durationSec),
+                durationSec,
+            )
         }
     }
 
     fun confirmReplace() {
         viewModelScope.launch {
             val pending = _state.value.pendingOverlap ?: return@launch
-            timerController.cancelWithPartialLog(userIdProvider())
-            timerController.signalServiceStop()
             _state.update { it.copy(pendingOverlap = null) }
-            doStart(pending.desiredDurationSec)
+            apply(
+                timerController.replaceAndStart(userIdProvider(), activityId, pending.desiredDurationSec),
+                pending.desiredDurationSec,
+            )
         }
     }
 
-    private suspend fun doStart(durationSec: Int) {
-        try {
-            timerController.start(userIdProvider(), activityId, durationSec)
-            _state.update {
-                it.copy(
+    private fun apply(outcome: StartTimerOutcome, durationSec: Int) {
+        _state.update {
+            when (outcome) {
+                StartTimerOutcome.Started -> it.copy(
                     showDurationSheet = false,
                     navigateToTimerActivityId = activityId,
                 )
+                StartTimerOutcome.NoPoints -> it.copy(
+                    showDurationSheet = false,
+                    toast = "No points left to spend",
+                )
+                is StartTimerOutcome.NeedsReplace -> it.copy(
+                    showDurationSheet = false,
+                    pendingOverlap = PendingOverlap(
+                        otherWantName = outcome.otherWantName,
+                        elapsedMin = outcome.elapsedMin,
+                        minutesLeft = outcome.minutesLeft,
+                        desiredDurationSec = durationSec,
+                    ),
+                )
             }
-        } catch (e: com.habittracker.domain.usecase.InsufficientPointsException) {
-            _state.update { it.copy(showDurationSheet = false, toast = "No points left to spend") }
         }
     }
 

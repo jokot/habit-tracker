@@ -18,6 +18,7 @@ import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogHabitStatus
 import com.habittracker.domain.usecase.PointCalculator
 import com.jktdeveloper.habitto.timer.CancelResult
+import com.jktdeveloper.habitto.timer.StartTimerOutcome
 import com.jktdeveloper.habitto.timer.WantTimerService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -69,7 +70,18 @@ data class PendingWantLog(
 
 sealed interface HomeEvent {
     data class Message(val text: String) : HomeEvent
+    /** A timer just started from Home; the screen navigates to it. */
+    data class OpenTimer(val activityId: String) : HomeEvent
 }
+
+/** A want whose timer Home offered to start, and the other timer standing in the way. */
+data class HomeOverlap(
+    val activity: WantActivity,
+    val otherWantName: String,
+    val elapsedMin: Int,
+    val minutesLeft: Int,
+    val desiredDurationSec: Int,
+)
 
 /** Active Want timer, surfaced on Home regardless of which want it belongs to. */
 data class HomeTimerUi(
@@ -180,6 +192,60 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 }
                 delay(1000L)
             }
+        }
+    }
+
+    /** The want whose "How long?" sheet is open, or null. */
+    private val _durationSheetWant = MutableStateFlow<WantActivity?>(null)
+    val durationSheetWant: StateFlow<WantActivity?> = _durationSheetWant.asStateFlow()
+
+    private val _pendingOverlap = MutableStateFlow<HomeOverlap?>(null)
+    val pendingOverlap: StateFlow<HomeOverlap?> = _pendingOverlap.asStateFlow()
+
+    fun showDurationSheet(activity: WantActivity) { _durationSheetWant.value = activity }
+    fun dismissDurationSheet() { _durationSheetWant.value = null }
+    fun dismissOverlap() { _pendingOverlap.value = null }
+
+    /** Duration picked on Home: start right here rather than sending the user to want detail. */
+    fun requestStartTimer(durationSec: Int) {
+        val activity = _durationSheetWant.value ?: return
+        _durationSheetWant.value = null
+        viewModelScope.launch {
+            apply(
+                container.wantTimerController.startUnlessOverlapping(
+                    container.currentUserId(), activity.id, durationSec,
+                ),
+                activity,
+                durationSec,
+            )
+        }
+    }
+
+    fun confirmReplace() {
+        val pending = _pendingOverlap.value ?: return
+        _pendingOverlap.value = null
+        viewModelScope.launch {
+            apply(
+                container.wantTimerController.replaceAndStart(
+                    container.currentUserId(), pending.activity.id, pending.desiredDurationSec,
+                ),
+                pending.activity,
+                pending.desiredDurationSec,
+            )
+        }
+    }
+
+    private fun apply(outcome: StartTimerOutcome, activity: WantActivity, durationSec: Int) {
+        when (outcome) {
+            StartTimerOutcome.Started -> _events.tryEmit(HomeEvent.OpenTimer(activity.id))
+            StartTimerOutcome.NoPoints -> _events.tryEmit(HomeEvent.Message("No points left to spend"))
+            is StartTimerOutcome.NeedsReplace -> _pendingOverlap.value = HomeOverlap(
+                activity = activity,
+                otherWantName = outcome.otherWantName,
+                elapsedMin = outcome.elapsedMin,
+                minutesLeft = outcome.minutesLeft,
+                desiredDurationSec = durationSec,
+            )
         }
     }
 

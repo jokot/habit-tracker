@@ -67,9 +67,11 @@ import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.isTimed
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
+import com.jktdeveloper.habitto.ui.components.DurationSheet
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
 import com.jktdeveloper.habitto.ui.components.IdentityStrip
+import com.jktdeveloper.habitto.ui.components.ReplaceTimerDialog
 import com.jktdeveloper.habitto.ui.components.SyncChip
 import com.jktdeveloper.habitto.ui.components.habitIcon
 import com.jktdeveloper.habitto.ui.components.resolveWantIcon
@@ -100,13 +102,33 @@ fun HomeScreen(
     val showLogoutDialog by viewModel.showLogoutDialog.collectAsState()
     val logoutUnsyncedCount by viewModel.logoutUnsyncedCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val durationSheetWant by viewModel.durationSheetWant.collectAsState()
+    val pendingOverlap by viewModel.pendingOverlap.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is HomeEvent.Message -> snackbarHostState.showSnackbar(event.text)
+                is HomeEvent.OpenTimer -> onOpenTimer(event.activityId)
             }
         }
+    }
+
+    if (durationSheetWant != null) {
+        DurationSheet(
+            onPick = viewModel::requestStartTimer,
+            onDismiss = viewModel::dismissDurationSheet,
+        )
+    }
+
+    pendingOverlap?.let { overlap ->
+        ReplaceTimerDialog(
+            otherWantName = overlap.otherWantName,
+            elapsedMin = overlap.elapsedMin,
+            minutesLeft = overlap.minutesLeft,
+            onReplace = viewModel::confirmReplace,
+            onKeep = viewModel::dismissOverlap,
+        )
     }
 
     LaunchedEffect(syncState) {
@@ -340,9 +362,7 @@ fun HomeScreen(
                                         // sheet would be wrong, so go to the timer.
                                         homeTimer?.activityId == activity.id ->
                                             onOpenTimer(activity.id)
-                                        // Want detail auto-opens the duration sheet,
-                                        // the same route a widget tap takes.
-                                        else -> onOpenWantDetail(activity.id, true)
+                                        else -> viewModel.showDurationSheet(activity)
                                     }
                                 },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
