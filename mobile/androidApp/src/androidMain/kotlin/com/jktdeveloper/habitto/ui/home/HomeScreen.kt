@@ -1,6 +1,12 @@
 package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -30,6 +36,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Timer
@@ -58,6 +65,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -355,6 +363,7 @@ fun HomeScreen(
                                 pending = pendingWantMap[activity.id],
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
+                                isRunning = homeTimer?.activityId == activity.id,
                                 onTap = {
                                     // Already counting down on this want: no undo
                                     // window, no duration sheet — show the timer.
@@ -629,6 +638,8 @@ private fun WantActivityCard(
     pending: PendingWantLog?,
     balance: Int,
     canAfford: Boolean,
+    /** Whether *this* want's timer is counting down right now. */
+    isRunning: Boolean,
     onTap: () -> Unit,
     onCancel: () -> Unit,
     onLongPress: () -> Unit,
@@ -696,18 +707,23 @@ private fun WantActivityCard(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             if (activity.isTimed) {
-                                Icon(
-                                    imageVector = Icons.Default.Timer,
-                                    contentDescription = "Timed want",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp),
-                                )
+                                if (isRunning) {
+                                    RunningHourglass()
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Timer,
+                                        contentDescription = "Timed want",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
                             }
                         }
                         // Trailing: count pill while the tap is still undoable, else the
-                        // spend affordance every want card shows.
+                        // spend affordance every want card shows. The running timer reads
+                        // off the hourglass and the banner up top, not a second clock.
                         if (pending != null) {
-                            WantCountPill(pending.count)
+                            WantPill("×${pending.count}")
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Remove,
@@ -787,14 +803,41 @@ private fun HabitCountPill(count: Int) {
     }
 }
 
+/**
+ * The timed-want glyph while its timer runs: an hourglass that flips every 1.5s.
+ * The remaining time lives in the banner up top — this only says "still going".
+ */
 @Composable
-private fun WantCountPill(count: Int) {
+private fun RunningHourglass() {
+    val transition = rememberInfiniteTransition(label = "hourglass")
+    val flip by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 180f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "flip",
+    )
+    Icon(
+        imageVector = Icons.Default.HourglassTop,
+        contentDescription = "Timer running",
+        tint = MaterialTheme.colorScheme.error,
+        modifier = Modifier
+            .size(14.dp)
+            .graphicsLayer { rotationZ = flip },
+    )
+}
+
+/** Trailing pill on a want card: the pending tap count. */
+@Composable
+private fun WantPill(text: String) {
     Surface(
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.error,
     ) {
         Text(
-            text = "×$count",
+            text = text,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onError,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
