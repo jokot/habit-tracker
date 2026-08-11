@@ -722,7 +722,9 @@ private fun WantActivityCard(
                         // Trailing: count pill while the tap is still undoable, else the
                         // spend affordance every want card shows. The running timer reads
                         // off the hourglass and the banner up top, not a second clock.
-                        if (pending != null) {
+                        // A timed want has no count to show — extra taps still start
+                        // one timer, so the pill would promise a batch that never lands.
+                        if (pending != null && !activity.isTimed) {
                             WantPill("×${pending.count}")
                         } else {
                             Icon(
@@ -737,11 +739,14 @@ private fun WantActivityCard(
                     // Subtitle
                     Spacer(Modifier.height(Spacing.xs))
                     if (pending != null) {
-                        val totalCost = pending.count
+                        // A timed want spends one point when its timer starts, however
+                        // many times the card was tapped — the countdown ends in the
+                        // duration sheet, not in a log.
+                        val totalCost = if (activity.isTimed) 1 else pending.count
                         val afterBalance = balance - totalCost
                         Row {
                             Text(
-                                text = "−$totalCost pt total",
+                                text = if (activity.isTimed) "−1 pt at start" else "−$totalCost pt total",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -775,7 +780,11 @@ private fun WantActivityCard(
                         )
                         Spacer(Modifier.height(Spacing.md))
                         PendingActionRow(
-                            label = "Spends in ${pending.secondsRemaining}s",
+                            label = if (activity.isTimed) {
+                                "Starts in ${pending.secondsRemaining}s"
+                            } else {
+                                "Spends in ${pending.secondsRemaining}s"
+                            },
                             accent = MaterialTheme.colorScheme.error,
                             onCancel = onCancel,
                         )
