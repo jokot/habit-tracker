@@ -366,11 +366,11 @@ fun HomeScreen(
                                 isRunning = homeTimer?.activityId == activity.id,
                                 onTap = {
                                     // Already counting down on this want: no undo
-                                    // window, no duration sheet — show the timer.
+                                    // window, no sheet — just say it is running.
                                     if (activity.isTimed &&
                                         homeTimer?.activityId == activity.id
                                     ) {
-                                        onOpenTimer(activity.id)
+                                        viewModel.notifyTimerRunning(activity)
                                     } else {
                                         viewModel.tapWant(activity)
                                     }

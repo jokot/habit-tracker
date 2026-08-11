@@ -203,6 +203,15 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     val pendingOverlap: StateFlow<HomeOverlap?> = _pendingOverlap.asStateFlow()
 
     fun dismissDurationSheet() { _durationSheetWant.value = null }
+
+    /**
+     * Tapping a want that is already counting down: say so and stop there. No undo
+     * window to open, no duration to ask for — the banner up top holds the controls.
+     */
+    fun notifyTimerRunning(activity: WantActivity) {
+        val left = _homeTimer.value?.remainingMmSs ?: return
+        _events.tryEmit(HomeEvent.Message("${activity.name} timer running · $left left"))
+    }
     fun dismissOverlap() { _pendingOverlap.value = null }
 
     /** Duration picked on Home: start right here rather than sending the user to want detail. */
