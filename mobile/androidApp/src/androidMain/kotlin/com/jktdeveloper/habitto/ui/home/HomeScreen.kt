@@ -356,13 +356,14 @@ fun HomeScreen(
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
                                 onTap = {
-                                    when {
-                                        !activity.isTimed -> viewModel.tapWant(activity)
-                                        // Already running on this want: the duration
-                                        // sheet would be wrong, so go to the timer.
-                                        homeTimer?.activityId == activity.id ->
-                                            onOpenTimer(activity.id)
-                                        else -> viewModel.showDurationSheet(activity)
+                                    // Already counting down on this want: no undo
+                                    // window, no duration sheet — show the timer.
+                                    if (activity.isTimed &&
+                                        homeTimer?.activityId == activity.id
+                                    ) {
+                                        onOpenTimer(activity.id)
+                                    } else {
+                                        viewModel.tapWant(activity)
                                     }
                                 },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
@@ -684,23 +685,33 @@ private fun WantActivityCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Name
-                        Text(
-                            text = activity.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        // Trailing: count pill when pending, otherwise the action a tap
-                        // actually takes — a timed want starts its timer, it does not
-                        // spend a point outright.
+                        // Name, with a small glyph marking the wants that run on a timer.
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = activity.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            if (activity.isTimed) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "Timed want",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
+                        // Trailing: count pill while the tap is still undoable, else the
+                        // spend affordance every want card shows.
                         if (pending != null) {
                             WantCountPill(pending.count)
                         } else {
                             Icon(
-                                imageVector = if (activity.isTimed) Icons.Default.Timer
-                                else Icons.Default.Remove,
-                                contentDescription = if (activity.isTimed) "Start timer"
-                                else "Spend points",
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Spend points",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )

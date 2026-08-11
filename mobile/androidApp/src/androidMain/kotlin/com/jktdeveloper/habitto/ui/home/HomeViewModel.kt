@@ -202,7 +202,6 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     private val _pendingOverlap = MutableStateFlow<HomeOverlap?>(null)
     val pendingOverlap: StateFlow<HomeOverlap?> = _pendingOverlap.asStateFlow()
 
-    fun showDurationSheet(activity: WantActivity) { _durationSheetWant.value = activity }
     fun dismissDurationSheet() { _durationSheetWant.value = null }
     fun dismissOverlap() { _pendingOverlap.value = null }
 
@@ -415,11 +414,10 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /**
      * Tap handler: bump pending count for this want activity and (re)start its 3s countdown.
      *
-     * Timed wants never belong here — Home routes them to the duration sheet instead, and
-     * spending their point outright would log a want that was never actually done.
+     * Timed wants take the same countdown — it is the undo window every want card offers.
+     * Only the commit differs: they open the duration sheet instead of logging.
      */
     fun tapWant(activity: WantActivity) {
-        if (activity.isTimed) return
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
         val projectedCost = newCount  // 1 tap = 1 pt
         val balance = _uiState.value.pointBalance.balance
@@ -458,6 +456,12 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         val batch = _pendingWants.value[activity.id] ?: return
         _pendingWants.update { it - activity.id }
         wantTimers.remove(activity.id)
+        // A timed want spends its point when the timer finishes, not now: the countdown
+        // was the undo window, so what follows it is "how long?", not a log.
+        if (activity.isTimed) {
+            _durationSheetWant.value = activity
+            return
+        }
         val userId = container.currentUserId()
         val result = container.logWantUseCase.execute(
             userId = userId,
