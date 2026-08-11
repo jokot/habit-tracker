@@ -1,6 +1,12 @@
 package com.jktdeveloper.habitto.ui.home
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -30,6 +36,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Timer
@@ -58,6 +65,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,10 +73,13 @@ import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.isTimed
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
+import com.jktdeveloper.habitto.ui.components.DurationSheet
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
 import com.jktdeveloper.habitto.ui.components.IdentityStrip
+import com.jktdeveloper.habitto.ui.components.ReplaceTimerDialog
 import com.jktdeveloper.habitto.ui.components.SyncChip
 import com.jktdeveloper.habitto.ui.components.habitIcon
 import com.jktdeveloper.habitto.ui.components.resolveWantIcon
@@ -87,7 +98,7 @@ fun HomeScreen(
     onIdentityClick: (String) -> Unit,
     onIdentitiesClick: () -> Unit,
     onOpenExchangeRate: () -> Unit = {},
-    onOpenWantDetail: (String) -> Unit = {},
+    onOpenWantDetail: (id: String, openTimer: Boolean) -> Unit = { _, _ -> },
     onOpenTimer: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -99,13 +110,33 @@ fun HomeScreen(
     val showLogoutDialog by viewModel.showLogoutDialog.collectAsState()
     val logoutUnsyncedCount by viewModel.logoutUnsyncedCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val durationSheetWant by viewModel.durationSheetWant.collectAsState()
+    val pendingOverlap by viewModel.pendingOverlap.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is HomeEvent.Message -> snackbarHostState.showSnackbar(event.text)
+                is HomeEvent.OpenTimer -> onOpenTimer(event.activityId)
             }
         }
+    }
+
+    if (durationSheetWant != null) {
+        DurationSheet(
+            onPick = viewModel::requestStartTimer,
+            onDismiss = viewModel::dismissDurationSheet,
+        )
+    }
+
+    pendingOverlap?.let { overlap ->
+        ReplaceTimerDialog(
+            otherWantName = overlap.otherWantName,
+            elapsedMin = overlap.elapsedMin,
+            minutesLeft = overlap.minutesLeft,
+            onReplace = viewModel::confirmReplace,
+            onKeep = viewModel::dismissOverlap,
+        )
     }
 
     LaunchedEffect(syncState) {
@@ -332,9 +363,20 @@ fun HomeScreen(
                                 pending = pendingWantMap[activity.id],
                                 balance = uiState.pointBalance.balance,
                                 canAfford = canAfford,
-                                onTap = { viewModel.tapWant(activity) },
+                                isRunning = homeTimer?.activityId == activity.id,
+                                onTap = {
+                                    // Already counting down on this want: no undo
+                                    // window, no sheet — just say it is running.
+                                    if (activity.isTimed &&
+                                        homeTimer?.activityId == activity.id
+                                    ) {
+                                        viewModel.notifyTimerRunning(activity)
+                                    } else {
+                                        viewModel.tapWant(activity)
+                                    }
+                                },
                                 onCancel = { viewModel.cancelPendingWant(activity.id) },
-                                onLongPress = { onOpenWantDetail(activity.id) },
+                                onLongPress = { onOpenWantDetail(activity.id, false) },
                             )
                         }
                     }
@@ -596,6 +638,8 @@ private fun WantActivityCard(
     pending: PendingWantLog?,
     balance: Int,
     canAfford: Boolean,
+    /** Whether *this* want's timer is counting down right now. */
+    isRunning: Boolean,
     onTap: () -> Unit,
     onCancel: () -> Unit,
     onLongPress: () -> Unit,
@@ -652,15 +696,34 @@ private fun WantActivityCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Name
-                        Text(
-                            text = activity.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        // Trailing: count pill when pending, Remove icon when idle
+                        // Name, with a small glyph marking the wants that run on a timer.
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = activity.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            if (activity.isTimed) {
+                                if (isRunning) {
+                                    RunningHourglass()
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Timer,
+                                        contentDescription = "Timed want",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                            }
+                        }
+                        // Trailing: count pill while the tap is still undoable, else the
+                        // spend affordance every want card shows. The running timer reads
+                        // off the hourglass and the banner up top, not a second clock.
                         if (pending != null) {
-                            WantCountPill(pending.count)
+                            WantPill("×${pending.count}")
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Remove,
@@ -740,14 +803,41 @@ private fun HabitCountPill(count: Int) {
     }
 }
 
+/**
+ * The timed-want glyph while its timer runs: an hourglass that flips every 1.5s.
+ * The remaining time lives in the banner up top — this only says "still going".
+ */
 @Composable
-private fun WantCountPill(count: Int) {
+private fun RunningHourglass() {
+    val transition = rememberInfiniteTransition(label = "hourglass")
+    val flip by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 180f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "flip",
+    )
+    Icon(
+        imageVector = Icons.Default.HourglassTop,
+        contentDescription = "Timer running",
+        tint = MaterialTheme.colorScheme.error,
+        modifier = Modifier
+            .size(14.dp)
+            .graphicsLayer { rotationZ = flip },
+    )
+}
+
+/** Trailing pill on a want card: the pending tap count. */
+@Composable
+private fun WantPill(text: String) {
     Surface(
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.error,
     ) {
         Text(
-            text = "×$count",
+            text = text,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onError,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),

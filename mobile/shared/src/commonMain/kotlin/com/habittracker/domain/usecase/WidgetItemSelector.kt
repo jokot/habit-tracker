@@ -3,6 +3,7 @@ package com.habittracker.domain.usecase
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.isTimed
 import kotlin.math.nextUp
 
 /** One habit as a widget renders it. */
@@ -52,9 +53,6 @@ data class WidgetData(
  */
 object WidgetItemSelector {
 
-    /** Wants measured in this unit run on a timer instead of logging instantly. */
-    const val MINUTE_UNIT: String = "min"
-
     fun select(
         habits: List<HabitWithProgress>,
         wants: List<WantActivity>,
@@ -91,7 +89,7 @@ object WidgetItemSelector {
                     activityId = want.id,
                     name = want.name,
                     rateText = "$units ${want.unit}",
-                    isTimed = want.unit == MINUTE_UNIT,
+                    isTimed = want.isTimed,
                     enabled = affordable,
                     iconKey = want.iconKey,
                 )

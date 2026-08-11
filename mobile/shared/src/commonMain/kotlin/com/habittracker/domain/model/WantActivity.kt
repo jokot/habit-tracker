@@ -14,3 +14,12 @@ data class WantActivity(
     val updatedAt: Instant = Instant.fromEpochMilliseconds(0),
     val syncedAt: Instant? = null,
 )
+
+/** Wants measured in this unit run on a timer instead of logging instantly. */
+const val MINUTE_UNIT: String = "min"
+
+/**
+ * Whether tapping this want starts a timer rather than spending a point outright.
+ * Lives next to the model so Home, the widgets and `WidgetItemSelector` read one rule.
+ */
+val WantActivity.isTimed: Boolean get() = unit == MINUTE_UNIT

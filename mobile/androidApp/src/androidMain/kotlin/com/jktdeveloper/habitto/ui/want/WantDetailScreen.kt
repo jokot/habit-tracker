@@ -65,6 +65,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jktdeveloper.habitto.ui.components.DurationSheet
+import com.jktdeveloper.habitto.ui.components.ReplaceTimerDialog
 import com.jktdeveloper.habitto.ui.components.resolveWantIcon
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -299,42 +301,19 @@ fun WantDetailScreen(
         }
 
         if (state.showDurationSheet) {
-            androidx.compose.material3.ModalBottomSheet(onDismissRequest = viewModel::dismissDurationSheet) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("How long?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(12.dp))
-                    val durations = listOf(5, 10, 15, 20, 30, 60)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        durations.forEach { mins ->
-                            androidx.compose.material3.AssistChip(
-                                onClick = { viewModel.requestStartTimer(mins * 60) },
-                                label = { Text("$mins min") },
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
+            DurationSheet(
+                onPick = viewModel::requestStartTimer,
+                onDismiss = viewModel::dismissDurationSheet,
+            )
         }
 
         state.pendingOverlap?.let { p ->
-            AlertDialog(
-                onDismissRequest = viewModel::dismissOverlap,
-                title = { Text("Replace running timer?") },
-                text = {
-                    val tail = if (p.elapsedMin >= 1) {
-                        "Starting a new one will log ${p.elapsedMin} min and end it."
-                    } else {
-                        "Starting a new one will discard it."
-                    }
-                    Text("You have a ${p.minutesLeft} min timer for ${p.otherWantName}. $tail")
-                },
-                confirmButton = {
-                    Button(onClick = viewModel::confirmReplace) { Text("Replace") }
-                },
-                dismissButton = {
-                    TextButton(onClick = viewModel::dismissOverlap) { Text("Keep") }
-                },
+            ReplaceTimerDialog(
+                otherWantName = p.otherWantName,
+                elapsedMin = p.elapsedMin,
+                minutesLeft = p.minutesLeft,
+                onReplace = viewModel::confirmReplace,
+                onKeep = viewModel::dismissOverlap,
             )
         }
     }

@@ -18,6 +18,21 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * What asking for a timer turned into. Lets Home and want detail share one decision —
+ * the screens only choose how to render each case.
+ */
+sealed interface StartTimerOutcome {
+    data object Started : StartTimerOutcome
+    /** Another want is already counting down; the caller must confirm the replacement. */
+    data class NeedsReplace(
+        val otherWantName: String,
+        val elapsedMin: Int,
+        val minutesLeft: Int,
+    ) : StartTimerOutcome
+    data object NoPoints : StartTimerOutcome
+}
+
 class WantTimerController(
     private val context: Context,
     private val repository: WantTimerRepository,
@@ -56,6 +71,53 @@ class WantTimerController(
             // to finish the timer, so hand that to WorkManager.
             WantTimerFinalizeWorker.enqueue(context, durationSec)
         }
+    }
+
+    /**
+     * Start unless another want is mid-countdown, in which case the caller decides
+     * whether to replace it. A timer already running on *this* want is not an overlap —
+     * `start` replaces it, which is what tapping the same want again means.
+     */
+    suspend fun startUnlessOverlapping(
+        userId: String,
+        activityId: String,
+        durationSec: Int,
+    ): StartTimerOutcome {
+        val active = repository.getActive(userId)
+        if (active != null && active.activityId != activityId) {
+            val other = wantActivityRepository
+                .getAllWantActivitiesForUser(userId)
+                .firstOrNull { it.id == active.activityId }
+            val now = clock.now()
+            return StartTimerOutcome.NeedsReplace(
+                otherWantName = other?.name ?: "another want",
+                elapsedMin = ((now - active.startedAt).inWholeSeconds / 60).coerceAtLeast(0).toInt(),
+                minutesLeft = ((active.endsAt - now).inWholeSeconds / 60).coerceAtLeast(0).toInt(),
+            )
+        }
+        return startOrNoPoints(userId, activityId, durationSec)
+    }
+
+    /** Confirmed replacement: log what the running timer earned, then start the new one. */
+    suspend fun replaceAndStart(
+        userId: String,
+        activityId: String,
+        durationSec: Int,
+    ): StartTimerOutcome {
+        cancelWithPartialLog(userId)
+        signalServiceStop()
+        return startOrNoPoints(userId, activityId, durationSec)
+    }
+
+    private suspend fun startOrNoPoints(
+        userId: String,
+        activityId: String,
+        durationSec: Int,
+    ): StartTimerOutcome = try {
+        start(userId, activityId, durationSec)
+        StartTimerOutcome.Started
+    } catch (e: InsufficientPointsException) {
+        StartTimerOutcome.NoPoints
     }
 
     /**

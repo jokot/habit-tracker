@@ -46,10 +46,7 @@ Out of scope by decision: posted notification copy in the workers,
 
 ## Known bugs
 
-1. **No way to start a timer for a timed want from Home** — `HomeViewModel.tapWant`
-   (`HomeViewModel.kt:349`) always runs the pending-count/undo path, whatever the want
-   is. The timer is reachable only via long-press → want detail, or from the quick-log
-   grid widget, which does open the duration sheet for timed wants. Home should match.
+None open.
 
 ## Phase 11 — You hub + settings redesign (shipped, PR #25)
 

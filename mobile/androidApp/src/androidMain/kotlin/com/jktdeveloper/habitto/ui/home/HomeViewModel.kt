@@ -12,11 +12,13 @@ import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.isTimed
 import com.habittracker.domain.usecase.ExchangeRateCalculator
 import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogHabitStatus
 import com.habittracker.domain.usecase.PointCalculator
 import com.jktdeveloper.habitto.timer.CancelResult
+import com.jktdeveloper.habitto.timer.StartTimerOutcome
 import com.jktdeveloper.habitto.timer.WantTimerService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -68,7 +70,18 @@ data class PendingWantLog(
 
 sealed interface HomeEvent {
     data class Message(val text: String) : HomeEvent
+    /** A timer just started from Home; the screen navigates to it. */
+    data class OpenTimer(val activityId: String) : HomeEvent
 }
+
+/** A want whose timer Home offered to start, and the other timer standing in the way. */
+data class HomeOverlap(
+    val activity: WantActivity,
+    val otherWantName: String,
+    val elapsedMin: Int,
+    val minutesLeft: Int,
+    val desiredDurationSec: Int,
+)
 
 /** Active Want timer, surfaced on Home regardless of which want it belongs to. */
 data class HomeTimerUi(
@@ -179,6 +192,68 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 }
                 delay(1000L)
             }
+        }
+    }
+
+    /** The want whose "How long?" sheet is open, or null. */
+    private val _durationSheetWant = MutableStateFlow<WantActivity?>(null)
+    val durationSheetWant: StateFlow<WantActivity?> = _durationSheetWant.asStateFlow()
+
+    private val _pendingOverlap = MutableStateFlow<HomeOverlap?>(null)
+    val pendingOverlap: StateFlow<HomeOverlap?> = _pendingOverlap.asStateFlow()
+
+    fun dismissDurationSheet() { _durationSheetWant.value = null }
+
+    /**
+     * Tapping a want that is already counting down: say so and stop there. No undo
+     * window to open, no duration to ask for — the banner up top holds the controls.
+     */
+    fun notifyTimerRunning(activity: WantActivity) {
+        val left = _homeTimer.value?.remainingMmSs ?: return
+        _events.tryEmit(HomeEvent.Message("${activity.name} timer running · $left left"))
+    }
+    fun dismissOverlap() { _pendingOverlap.value = null }
+
+    /** Duration picked on Home: start right here rather than sending the user to want detail. */
+    fun requestStartTimer(durationSec: Int) {
+        val activity = _durationSheetWant.value ?: return
+        _durationSheetWant.value = null
+        viewModelScope.launch {
+            apply(
+                container.wantTimerController.startUnlessOverlapping(
+                    container.currentUserId(), activity.id, durationSec,
+                ),
+                activity,
+                durationSec,
+            )
+        }
+    }
+
+    fun confirmReplace() {
+        val pending = _pendingOverlap.value ?: return
+        _pendingOverlap.value = null
+        viewModelScope.launch {
+            apply(
+                container.wantTimerController.replaceAndStart(
+                    container.currentUserId(), pending.activity.id, pending.desiredDurationSec,
+                ),
+                pending.activity,
+                pending.desiredDurationSec,
+            )
+        }
+    }
+
+    private fun apply(outcome: StartTimerOutcome, activity: WantActivity, durationSec: Int) {
+        when (outcome) {
+            StartTimerOutcome.Started -> _events.tryEmit(HomeEvent.OpenTimer(activity.id))
+            StartTimerOutcome.NoPoints -> _events.tryEmit(HomeEvent.Message("No points left to spend"))
+            is StartTimerOutcome.NeedsReplace -> _pendingOverlap.value = HomeOverlap(
+                activity = activity,
+                otherWantName = outcome.otherWantName,
+                elapsedMin = outcome.elapsedMin,
+                minutesLeft = outcome.minutesLeft,
+                desiredDurationSec = durationSec,
+            )
         }
     }
 
@@ -345,7 +420,12 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
             }
     }
 
-    /** Tap handler: bump pending count for this want activity and (re)start its 3s countdown. */
+    /**
+     * Tap handler: bump pending count for this want activity and (re)start its 3s countdown.
+     *
+     * Timed wants take the same countdown — it is the undo window every want card offers.
+     * Only the commit differs: they open the duration sheet instead of logging.
+     */
     fun tapWant(activity: WantActivity) {
         val newCount = (_pendingWants.value[activity.id]?.count ?: 0) + 1
         val projectedCost = newCount  // 1 tap = 1 pt
@@ -385,6 +465,12 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         val batch = _pendingWants.value[activity.id] ?: return
         _pendingWants.update { it - activity.id }
         wantTimers.remove(activity.id)
+        // A timed want spends its point when the timer finishes, not now: the countdown
+        // was the undo window, so what follows it is "how long?", not a log.
+        if (activity.isTimed) {
+            _durationSheetWant.value = activity
+            return
+        }
         val userId = container.currentUserId()
         val result = container.logWantUseCase.execute(
             userId = userId,
