@@ -35,52 +35,68 @@ class PostgrestSupabaseSyncClient(
     }
 
     override suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit> =
-        supabase.postgrest.from("habits")
-            .select {
-                filter {
-                    eq("user_id", userId)
-                    gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        fetchAllPages { page ->
+            supabase.postgrest.from("habits")
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                    }
+                    order("updated_at", Order.ASCENDING)
+                    order("id", Order.ASCENDING)
+                    range(page)
                 }
-                order("updated_at", Order.ASCENDING)
-            }
-            .decodeList<HabitDto>()
-            .map { it.toDomain() }
+                .decodeList<HabitDto>()
+                .map { it.toDomain() }
+        }
 
     override suspend fun fetchWantActivitiesSince(userId: String, sinceMs: Long): List<WantActivity> =
-        supabase.postgrest.from("want_activities")
-            .select {
-                filter {
-                    eq("user_id", userId)
-                    gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        fetchAllPages { page ->
+            supabase.postgrest.from("want_activities")
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                    }
+                    order("updated_at", Order.ASCENDING)
+                    order("id", Order.ASCENDING)
+                    range(page)
                 }
-                order("updated_at", Order.ASCENDING)
-            }
-            .decodeList<WantActivityDto>()
-            .map { it.toDomain() }
+                .decodeList<WantActivityDto>()
+                .map { it.toDomain() }
+        }
 
     override suspend fun fetchHabitLogsSince(userId: String, sinceMs: Long): List<HabitLog> =
-        supabase.postgrest.from("habit_logs")
-            .select {
-                filter {
-                    eq("user_id", userId)
-                    gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        fetchAllPages { page ->
+            supabase.postgrest.from("habit_logs")
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                    }
+                    order("synced_at", Order.ASCENDING)
+                    order("id", Order.ASCENDING)
+                    range(page)
                 }
-                order("synced_at", Order.ASCENDING)
-            }
-            .decodeList<HabitLogDto>()
-            .map { it.toDomain() }
+                .decodeList<HabitLogDto>()
+                .map { it.toDomain() }
+        }
 
     override suspend fun fetchWantLogsSince(userId: String, sinceMs: Long): List<WantLog> =
-        supabase.postgrest.from("want_logs")
-            .select {
-                filter {
-                    eq("user_id", userId)
-                    gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        fetchAllPages { page ->
+            supabase.postgrest.from("want_logs")
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                    }
+                    order("synced_at", Order.ASCENDING)
+                    order("id", Order.ASCENDING)
+                    range(page)
                 }
-                order("synced_at", Order.ASCENDING)
-            }
-            .decodeList<WantLogDto>()
-            .map { it.toDomain() }
+                .decodeList<WantLogDto>()
+                .map { it.toDomain() }
+        }
 
     override suspend fun upsertUserIdentity(row: UserIdentityRow) {
         supabase.postgrest.from("user_identities").upsert(row.toDto())
@@ -95,28 +111,70 @@ class PostgrestSupabaseSyncClient(
         // changing added_at. Watermark by added_at would miss those updates.
         // Volume per user is small (≤10 rows) — fetch all rows for the user.
         @Suppress("UNUSED_PARAMETER") val _s = sinceMs
-        return supabase.postgrest.from("user_identities")
-            .select {
-                filter { eq("user_id", userId) }
-                order("added_at", Order.ASCENDING)
-            }
-            .decodeList<UserIdentityDto>()
-            .map { it.toDomain() }
+        return fetchAllPages { page ->
+            supabase.postgrest.from("user_identities")
+                .select {
+                    filter { eq("user_id", userId) }
+                    order("added_at", Order.ASCENDING)
+                    order("identity_id", Order.ASCENDING)
+                    range(page)
+                }
+                .decodeList<UserIdentityDto>()
+                .map { it.toDomain() }
+        }
     }
 
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
         // RLS scopes to habits owned by current user; client-side userId arg is for parity
         @Suppress("UNUSED_PARAMETER") val _u = userId
-        return supabase.postgrest.from("habit_identities")
-            .select {
-                filter {
-                    gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        return fetchAllPages { page ->
+            supabase.postgrest.from("habit_identities")
+                .select {
+                    filter {
+                        gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+                    }
+                    order("updated_at", Order.ASCENDING)
+                    order("habit_id", Order.ASCENDING)
+                    order("identity_id", Order.ASCENDING)
+                    range(page)
                 }
-                order("updated_at", Order.ASCENDING)
-            }
-            .decodeList<HabitIdentityDto>()
-            .map { it.toDomain() }
+                .decodeList<HabitIdentityDto>()
+                .map { it.toDomain() }
+        }
     }
+}
+
+// ---- Paging -------------------------------------------------------------
+
+/** Postgrest caps one response at 1000 rows; ask for exactly that per page. */
+internal const val SYNC_PAGE_SIZE = 1000L
+
+/**
+ * Stop after this many pages. A server that ignores the range would otherwise
+ * hand back the same full page forever and hang the pull.
+ */
+internal const val MAX_SYNC_PAGES = 1000
+
+/**
+ * Walk pages until one comes back short — a short page is the last page.
+ *
+ * Every fetch orders by its watermark column *and* a unique tie-break, because
+ * rows sharing a timestamp have no defined order between two requests: without
+ * the tie-break a row can land on both sides of a page seam, or on neither.
+ */
+internal suspend fun <T> fetchAllPages(
+    pageSize: Long = SYNC_PAGE_SIZE,
+    fetchPage: suspend (LongRange) -> List<T>,
+): List<T> {
+    val all = mutableListOf<T>()
+    var from = 0L
+    repeat(MAX_SYNC_PAGES) {
+        val page = fetchPage(from until from + pageSize)
+        all += page
+        if (page.size < pageSize) return all
+        from += pageSize
+    }
+    return all
 }
 
 // ---- DTOs ---------------------------------------------------------------
