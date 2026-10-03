@@ -3,7 +3,6 @@ package com.habittracker.data.sync
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * The fake sync client returns whole lists, so it can never reproduce the bug
@@ -77,6 +76,6 @@ class FetchAllPagesTest {
         }
 
         assertEquals(MAX_SYNC_PAGES, requests)
-        assertTrue(all.size == MAX_SYNC_PAGES * 2)
+        assertEquals(MAX_SYNC_PAGES * 2, all.size)
     }
 }
