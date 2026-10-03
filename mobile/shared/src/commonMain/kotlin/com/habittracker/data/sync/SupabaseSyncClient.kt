@@ -21,4 +21,8 @@ interface SupabaseSyncClient {
     suspend fun fetchWantLogsSince(userId: String, sinceMs: Long): List<WantLog>
     suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow>
     suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow>
+
+    /** Logs with `logged_at >= fromMs`, whatever their sync time. Moves no watermark. */
+    suspend fun fetchHabitLogsLoggedFrom(userId: String, fromMs: Long): List<HabitLog>
+    suspend fun fetchWantLogsLoggedFrom(userId: String, fromMs: Long): List<WantLog>
 }

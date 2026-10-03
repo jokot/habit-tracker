@@ -31,4 +31,7 @@ interface WantLogRepository {
     suspend fun markSynced(id: String, syncedAt: Instant)
 
     suspend fun mergePulled(row: WantLog)
+
+    /** Merge a pulled page of rows. Observers see the page as one change. */
+    suspend fun mergePulledAll(rows: List<WantLog>) = rows.forEach { mergePulled(it) }
 }

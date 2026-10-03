@@ -15,6 +15,18 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
 
     var shouldThrowOnNext: Throwable? = null
 
+    /** Names of the fetches made, in order. A `_recent` suffix marks the recent-logs fetches. */
+    val fetches = mutableListOf<String>()
+
+    /** The fetch with this name throws, every time. */
+    var throwOn: String? = null
+
+    private fun fetch(name: String) {
+        fetches += name
+        if (throwOn == name) throw RuntimeException("fetch $name failed")
+        failIfNeeded()
+    }
+
     private fun failIfNeeded() {
         shouldThrowOnNext?.let { err ->
             shouldThrowOnNext = null
@@ -47,12 +59,12 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     }
 
     override suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit> {
-        failIfNeeded()
+        fetch("habits")
         return habits.filter { it.userId == userId && it.updatedAt.toEpochMilliseconds() > sinceMs }
     }
 
     override suspend fun fetchWantActivitiesSince(userId: String, sinceMs: Long): List<WantActivity> {
-        failIfNeeded()
+        fetch("want_activities")
         return wantActivities.filter {
             (it.createdByUserId == userId || it.createdByUserId == null) &&
                 it.updatedAt.toEpochMilliseconds() > sinceMs
@@ -60,14 +72,14 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     }
 
     override suspend fun fetchHabitLogsSince(userId: String, sinceMs: Long): List<HabitLog> {
-        failIfNeeded()
+        fetch("habit_logs")
         return habitLogs.filter {
             it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: 0L) > sinceMs
         }
     }
 
     override suspend fun fetchWantLogsSince(userId: String, sinceMs: Long): List<WantLog> {
-        failIfNeeded()
+        fetch("want_logs")
         return wantLogs.filter {
             it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: 0L) > sinceMs
         }
@@ -89,13 +101,23 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     }
 
     override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> {
-        failIfNeeded()
+        fetch("user_identities")
         return userIdentities.filter { it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds()) > sinceMs }
     }
 
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
-        failIfNeeded()
+        fetch("habit_identities")
         @Suppress("UNUSED_PARAMETER") val _u = userId
         return habitIdentities.filter { (it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds()) > sinceMs }
+    }
+
+    override suspend fun fetchHabitLogsLoggedFrom(userId: String, fromMs: Long): List<HabitLog> {
+        fetch("habit_logs_recent")
+        return habitLogs.filter { it.userId == userId && it.loggedAt.toEpochMilliseconds() >= fromMs }
+    }
+
+    override suspend fun fetchWantLogsLoggedFrom(userId: String, fromMs: Long): List<WantLog> {
+        fetch("want_logs_recent")
+        return wantLogs.filter { it.userId == userId && it.loggedAt.toEpochMilliseconds() >= fromMs }
     }
 }

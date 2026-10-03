@@ -4,8 +4,10 @@ import android.content.Context
 import com.habittracker.data.local.DatabaseDriverFactory
 import com.habittracker.data.local.HabitTrackerDatabase
 import com.habittracker.data.local.LocalUserIdStore
+import com.habittracker.data.local.PullProgress
 import com.habittracker.data.local.SeedData
 import com.habittracker.data.local.SyncPreferences
+import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.SyncWatermarkStore
 import com.habittracker.data.remote.GoogleSignInLauncher
 import com.habittracker.data.remote.SupabaseClientFactory
@@ -67,7 +69,10 @@ import com.jktdeveloper.habitto.preferences.AppFlagsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import com.habittracker.domain.model.TodaySection
+import com.habittracker.domain.model.readySections
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -79,6 +84,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -137,6 +143,9 @@ class AppContainer(context: Context) {
         watermarks,
         syncIdentity,
     )
+
+    /** Which tables the first sync on this device has pulled so far. */
+    val pullProgress: StateFlow<PullProgress> = syncEngine.pullProgress
 
     val googleSignInLauncher = GoogleSignInLauncher(
         context = appContext,
@@ -245,6 +254,15 @@ class AppContainer(context: Context) {
         }
         .stateIn(applicationScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** Today sections whose data is all local. Streak History also waits for [TodaySection.STREAK]. */
+    val readySections: StateFlow<Set<TodaySection>> =
+        combine(authState, pullProgress) { auth, progress -> progress.readySections(auth.isAuthenticated) }
+            .stateIn(
+                applicationScope,
+                SharingStarted.Eagerly,
+                pullProgress.value.readySections(isAuthenticated()),
+            )
+
     private val _sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val sessionExpiredEvents: SharedFlow<Unit> = _sessionExpiredEvents.asSharedFlow()
 
@@ -272,27 +290,37 @@ class AppContainer(context: Context) {
         if (identityRepository.getAllIdentities().isEmpty()) {
             identityRepository.upsertIdentities(SeedData.identities)
         }
-        // For authenticated users: pull from server FIRST so reconcile sees any
-        // existing seed wants the user already owns and skips re-inserting them
-        // with fresh UUIDs. Reconcile-before-pull would push 14 random-UUID rows
-        // every install, accumulating duplicates server-side across reinstalls.
-        // Bounded timeout — failure must not block app start; reconcile then
-        // proceeds against whatever local state exists.
-        if (isAuthenticated()) {
-            runCatching {
-                kotlinx.coroutines.withTimeoutOrNull(5_000) {
-                    syncEngine.sync(SyncReason.POST_SIGN_IN)
-                }
-            }.onFailure { e ->
-                android.util.Log.w("AppContainer", "Pre-reconcile sync failed", e)
-            }
-        }
         // Want activities: reconcile the canonical 14-item seed list. Name-match
         // against existing rows means already-pulled seeds are skipped. Brand-new
         // users (or guests pre-auth) with empty local state get the full 14
         // inserted with fresh per-user UUIDs.
-        runCatching { setupUserWantActivitiesUseCase.reconcile(currentUserId()) }
+        reconcileJob?.cancel()
+        if (!isAuthenticated() || SyncTable.WANT_ACTIVITIES in pullProgress.value.tables) {
+            reconcileWantActivities(currentUserId())
+            return
+        }
+        // Signed in, and the user's wants are not pulled yet: reconcile after they are,
+        // so it sees the seed wants the user already owns. Reconcile-before-pull would
+        // push 14 random-UUID rows every install, accumulating duplicates server-side
+        // across reinstalls. This waits in the background, so it never blocks app start.
+        val userId = currentUserId()
+        reconcileJob = applicationScope.launch {
+            pullProgress.first { SyncTable.WANT_ACTIVITIES in it.tables }
+            if (currentUserId() == userId) reconcileWantActivities(userId)
+        }
+    }
+
+    /** The pending deferred reconcile. A newer call replaces it, so two never race. */
+    private var reconcileJob: Job? = null
+
+    private suspend fun reconcileWantActivities(userId: String) {
+        runCatching { setupUserWantActivitiesUseCase.reconcile(userId) }
             .onFailure { e -> android.util.Log.w("AppContainer", "Want-activity reconcile failed", e) }
+    }
+
+    /** Starts a sync that outlives the caller's screen. Results arrive through the local flows. */
+    fun syncInBackground(reason: SyncReason) {
+        applicationScope.launch { syncEngine.sync(reason) }
     }
 
     /**

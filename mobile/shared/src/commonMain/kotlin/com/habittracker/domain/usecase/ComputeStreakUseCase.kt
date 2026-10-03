@@ -10,8 +10,8 @@ import com.habittracker.domain.model.StreakDayState
 import com.habittracker.domain.model.StreakRangeResult
 import com.habittracker.domain.model.StreakSummary
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
@@ -27,15 +27,23 @@ class ComputeStreakUseCase(
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
     private val clock: Clock = Clock.System,
 ) {
+    /** Emits again when a log or a habit changes, because a habit edit can change a day's state. */
     fun observeRange(userId: String, range: DateRange): Flow<StreakRangeResult> =
-        habitLogRepository.observeActiveLogsBetween(
-            userId = userId,
-            startInclusive = range.start.atStartOfDayIn(timeZone),
-            endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
-        ).map { logs -> buildRangeResult(userId, range, logs, firstLogDateFor(userId)) }
+        combine(
+            habitLogRepository.observeActiveLogsBetween(
+                userId = userId,
+                startInclusive = range.start.atStartOfDayIn(timeZone),
+                endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
+            ),
+            habitRepository.observeHabitsForUser(userId),
+        ) { logs, habits -> buildRangeResult(range, logs, habits, firstLogDateFor(userId)) }
 
+    /** Emits again when a log or a habit changes. */
     fun observeCurrent(userId: String): Flow<StreakSummary> =
-        habitLogRepository.observeAllActiveLogsForUser(userId).map { logs ->
+        combine(
+            habitLogRepository.observeAllActiveLogsForUser(userId),
+            habitRepository.observeHabitsForUser(userId),
+        ) { logs, habits ->
             // Re-derive firstLog from the live log stream rather than a snapshot at flow
             // creation. Previous impl exited early when the user had 0 logs, so the first
             // habit log never triggered a re-emit and the streak counter stayed at 0 even
@@ -44,9 +52,7 @@ class ComputeStreakUseCase(
             if (first == null) {
                 StreakSummary(0, 0, 0, null)
             } else {
-                val today = todayLocal()
-                val habits = habitRepository.getHabitsForUser(userId)
-                summarize(first, today, logs, habits)
+                summarize(first, todayLocal(), logs, habits)
             }
         }
 
@@ -57,7 +63,7 @@ class ComputeStreakUseCase(
             startInclusive = range.start.atStartOfDayIn(timeZone),
             endExclusive = range.endExclusive.atStartOfDayIn(timeZone),
         ).first()
-        return buildRangeResult(userId, range, logs, firstLog)
+        return buildRangeResult(range, logs, habitRepository.getHabitsForUser(userId), firstLog)
     }
 
     suspend fun computeSummaryNow(userId: String): StreakSummary {
@@ -78,14 +84,13 @@ class ComputeStreakUseCase(
     private suspend fun firstLogDateFor(userId: String): LocalDate? =
         habitLogRepository.firstActiveLogAt(userId)?.toLocalDate()
 
-    private suspend fun buildRangeResult(
-        userId: String,
+    private fun buildRangeResult(
         range: DateRange,
         logs: List<HabitLog>,
+        habits: List<Habit>,
         firstLogDate: LocalDate?,
     ): StreakRangeResult {
         val today = todayLocal()
-        val habits = habitRepository.getHabitsForUser(userId)
         val pastLogs = logs.filter { it.loggedAt <= now() } // ignore future-dated
         // Strict streak (option A): a day counts as COMPLETE only when ALL habits active
         // on that day met their dailyTarget. Partial-log days do NOT continue the streak.

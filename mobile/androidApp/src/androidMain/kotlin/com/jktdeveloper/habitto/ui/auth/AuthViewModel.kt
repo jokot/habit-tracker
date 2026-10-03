@@ -130,7 +130,8 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         container.migrateLocalToAuthenticated(session.userId)
         container.refreshAuthState()
         container.seedLocalDataIfEmpty()
-        container.syncEngine.sync(SyncReason.POST_SIGN_IN)
+        // Home opens at once; each section fills in as its data arrives.
+        container.syncInBackground(SyncReason.POST_SIGN_IN)
         _events.emit(AuthEvent.Success)
     }
 }

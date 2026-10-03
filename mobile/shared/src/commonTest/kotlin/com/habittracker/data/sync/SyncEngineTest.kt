@@ -1,5 +1,6 @@
 package com.habittracker.data.sync
 
+import com.habittracker.data.local.PullProgress
 import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.WatermarkReader
 import com.habittracker.data.repository.FakeHabitLogRepository
@@ -9,11 +10,16 @@ import com.habittracker.data.repository.FakeWantActivityRepository
 import com.habittracker.data.repository.FakeWantLogRepository
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -28,9 +34,14 @@ class SyncEngineTest {
     private val watermarks = InMemoryWatermarks()
     private val auth = FakeAuthIdentity("user-1", authenticated = true)
 
+    /** Saturday 2026-10-03, noon UTC. */
+    private val now = Instant.parse("2026-10-03T12:00:00Z")
+
     private val engine = SyncEngine(
         habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo, identityRepo,
         supabase, watermarks, auth,
+        clock = object : Clock { override fun now() = this@SyncEngineTest.now },
+        timeZone = TimeZone.UTC,
     )
 
     private val t0: Instant = Clock.System.now()
@@ -133,6 +144,61 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `first pull fetches core tables, then recent logs, then history`() = runTest {
+        engine.sync(SyncReason.POST_SIGN_IN).getOrThrow()
+        assertEquals(
+            listOf(
+                "user_identities", "habits", "habit_identities", "want_activities",
+                "habit_logs_recent", "want_logs_recent", "habit_logs", "want_logs",
+            ),
+            supabase.fetches,
+        )
+    }
+
+    @Test
+    fun `an empty server marks every table pulled`() = runTest {
+        engine.sync(SyncReason.POST_SIGN_IN).getOrThrow()
+        assertEquals(PullProgress(SyncTable.entries.toSet(), recentLogs = true), watermarks.progress.value)
+    }
+
+    @Test
+    fun `a later sync skips the recent-logs stage`() = runTest {
+        engine.sync(SyncReason.POST_SIGN_IN).getOrThrow()
+        supabase.fetches.clear()
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+        assertFalse(supabase.fetches.any { it.endsWith("_recent") })
+    }
+
+    @Test
+    fun `recent-logs stage pulls logs from the start of the day 6 days ago`() = runTest {
+        val inRange = HabitLog("in", "user-1", "h1", 1.0, Instant.parse("2026-09-27T00:00:00Z"), syncedAt = now)
+        val tooOld = HabitLog("old", "user-1", "h1", 1.0, Instant.parse("2026-09-26T23:59:59Z"), syncedAt = now)
+        supabase.habitLogs += listOf(inRange, tooOld)
+        supabase.throwOn = "habit_logs" // stop before the history stage
+
+        engine.sync(SyncReason.POST_SIGN_IN)
+
+        assertEquals(listOf("in"), habitLogRepo.logs.map { it.id })
+    }
+
+    @Test
+    fun `a failure in the history stage keeps the earlier stages and the log watermark`() = runTest {
+        supabase.habits.add(makeHabit("h1", updatedAt = tPlus(10)))
+        supabase.habitLogs.add(HabitLog("l1", "user-1", "h1", 1.0, now, syncedAt = now))
+        supabase.throwOn = "habit_logs"
+
+        val result = engine.sync(SyncReason.POST_SIGN_IN)
+
+        assertTrue(result.isFailure)
+        assertTrue(engine.syncState.value is SyncState.Error)
+        val progress = watermarks.progress.value
+        assertTrue(SyncTable.HABITS in progress.tables)
+        assertTrue(progress.recentLogs)
+        assertFalse(SyncTable.HABIT_LOGS in progress.tables)
+        assertEquals(0L, watermarks.get(SyncTable.HABIT_LOGS))
+    }
+
+    @Test
     fun `push syncs unsynced user and habit identities`() = runTest {
         val habit = makeHabit(id = "h1")
         habitRepo.saveHabit(habit)
@@ -154,8 +220,12 @@ class SyncEngineTest {
 
 class InMemoryWatermarks : WatermarkReader {
     private val store = mutableMapOf<SyncTable, Long>()
+    private val _progress = MutableStateFlow(PullProgress())
+    override val progress: StateFlow<PullProgress> = _progress
     override fun get(table: SyncTable): Long = store[table] ?: 0L
     override fun set(table: SyncTable, valueMs: Long) { store[table] = valueMs }
+    override fun markPulled(table: SyncTable) = _progress.update { it.copy(tables = it.tables + table) }
+    override fun markRecentLogsPulled() = _progress.update { it.copy(recentLogs = true) }
 }
 
 class FakeAuthIdentity(

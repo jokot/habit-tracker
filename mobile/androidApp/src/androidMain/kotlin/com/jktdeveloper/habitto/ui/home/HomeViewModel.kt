@@ -10,6 +10,7 @@ import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitWithProgress
 import com.habittracker.domain.model.Identity
+import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.isTimed
@@ -29,9 +30,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -98,6 +101,15 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     val syncState: StateFlow<SyncState> = container.syncEngine.syncState
+
+    /** Today sections whose data is all local. The rest show a skeleton. */
+    val readySections: StateFlow<Set<TodaySection>> = container.readySections
+
+    /** The last sync failed while some section was still loading. */
+    val loadFailed: StateFlow<Boolean> =
+        combine(syncState, readySections) { state, ready ->
+            state is SyncState.Error && ready.size < TodaySection.entries.size
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _streakStrip = MutableStateFlow(
         com.habittracker.domain.model.StreakRangeResult(emptyList(), null)
@@ -338,6 +350,8 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         }
                     }
                 }
+                // The combine walks the whole log history; keep it off the main thread.
+                .flowOn(Dispatchers.Default)
                 .collect { _uiState.value = it }
         }
     }
@@ -356,11 +370,13 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         container.computeStreakUseCase.observeRange(auth.userId, range)
                     }
                 }
+                .flowOn(Dispatchers.Default)
                 .collect { _streakStrip.value = it }
         }
         viewModelScope.launch {
             container.authState
                 .flatMapLatest { auth -> container.computeStreakUseCase.observeCurrent(auth.userId) }
+                .flowOn(Dispatchers.Default)
                 .collect { _streakSummary.value = it }
         }
     }

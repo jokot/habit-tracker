@@ -43,6 +43,9 @@ interface HabitLogRepository {
 
     suspend fun mergePulled(row: HabitLog)
 
+    /** Merge a pulled page of rows. Observers see the page as one change. */
+    suspend fun mergePulledAll(rows: List<HabitLog>) = rows.forEach { mergePulled(it) }
+
     fun observeActiveLogsBetween(
         userId: String,
         startInclusive: Instant,
