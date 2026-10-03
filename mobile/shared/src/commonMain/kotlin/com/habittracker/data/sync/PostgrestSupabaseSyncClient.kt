@@ -91,6 +91,11 @@ class PostgrestSupabaseSyncClient(
     /**
      * Pull every row of [table] that matches [where], one page at a time. Rows
      * are sorted ascending by each column of [orderBy], in order.
+     *
+     * [orderBy] must start with the watermark column and end with columns that
+     * are unique per row. Rows that share a timestamp have no defined order
+     * between two requests: without the tie-break a row can land on both sides
+     * of a page seam, or on neither.
      */
     private suspend inline fun <reified D : Any> fetchPaged(
         table: String,
@@ -124,10 +129,6 @@ internal const val MAX_SYNC_PAGES = 1000
  * Walk pages until one comes back empty. A short page is not the last page: the
  * server may cap a response below [pageSize] (`max_rows` is set per project), so
  * the next page starts after the rows that arrived, not after [pageSize].
- *
- * Every fetch orders by its watermark column *and* a unique tie-break, because
- * rows sharing a timestamp have no defined order between two requests: without
- * the tie-break a row can land on both sides of a page seam, or on neither.
  */
 internal suspend fun <T> fetchAllPages(
     pageSize: Long = SYNC_PAGE_SIZE,
