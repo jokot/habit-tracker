@@ -135,12 +135,13 @@ internal class FakePostgrest(private val cap: Int = 1000) {
     private companion object {
         fun JsonObject.text(column: String): String? = get(column)?.jsonPrimitive?.contentOrNull
 
-        /** Like SQL, a null never passes `eq` or `gt`. */
+        /** Like SQL, a null never passes `eq`, `gt` or `gte`. */
         fun condition(column: String, op: String, value: String): (JsonObject) -> Boolean = { row ->
             val field = row.text(column)
             field != null && when (op) {
                 "eq" -> compareField(field, value) == 0
                 "gt" -> compareField(field, value) > 0
+                "gte" -> compareField(field, value) >= 0
                 else -> error("unsupported operator $op")
             }
         }

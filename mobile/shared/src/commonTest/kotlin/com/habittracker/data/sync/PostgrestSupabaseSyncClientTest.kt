@@ -94,6 +94,51 @@ class PostgrestSupabaseSyncClientTest {
     }
 
     @Test
+    fun `recent habit logs pull every row logged from the given time, across pages`() = runTest {
+        val atFrom = buildJsonObject {
+            put("id", "log-at")
+            put("user_id", USER)
+            put("habit_id", "habit-1")
+            put("quantity", 1.0)
+            put("logged_at", SINCE.toString())
+            put("deleted_at", null as String?)
+            put("synced_at", OLD_SYNC)
+        }
+        server.seed("habit_logs", rows(ROWS) { i, time ->
+            put("id", "log-$i")
+            put("user_id", if (i % 5 == 0) OTHER_USER else USER)
+            put("habit_id", "habit-1")
+            put("quantity", 1.0)
+            put("logged_at", time)
+            put("deleted_at", null as String?)
+            put("synced_at", OLD_SYNC)
+        } + atFrom)
+
+        val pulled = client.fetchHabitLogsLoggedFrom(USER, SINCE_MS).map { it.id }
+
+        assertEquals((expected("log-") { it % 5 != 0 } + "log-at").sorted(), pulled.sorted())
+    }
+
+    @Test
+    fun `recent want logs pull every row logged from the given time, across pages`() = runTest {
+        server.seed("want_logs", rows(ROWS) { i, time ->
+            put("id", "wlog-$i")
+            put("user_id", if (i % 5 == 0) OTHER_USER else USER)
+            put("activity_id", "want-1")
+            put("quantity", 1.0)
+            put("points_spent", 1)
+            put("device_mode", "this_device")
+            put("logged_at", time)
+            put("deleted_at", null as String?)
+            put("synced_at", OLD_SYNC)
+        })
+
+        val pulled = client.fetchWantLogsLoggedFrom(USER, SINCE_MS).map { it.id }
+
+        assertEquals(expected("wlog-") { it % 5 != 0 }, pulled.sorted())
+    }
+
+    @Test
     fun `user identities pull every row of the user, old ones too`() = runTest {
         // No watermark here: a pin or a why-text edit does not move added_at.
         server.seed("user_identities", rows(ROWS) { i, time ->
@@ -157,6 +202,9 @@ class PostgrestSupabaseSyncClientTest {
 
         val SINCE: Instant = Instant.parse("2026-08-11T14:00:00Z")
         val SINCE_MS = SINCE.toEpochMilliseconds()
+
+        /** A sync time before every row, so the recent-log tests filter by `logged_at` alone. */
+        const val OLD_SYNC = "2026-01-01T00:00:00+00:00"
 
         /**
          * [count] rows, three to a timestamp, one microsecond apart. Row

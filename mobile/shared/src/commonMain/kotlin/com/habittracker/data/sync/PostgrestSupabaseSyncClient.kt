@@ -75,6 +75,26 @@ class PostgrestSupabaseSyncClient(
             gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
         }.map { it.toDomain() }
 
+    override suspend fun fetchHabitLogsLoggedFrom(userId: String, fromMs: Long): List<HabitLog> =
+        fetchPaged<HabitLogDto>(
+            "habit_logs",
+            orderBy = listOf("logged_at", "id"),
+            keyOf = { listOf(it.loggedAt.asCursorTime(), it.id) },
+        ) {
+            eq("user_id", userId)
+            gte("logged_at", Instant.fromEpochMilliseconds(fromMs).toString())
+        }.map { it.toDomain() }
+
+    override suspend fun fetchWantLogsLoggedFrom(userId: String, fromMs: Long): List<WantLog> =
+        fetchPaged<WantLogDto>(
+            "want_logs",
+            orderBy = listOf("logged_at", "id"),
+            keyOf = { listOf(it.loggedAt.asCursorTime(), it.id) },
+        ) {
+            eq("user_id", userId)
+            gte("logged_at", Instant.fromEpochMilliseconds(fromMs).toString())
+        }.map { it.toDomain() }
+
     override suspend fun upsertUserIdentity(row: UserIdentityRow) {
         supabase.postgrest.from("user_identities").upsert(row.toDto())
     }
