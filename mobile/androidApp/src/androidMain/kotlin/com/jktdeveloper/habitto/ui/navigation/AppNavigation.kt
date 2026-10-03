@@ -40,7 +40,9 @@ import com.jktdeveloper.habitto.ui.identity.AddIdentityViewModel
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingScreen
 import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
 import com.jktdeveloper.habitto.devtools.devToolsRoute
+import com.habittracker.data.local.SyncTable
 import com.habittracker.data.sync.SyncReason
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 sealed class Screen(val route: String) {
@@ -111,16 +113,21 @@ fun AppNavigation(container: AppContainer) {
         container.seedLocalDataIfEmpty()
         val userId = container.currentUserId()
 
-        // Fresh device with existing session — try a 2s cloud restore before routing.
-        if (container.isAuthenticated() &&
-            container.habitRepository.getHabitsForUser(userId).isEmpty()
-        ) {
-            withTimeoutOrNull(2_000L) {
-                container.syncEngine.sync(SyncReason.POST_SIGN_IN)
-            }
+        // Signed in, but the habits are not pulled yet: onboarding depends on them, so
+        // give the pull a moment. On a timeout go Home, where the skeletons show —
+        // Onboarding would be wrong for a user whose habits are still on the way.
+        val habitsPending = container.isAuthenticated() &&
+            SyncTable.HABITS !in container.pullProgress.value.tables
+        val habitsArrived = if (habitsPending) {
+            container.syncInBackground(SyncReason.POST_SIGN_IN)
+            withTimeoutOrNull(5_000L) {
+                container.pullProgress.first { SyncTable.HABITS in it.tables }
+            } != null
+        } else {
+            true
         }
 
-        startDestination = if (container.isOnboardedUseCase.execute(userId)) {
+        startDestination = if (!habitsArrived || container.isOnboardedUseCase.execute(userId)) {
             Screen.Home.route
         } else {
             Screen.Onboarding.route
