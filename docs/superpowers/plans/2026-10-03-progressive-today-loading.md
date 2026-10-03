@@ -34,7 +34,7 @@
 
 1. **The user signs out during the first pull.** The deferred want reconcile must not run for the old user, and it must not run for the next user on stale data. Task 5 covers this with a user-id check after the wait.
 2. **Two deferred reconciles run at once,** one from startup and one from sign-in. This can insert duplicate seed wants. Task 5 cancels the earlier job before it starts a new one.
-3. **An upgraded install has watermarks but no flags.** Its sections must be ready at once and must not shimmer. Task 1 covers this with a test.
+3. **An upgraded install has watermarks but no flags.** Its sections must be ready at once and must not shimmer, also for its empty tables. A first pull that a restart cuts short must not count as pulled. Task 1 covers both with tests, using the one-time `pulled.flags_version` marker.
 4. **A table that is empty on the server** must count as pulled, or its section shimmers forever. Task 2 covers this with a test.
 5. **A sync fails in stage 3.** The flags from stages 1 and 2 must stay set, and the log watermarks must not move. Task 2 covers this with a test.
 

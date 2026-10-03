@@ -33,10 +33,34 @@ class SyncWatermarkStoreTest {
         )
     }
 
-    @Test fun `a watermark above zero counts as pulled, for upgraded installs`() {
+    @Test fun `an install from before the flags with a watermark counts as fully pulled`() {
+        val prefs = SyncPreferences().apply { putLong("watermark.habit_logs", 5L) }
+        assertEquals(
+            PullProgress(SyncTable.entries.toSet(), recentLogs = true),
+            SyncWatermarkStore(prefs).progress.value,
+        )
+    }
+
+    @Test fun `an install from before the flags with no watermark has nothing pulled`() {
+        assertEquals(PullProgress(), SyncWatermarkStore(SyncPreferences()).progress.value)
+    }
+
+    @Test fun `a first pull cut short by a restart does not count as pulled`() {
         val prefs = SyncPreferences()
-        SyncWatermarkStore(prefs).set(SyncTable.HABIT_LOGS, 5L)
-        assertEquals(setOf(SyncTable.HABIT_LOGS), SyncWatermarkStore(prefs).progress.value.tables)
+        SyncWatermarkStore(prefs).apply {
+            set(SyncTable.HABITS, 5L)
+            markPulled(SyncTable.HABITS)
+        }
+        assertEquals(PullProgress(setOf(SyncTable.HABITS)), SyncWatermarkStore(prefs).progress.value)
+    }
+
+    @Test fun `reset is not mistaken for an install from before the flags`() {
+        val prefs = SyncPreferences()
+        SyncWatermarkStore(prefs).apply {
+            set(SyncTable.HABITS, 5L)
+            reset()
+        }
+        assertEquals(PullProgress(), SyncWatermarkStore(prefs).progress.value)
     }
 
     @Test fun `reset clears the watermarks, the flags and the recent-logs flag`() {

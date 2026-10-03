@@ -66,7 +66,7 @@ Where the progress is stored:
 Rules:
 
 - **When a table counts as pulled:** after its step finishes, including when the server returned 0 rows. An empty table is pulled, not loading.
-- **When a table counts as pulled on an upgraded install:** a table with a watermark above 0 and no flag is treated as pulled. Without this rule, users who upgrade would see a shimmer until their next sync.
+- **When a table counts as pulled on an upgraded install:** the first time the new version runs, it checks for any watermark above 0. If there is one, the device synced in full before, so every table and the recent logs count as pulled, empty tables too. Without this rule, users who upgrade would see a shimmer until their next sync, or for good while offline. A one-time marker (`pulled.flags_version`) stops the check from running again, so a first pull that a restart cuts short is not mistaken for a full one.
 - **Recent logs are also ready** when both log tables are pulled in full.
 - **What `reset()` clears:** both the flags and the watermarks. That covers sign-out, a migrate for an existing user, and a DB wipe.
 - **Where the UI reads it:** `SyncEngine.pullProgress` exposes `watermarks.progress`. AppContainer passes it on.
