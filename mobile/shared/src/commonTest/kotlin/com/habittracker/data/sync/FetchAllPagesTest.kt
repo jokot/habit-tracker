@@ -12,8 +12,11 @@ import kotlin.test.assertFailsWith
  */
 class FetchAllPagesTest {
 
-    /** A server holding [rowCount] rows that honours the requested range. */
-    private class PagedServer(rowCount: Int) {
+    /**
+     * A server holding [rowCount] rows. It honours the requested range, but like
+     * Postgrest's `max_rows` it never returns more than [cap] rows in one response.
+     */
+    private class PagedServer(rowCount: Int, private val cap: Int = Int.MAX_VALUE) {
         val rows = List(rowCount) { it }
         var requests = 0
             private set
@@ -22,7 +25,7 @@ class FetchAllPagesTest {
             requests++
             val from = range.first.toInt().coerceAtMost(rows.size)
             val to = (range.last.toInt() + 1).coerceAtMost(rows.size)
-            return rows.subList(from, to)
+            return rows.subList(from, to).take(cap)
         }
     }
 
