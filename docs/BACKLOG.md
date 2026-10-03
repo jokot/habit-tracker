@@ -66,21 +66,20 @@ Out of scope by decision: posted notification copy in the workers,
 | #27 | 2026-08-10 | Widgets no longer go empty after a cold start. `LastAuthUserStore` keeps the last signed-in user id, so widgets, workers and `WantTimerService` read the correct rows before the session loads. Also: streak grid fills its frame, widgets default to 2×2, quick-log tiles fit their cells. |
 | #28 | 2026-08-11 | Timed wants start their timer from Today. A tap opens the "How long?" sheet on Home. A tap on a running want shows a snackbar with the time left. The predicate moved to `WantActivity.isTimed`. |
 | #29 | 2026-08-11 | The pending card of a timed want says `Starts in 3s` and `−1 pt at start`. Before, it said `Spends in 3s` with a total for each tap. |
+| #30 | 2026-10-03 | Fixes items 1 and 3 of issue #20. All six pulls use keyset paging, so a first sync no longer loses rows past the 1000-row cap. Sign-in opens Home at once, and each Today section shows a shimmer until its data is local. Streak History updates live and computes off the main thread. A sync at `SYNC_PAGE_SIZE` 2 against the real server pulled all 348 rows correctly. |
 
 ## Known bugs
 
-1. **Sync pull has no pagination** — GitHub issue #20. A first sync of an account with
-   more than 1000 rows in one table loses the oldest rows. **In review: PR #30**
-   (`fix/sync-pagination`). The PR adds `fetchAllPages` for all six pull queries.
-   Before merge, do one sync with a signed-in account and `SYNC_PAGE_SIZE` set to 2.
-   This check confirms that Postgrest accepts the `range` and the two `order` clauses.
+None open. PR #30 fixes the pagination bug of issue #20.
 
 ## Open work, not started
 
 1. **iOS** — SwiftUI screens + WidgetKit extensions over the same shared KMP module.
    Largest remaining spec item; deserves its own spec → plan → phase cycle.
-2. **Sync pull latency** — items 2 and 3 of issue #20, not part of PR #30. Run the six
-   pulls in parallel. Move the pull off the auth screen.
+2. **Issue #20 leftovers** — PR #30 fixed items 1 and 3.
+   - Item 2: run the six pulls in parallel.
+   - Item 4: an automated sync test against a real Supabase server. It needs Docker
+     for local Supabase.
 3. **Overlay enforcement** (`SYSTEM_ALERT_WINDOW`) — spec backlog, marked post-iOS.
 4. **Device QA leftovers** — not done on a device yet:
    - Phase 10: quick-log grid scrolling past the visible rows, and tap latency with all
