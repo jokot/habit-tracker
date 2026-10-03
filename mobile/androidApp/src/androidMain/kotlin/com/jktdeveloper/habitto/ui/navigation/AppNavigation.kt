@@ -289,10 +289,18 @@ fun AppNavigation(container: AppContainer) {
                         useCase = container.computeStreakUseCase,
                         getDayPointsUseCase = container.getDayPointsUseCase,
                         userIdProvider = { container.currentUserId() },
+                        readySections = container.readySections,
+                        syncState = container.syncEngine.syncState,
                     )
                 }
                 com.jktdeveloper.habitto.ui.streak.StreakHistoryScreen(
                     viewModel = vm,
+                    onRetry = {
+                        com.jktdeveloper.habitto.sync.SyncTriggers.enqueue(
+                            container.appContext,
+                            com.habittracker.data.sync.SyncReason.MANUAL,
+                        )
+                    },
                 )
             }
 

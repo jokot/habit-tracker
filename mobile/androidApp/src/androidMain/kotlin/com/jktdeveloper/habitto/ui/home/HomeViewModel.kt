@@ -13,7 +13,6 @@ import com.habittracker.domain.model.Identity
 import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.PointBalance
 import com.habittracker.domain.model.WantActivity
-import com.habittracker.domain.model.readySections
 import com.habittracker.domain.model.isTimed
 import com.habittracker.domain.usecase.ExchangeRateCalculator
 import com.habittracker.domain.usecase.InsufficientPointsException
@@ -104,14 +103,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     val syncState: StateFlow<SyncState> = container.syncEngine.syncState
 
     /** Today sections whose data is all local. The rest show a skeleton. */
-    val readySections: StateFlow<Set<TodaySection>> =
-        combine(container.authState, container.pullProgress) { auth, progress ->
-            progress.readySections(auth.isAuthenticated)
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            container.pullProgress.value.readySections(container.isAuthenticated()),
-        )
+    val readySections: StateFlow<Set<TodaySection>> = container.readySections
 
     /** The last sync failed while some section was still loading. */
     val loadFailed: StateFlow<Boolean> =

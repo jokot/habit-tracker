@@ -23,7 +23,7 @@ The user waits a long time after sign-in, and again on Today, for these reasons:
 
 ## 3. Non-goals
 
-- Other screens (Streak history, Identity hub, You, the widgets) keep their current behaviour. They read local data as it arrives.
+- Other screens (Identity hub, You, the widgets) keep their current behaviour. They read local data as it arrives. Streak History is the exception (§4.9).
 - No change to the push half of sync.
 - No parallel pulls (issue #20 item 2 stays deferred).
 
@@ -179,6 +179,28 @@ suspend fun fetchWantLogsLoggedFrom(userId: String, fromMs: Long): List<WantLog>
 - It has the same keyset paging as PR #30.
 - `FakePostgrest` learns `gte`.
 
+### 4.9 Streak History
+
+The old screen had these problems:
+
+- It cleared every month on each resume and showed "Loading…".
+- It showed 0, 0, 0 before the first calculation ended.
+- It did not update while it was open.
+- It computed the streak on the main thread.
+
+The new screen works as follows:
+
+- **Reactive flows.** `StreakHistoryViewModel` collects `observeCurrent` and one `observeRange` per month. The screen does not reload on resume. A new log updates the summary and the month at once.
+- **Habit edits count.** `observeCurrent` and `observeRange` now also observe the habits. A habit that the user adds or archives can change the state of a day. Home, You and the exchange rate get the same benefit.
+- **Off the main thread.** Both flows run with `flowOn(Dispatchers.Default)`.
+- **Day change.** A shared `dayBoundaryFlow` restarts both flows when the day changes.
+- **Skeletons until STREAK.** `AppContainer.readySections` is shared by Home and Streak History. Until `TodaySection.STREAK` is ready:
+  - each summary number shows a skeleton block
+  - only the current month shows, as a shimmer grid with the real number of days
+  - older months do not load
+- **Errors.** When the sync ends in `Error` before STREAK is ready, the shimmer stops. The `LoadFailedNotice` row shows "Couldn't finish loading your history." Its Retry button starts a manual sync. The notice is now a shared component in `ui/components`.
+- **No pull-to-refresh.** The flows already show each change, so a manual reload has nothing to add.
+
 ## 5. Edge cases
 
 | Case | Behaviour |
@@ -204,7 +226,12 @@ suspend fun fetchWantLogsLoggedFrom(userId: String, fromMs: Long): List<WantLog>
   - a watermark above 0 counts as pulled
 - **`TodaySectionTest`:** the table in §4.3, plus the guest case
 - **`PostgrestSupabaseSyncClientTest`:** the two `LoggedFrom` fetches return every row from `from` on, across page seams
-- **No Android ViewModel test.** The app has no HomeViewModel test setup. `HomeViewModel` only combines `pullProgress` with `authState` through `readySections`, which `TodaySectionTest` covers.
+- **No HomeViewModel test.** The app has no HomeViewModel test setup. `HomeViewModel` only combines `pullProgress` with `authState` through `readySections`, which `TodaySectionTest` covers.
+- **`StreakHistoryViewModelTest`:**
+  - a new log updates the summary and the month without a reload
+  - a new habit updates the summary
+  - the history is not ready until the habit logs are pulled, and `loadFailed` follows the sync state
+  - `loadOlderMonth` waits for the first summary
 - **Manual:**
   - sign in on a fresh install of an account with long history
   - confirm Home opens at once and the sections fill in the order of §4.1

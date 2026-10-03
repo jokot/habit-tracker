@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -83,6 +82,7 @@ import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
 import com.jktdeveloper.habitto.ui.components.IdentityStrip
 import com.jktdeveloper.habitto.ui.components.IdentityStripSkeleton
+import com.jktdeveloper.habitto.ui.components.LoadFailedNotice
 import com.jktdeveloper.habitto.ui.components.LocalSkeletonAnimated
 import com.jktdeveloper.habitto.ui.components.ReplaceTimerDialog
 import com.jktdeveloper.habitto.ui.components.SectionSubtitleSkeleton
@@ -92,13 +92,9 @@ import com.jktdeveloper.habitto.ui.components.habitIcon
 import com.jktdeveloper.habitto.ui.components.resolveWantIcon
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.jktdeveloper.habitto.ui.theme.InterFontFamily
-import com.jktdeveloper.habitto.ui.theme.OnWarnContainer
-import com.jktdeveloper.habitto.ui.theme.OnWarnContainerDark
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.Surface1Dark
 import com.jktdeveloper.habitto.ui.theme.Surface1Light
-import com.jktdeveloper.habitto.ui.theme.WarnContainer
-import com.jktdeveloper.habitto.ui.theme.WarnContainerDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -459,39 +455,6 @@ fun HomeScreen(
 /** Title and subtitle widths, varied so the skeleton reads as a list. */
 private val HABIT_SKELETONS = listOf(120.dp to 168.dp, 96.dp to 148.dp, 136.dp to 156.dp)
 private val WANT_SKELETONS = listOf(110.dp to 140.dp, 88.dp to 128.dp)
-
-@Composable
-private fun LoadFailedNotice(onRetry: () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val onContainer = if (dark) OnWarnContainerDark else OnWarnContainer
-    Row(
-        modifier = Modifier
-            .padding(horizontal = Spacing.xl)
-            .padding(bottom = Spacing.md)
-            .fillMaxWidth()
-            .background(
-                if (dark) WarnContainerDark else WarnContainer,
-                RoundedCornerShape(14.dp),
-            )
-            .padding(start = Spacing.lg, end = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Outlined.CloudOff,
-            contentDescription = null,
-            tint = onContainer,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(Spacing.md))
-        Text(
-            "Couldn't finish loading. Pull down to try again.",
-            style = MaterialTheme.typography.bodySmall,
-            color = onContainer,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onRetry) { Text("Retry", color = onContainer) }
-    }
-}
 
 // ── Home timer banner ────────────────────────────────────────────────────────
 

@@ -71,6 +71,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import com.habittracker.domain.model.TodaySection
+import com.habittracker.domain.model.readySections
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -251,6 +253,15 @@ class AppContainer(context: Context) {
             getWidgetDataUseCase.observe(userId, habitSlots = Int.MAX_VALUE, wantSlots = Int.MAX_VALUE)
         }
         .stateIn(applicationScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Today sections whose data is all local. Streak History also waits for [TodaySection.STREAK]. */
+    val readySections: StateFlow<Set<TodaySection>> =
+        combine(authState, pullProgress) { auth, progress -> progress.readySections(auth.isAuthenticated) }
+            .stateIn(
+                applicationScope,
+                SharingStarted.Eagerly,
+                pullProgress.value.readySections(isAuthenticated()),
+            )
 
     private val _sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val sessionExpiredEvents: SharedFlow<Unit> = _sessionExpiredEvents.asSharedFlow()

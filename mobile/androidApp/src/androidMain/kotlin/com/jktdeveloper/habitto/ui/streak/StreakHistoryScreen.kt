@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
 import com.habittracker.domain.model.StreakSummary
+import com.jktdeveloper.habitto.ui.components.LoadFailedNotice
+import com.jktdeveloper.habitto.ui.components.LocalSkeletonAnimated
+import com.jktdeveloper.habitto.ui.components.SkeletonBlock
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.NumeralStyle
 import com.jktdeveloper.habitto.ui.theme.Spacing
@@ -32,23 +35,15 @@ import java.util.Locale
 @Composable
 fun StreakHistoryScreen(
     viewModel: StreakHistoryViewModel,
+    onRetry: () -> Unit,
 ) {
     val summary by viewModel.summary.collectAsState()
     val months by viewModel.months.collectAsState()
+    val historyReady by viewModel.historyReady.collectAsState()
+    val loadFailed by viewModel.loadFailed.collectAsState()
     val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
 
     var selectedDay by remember { mutableStateOf<StreakDay?>(null) }
-
-    // Refresh on every entry (including bottom-nav re-tap and resume) so logs made
-    // since last visit show up on the heatmap and summary.
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
 
     Scaffold(
         topBar = {
@@ -69,26 +64,42 @@ fun StreakHistoryScreen(
         },
         contentWindowInsets = WindowInsets(0.dp),
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = Spacing.xxl),
-        ) {
-            item {
-                SummaryCard(summary)
-            }
-            itemsIndexed(months) { index, month ->
-                LaunchedEffect(index, months.size) {
-                    if (index == months.lastIndex) viewModel.loadOlderMonth()
+        // Until the whole log history is local, the numbers and the grid are skeletons.
+        val firstLogDate = summary?.firstLogDate
+        CompositionLocalProvider(LocalSkeletonAnimated provides !loadFailed) {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(bottom = Spacing.xxl),
+            ) {
+                if (loadFailed) {
+                    item(key = "load-failed") {
+                        LoadFailedNotice(
+                            onRetry = onRetry,
+                            modifier = Modifier.padding(top = Spacing.md),
+                            message = "Couldn't finish loading your history.",
+                        )
+                    }
                 }
-                val topPad = if (index == 0) Spacing.xxl else Spacing.xl
-                MonthCalendar(
-                    month = month,
-                    today = today,
-                    modifier = Modifier.padding(top = topPad),
-                    onDayClick = { day -> selectedDay = day },
-                )
+                item {
+                    SummaryCard(summary.takeIf { historyReady })
+                }
+                // Older months load only when the history is ready, so the first log date is final.
+                val shown = if (historyReady) months else months.take(1)
+                itemsIndexed(shown) { index, month ->
+                    LaunchedEffect(index, shown.size, firstLogDate) {
+                        if (historyReady && index == shown.lastIndex) viewModel.loadOlderMonth()
+                    }
+                    val topPad = if (index == 0) Spacing.xxl else Spacing.xl
+                    MonthCalendar(
+                        month = month,
+                        today = today,
+                        modifier = Modifier.padding(top = topPad),
+                        loading = month.isLoading || !historyReady,
+                        onDayClick = { day -> selectedDay = day },
+                    )
+                }
             }
         }
     }
@@ -108,8 +119,9 @@ fun StreakHistoryScreen(
     }
 }
 
+/** A null [summary] shows a skeleton in place of each number. */
 @Composable
-private fun SummaryCard(summary: StreakSummary) {
+private fun SummaryCard(summary: StreakSummary?) {
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     Box(modifier = Modifier.padding(start = Spacing.xl, end = Spacing.xl, top = Spacing.md)) {
         Surface(
@@ -128,7 +140,7 @@ private fun SummaryCard(summary: StreakSummary) {
                 // Current streak — flame color
                 StatCell(
                     label = "Current",
-                    value = "${summary.currentStreak}",
+                    value = summary?.currentStreak?.toString(),
                     valueColor = FlameOrange,
                     modifier = Modifier.weight(1f),
                 )
@@ -142,7 +154,7 @@ private fun SummaryCard(summary: StreakSummary) {
                 // Longest streak — onSurface
                 StatCell(
                     label = "Longest",
-                    value = "${summary.longestStreak}",
+                    value = summary?.longestStreak?.toString(),
                     valueColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
@@ -156,7 +168,7 @@ private fun SummaryCard(summary: StreakSummary) {
                 // Total days — primary
                 StatCell(
                     label = "Total",
-                    value = "${summary.totalDaysComplete}",
+                    value = summary?.totalDaysComplete?.toString(),
                     valueColor = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
@@ -168,7 +180,8 @@ private fun SummaryCard(summary: StreakSummary) {
 @Composable
 private fun StatCell(
     label: String,
-    value: String,
+    /** Null shows a skeleton block with the same height as the number. */
+    value: String?,
     valueColor: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
 ) {
@@ -176,11 +189,17 @@ private fun StatCell(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = value,
-            style = NumeralStyle.copy(fontSize = 36.sp, lineHeight = 36.sp),
-            color = valueColor,
-        )
+        if (value == null) {
+            Box(Modifier.height(36.dp), contentAlignment = Alignment.Center) {
+                SkeletonBlock(40.dp, 28.dp)
+            }
+        } else {
+            Text(
+                text = value,
+                style = NumeralStyle.copy(fontSize = 36.sp, lineHeight = 36.sp),
+                color = valueColor,
+            )
+        }
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,

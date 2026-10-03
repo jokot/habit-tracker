@@ -12,13 +12,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
+import com.jktdeveloper.habitto.ui.components.shimmer
 import com.jktdeveloper.habitto.ui.theme.Spacing
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.plus
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -30,6 +36,8 @@ fun MonthCalendar(
     month: MonthData,
     today: LocalDate,
     modifier: Modifier = Modifier,
+    /** Shows a shimmer cell for each day. The month's days stay hidden and cannot be tapped. */
+    loading: Boolean = month.isLoading,
     onDayClick: ((StreakDay) -> Unit)? = null,
 ) {
     Column(
@@ -53,16 +61,12 @@ fun MonthCalendar(
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             tonalElevation = 0.dp,
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                if (month.isLoading) {
-                    Text(
-                        text = "Loading…",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    return@Column
-                }
-                if (month.error != null) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .then(if (loading) Modifier.semantics { contentDescription = "Loading month" } else Modifier),
+            ) {
+                if (!loading && month.error != null) {
                     Text(
                         text = "Couldn't load — ${month.error}",
                         color = MaterialTheme.colorScheme.error,
@@ -89,11 +93,16 @@ fun MonthCalendar(
                     }
                 }
 
-                // Day grid — 7 columns, padded start
+                // Day grid — 7 columns, padded start. A cell holds a day index, or -1 for a pad.
+                // The skeleton has the same cells as the month, so the card keeps its height.
                 val firstDay = LocalDate(month.year, month.month, 1)
                 val padStart = firstDay.dayOfWeek.ordinal // Mon=0
-                val cells: List<StreakDay?> = List(padStart) { null } + month.days
-                val rows = cells.chunked(7)
+                val dayCount = if (loading) {
+                    firstDay.daysUntil(firstDay.plus(1, DateTimeUnit.MONTH))
+                } else {
+                    month.days.size
+                }
+                val rows = (List(padStart) { -1 } + List(dayCount) { it }).chunked(7)
 
                 Column(verticalArrangement = Arrangement.spacedBy(CELL_GAP)) {
                     rows.forEach { row ->
@@ -101,15 +110,24 @@ fun MonthCalendar(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(CELL_GAP),
                         ) {
-                            row.forEach { day ->
-                                if (day == null) {
+                            row.forEach { index ->
+                                if (index < 0) {
                                     // Leading/trailing empty pad — keeps aspect ratio
                                     Spacer(
                                         modifier = Modifier
                                             .weight(1f)
                                             .aspectRatio(1f),
                                     )
+                                } else if (loading) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .shimmer(),
+                                    )
                                 } else {
+                                    val day = month.days[index]
                                     DayCell(
                                         day = day,
                                         isToday = day.date == today,
