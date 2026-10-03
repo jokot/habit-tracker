@@ -10,6 +10,7 @@ import com.habittracker.domain.model.WantLog
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,68 +36,28 @@ class PostgrestSupabaseSyncClient(
     }
 
     override suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit> =
-        fetchAllPages { pageRange ->
-            supabase.postgrest.from("habits")
-                .select {
-                    filter {
-                        eq("user_id", userId)
-                        gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                    }
-                    order("updated_at", Order.ASCENDING)
-                    order("id", Order.ASCENDING)
-                    range(pageRange)
-                }
-                .decodeList<HabitDto>()
-                .map { it.toDomain() }
-        }
+        fetchPaged<HabitDto>("habits", orderBy = listOf("updated_at", "id")) {
+            eq("user_id", userId)
+            gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        }.map { it.toDomain() }
 
     override suspend fun fetchWantActivitiesSince(userId: String, sinceMs: Long): List<WantActivity> =
-        fetchAllPages { pageRange ->
-            supabase.postgrest.from("want_activities")
-                .select {
-                    filter {
-                        eq("user_id", userId)
-                        gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                    }
-                    order("updated_at", Order.ASCENDING)
-                    order("id", Order.ASCENDING)
-                    range(pageRange)
-                }
-                .decodeList<WantActivityDto>()
-                .map { it.toDomain() }
-        }
+        fetchPaged<WantActivityDto>("want_activities", orderBy = listOf("updated_at", "id")) {
+            eq("user_id", userId)
+            gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        }.map { it.toDomain() }
 
     override suspend fun fetchHabitLogsSince(userId: String, sinceMs: Long): List<HabitLog> =
-        fetchAllPages { pageRange ->
-            supabase.postgrest.from("habit_logs")
-                .select {
-                    filter {
-                        eq("user_id", userId)
-                        gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                    }
-                    order("synced_at", Order.ASCENDING)
-                    order("id", Order.ASCENDING)
-                    range(pageRange)
-                }
-                .decodeList<HabitLogDto>()
-                .map { it.toDomain() }
-        }
+        fetchPaged<HabitLogDto>("habit_logs", orderBy = listOf("synced_at", "id")) {
+            eq("user_id", userId)
+            gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        }.map { it.toDomain() }
 
     override suspend fun fetchWantLogsSince(userId: String, sinceMs: Long): List<WantLog> =
-        fetchAllPages { pageRange ->
-            supabase.postgrest.from("want_logs")
-                .select {
-                    filter {
-                        eq("user_id", userId)
-                        gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                    }
-                    order("synced_at", Order.ASCENDING)
-                    order("id", Order.ASCENDING)
-                    range(pageRange)
-                }
-                .decodeList<WantLogDto>()
-                .map { it.toDomain() }
-        }
+        fetchPaged<WantLogDto>("want_logs", orderBy = listOf("synced_at", "id")) {
+            eq("user_id", userId)
+            gt("synced_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        }.map { it.toDomain() }
 
     override suspend fun upsertUserIdentity(row: UserIdentityRow) {
         supabase.postgrest.from("user_identities").upsert(row.toDto())
@@ -111,36 +72,38 @@ class PostgrestSupabaseSyncClient(
         // changing added_at. Watermark by added_at would miss those updates.
         // Volume per user is small (≤10 rows) — fetch all rows for the user.
         @Suppress("UNUSED_PARAMETER") val _s = sinceMs
-        return fetchAllPages { pageRange ->
-            supabase.postgrest.from("user_identities")
-                .select {
-                    filter { eq("user_id", userId) }
-                    order("added_at", Order.ASCENDING)
-                    order("identity_id", Order.ASCENDING)
-                    range(pageRange)
-                }
-                .decodeList<UserIdentityDto>()
-                .map { it.toDomain() }
-        }
+        return fetchPaged<UserIdentityDto>("user_identities", orderBy = listOf("added_at", "identity_id")) {
+            eq("user_id", userId)
+        }.map { it.toDomain() }
     }
 
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
         // RLS scopes to habits owned by current user; client-side userId arg is for parity
         @Suppress("UNUSED_PARAMETER") val _u = userId
-        return fetchAllPages { pageRange ->
-            supabase.postgrest.from("habit_identities")
-                .select {
-                    filter {
-                        gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
-                    }
-                    order("updated_at", Order.ASCENDING)
-                    order("habit_id", Order.ASCENDING)
-                    order("identity_id", Order.ASCENDING)
-                    range(pageRange)
-                }
-                .decodeList<HabitIdentityDto>()
-                .map { it.toDomain() }
-        }
+        return fetchPaged<HabitIdentityDto>(
+            "habit_identities",
+            orderBy = listOf("updated_at", "habit_id", "identity_id"),
+        ) {
+            gt("updated_at", Instant.fromEpochMilliseconds(sinceMs).toString())
+        }.map { it.toDomain() }
+    }
+
+    /**
+     * Pull every row of [table] that matches [where], one page at a time. Rows
+     * are sorted ascending by each column of [orderBy], in order.
+     */
+    private suspend inline fun <reified D : Any> fetchPaged(
+        table: String,
+        orderBy: List<String>,
+        crossinline where: PostgrestFilterBuilder.() -> Unit,
+    ): List<D> = fetchAllPages { pageRange ->
+        supabase.postgrest.from(table)
+            .select {
+                filter { where() }
+                orderBy.forEach { order(it, Order.ASCENDING) }
+                range(pageRange)
+            }
+            .decodeList<D>()
     }
 }
 
