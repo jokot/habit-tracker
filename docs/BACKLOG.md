@@ -70,23 +70,23 @@ Out of scope by decision: posted notification copy in the workers,
 
 ## Known bugs
 
-Found on 2026-10-03 while tracing the sync flow for `docs/sync-flow.md`. No issue
-exists for them yet. Most severe first:
+Found on 2026-10-03 while tracing the sync flow for `docs/sync-flow.md`. Each bug has
+an issue, #33 to #37. Most severe first:
 
-1. **A session expiry can delete unsynced rows.** When the token refresh fails,
+1. **#33 A session expiry can delete unsynced rows.** When the token refresh fails,
    `AppContainer.handleSessionExpired` calls `clearAuthenticatedUserData` with no push
    first. A log made offline and never pushed is lost.
-2. **A widget log does not start a sync.** `SyncReason.WIDGET_WRITE` exists, but no
+2. **#34 A widget log does not start a sync.** `SyncReason.WIDGET_WRITE` exists, but no
    code uses it. `LogHabitAction` and `LogWantAction` write only the local row. The row
    waits until the app comes to the front, or until another trigger runs.
-3. **The push stamps `synced_at` with the phone clock.** A phone with a slow clock
+3. **#35 The push stamps `synced_at` with the phone clock.** A phone with a slow clock
    writes a time earlier than the real time. Another device with a watermark after that
    time never pulls the row.
-4. **The background sync jobs have no network constraint.** `SyncTriggers.enqueue`
+4. **#36 The background sync jobs have no network constraint.** `SyncTriggers.enqueue`
    sets no `NetworkType.CONNECTED`. Offline, each job runs, fails and retries with a
    backoff of 30 s, 60 s, 120 s and more, up to 5 hours. The retry does not start when
    the network comes back.
-5. **The push sends one request per row, in series.** After a long time offline, a push
+5. **#37 The push sends one request per row, in series.** After a long time offline, a push
    of 200 logs needs 200 requests.
 
 ## Open work, not started
