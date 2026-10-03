@@ -40,8 +40,8 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,22 +73,32 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.data.sync.SyncReason
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.model.HabitWithProgress
+import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.isTimed
 import com.jktdeveloper.habitto.ui.auth.LogoutDialog
 import com.jktdeveloper.habitto.ui.components.DurationSheet
+import com.jktdeveloper.habitto.ui.components.HabitCardSkeleton
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
 import com.jktdeveloper.habitto.ui.components.IdentityHue
 import com.jktdeveloper.habitto.ui.components.IdentityStrip
+import com.jktdeveloper.habitto.ui.components.IdentityStripSkeleton
+import com.jktdeveloper.habitto.ui.components.LocalSkeletonAnimated
 import com.jktdeveloper.habitto.ui.components.ReplaceTimerDialog
+import com.jktdeveloper.habitto.ui.components.SectionSubtitleSkeleton
 import com.jktdeveloper.habitto.ui.components.SyncChip
+import com.jktdeveloper.habitto.ui.components.WantCardSkeleton
 import com.jktdeveloper.habitto.ui.components.habitIcon
 import com.jktdeveloper.habitto.ui.components.resolveWantIcon
 import com.jktdeveloper.habitto.ui.streak.DailyStatusCard
 import com.jktdeveloper.habitto.ui.theme.InterFontFamily
+import com.jktdeveloper.habitto.ui.theme.OnWarnContainer
+import com.jktdeveloper.habitto.ui.theme.OnWarnContainerDark
 import com.jktdeveloper.habitto.ui.theme.Spacing
 import com.jktdeveloper.habitto.ui.theme.Surface1Dark
 import com.jktdeveloper.habitto.ui.theme.Surface1Light
+import com.jktdeveloper.habitto.ui.theme.WarnContainer
+import com.jktdeveloper.habitto.ui.theme.WarnContainerDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +118,8 @@ fun HomeScreen(
     val homeTimer by viewModel.homeTimer.collectAsState()
     val currentRate by viewModel.currentRate.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
+    val readySections by viewModel.readySections.collectAsState()
+    val loadFailed by viewModel.loadFailed.collectAsState()
     val showLogoutDialog by viewModel.showLogoutDialog.collectAsState()
     val logoutUnsyncedCount by viewModel.logoutUnsyncedCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -189,20 +202,13 @@ fun HomeScreen(
             SnackbarHost(snackbarHostState) { Snackbar(it) }
         },
     ) { padding ->
-        if (uiState.isLoading) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator()
-            }
-            return@Scaffold
-        }
+        // Until the first local read lands, every section shows its skeleton.
+        val ready = if (uiState.isLoading) emptySet() else readySections
 
         val isRefreshing = uiState.isAuthenticated &&
             (syncState as? SyncState.Running)?.reason == SyncReason.MANUAL
         val content: @Composable () -> Unit = {
+            CompositionLocalProvider(LocalSkeletonAnimated provides !loadFailed) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xxxl),
@@ -248,8 +254,17 @@ fun HomeScreen(
                     }
                 }
 
+                // ── Load-failed notice ────────────────────────────────────────
+                if (loadFailed) {
+                    item(key = "load-failed") {
+                        LoadFailedNotice(onRetry = viewModel::triggerManualSync)
+                    }
+                }
+
                 // ── Identity strip ────────────────────────────────────────────
-                item {
+                if (TodaySection.IDENTITIES !in ready) {
+                    item { IdentityStripSkeleton() }
+                } else item {
                     val identities by viewModel.userIdentities.collectAsState()
                     val pinnedIdentityId by viewModel.pinnedIdentityId.collectAsState()
                     IdentityStrip(
@@ -273,6 +288,8 @@ fun HomeScreen(
                             balance = uiState.pointBalance.balance,
                             onDayTap = { onOpenStreakHistory() },
                             onBalanceTap = onOpenExchangeRate,
+                            streakLoading = TodaySection.STREAK !in ready,
+                            pointsLoading = TodaySection.POINTS !in ready,
                         )
                     }
                 }
@@ -292,7 +309,9 @@ fun HomeScreen(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        if (uiState.habitsWithProgress.isNotEmpty()) {
+                        if (TodaySection.HABITS !in ready) {
+                            SectionSubtitleSkeleton(88.dp)
+                        } else if (uiState.habitsWithProgress.isNotEmpty()) {
                             Spacer(Modifier.height(Spacing.xs))
                             Text(
                                 text = "${uiState.habitsWithProgress.count { it.isGoalMet }} of ${uiState.habitsWithProgress.size} goals met",
@@ -304,7 +323,17 @@ fun HomeScreen(
                 }
 
                 // ── Habit cards ───────────────────────────────────────────────
-                if (uiState.habitsWithProgress.isEmpty()) {
+                if (TodaySection.HABITS !in ready) {
+                    items(HABIT_SKELETONS) { (title, subtitle) ->
+                        HabitCardSkeleton(
+                            titleWidth = title,
+                            subtitleWidth = subtitle,
+                            modifier = Modifier
+                                .padding(horizontal = Spacing.xl)
+                                .padding(top = Spacing.md),
+                        )
+                    }
+                } else if (uiState.habitsWithProgress.isEmpty()) {
                     item {
                         Box(modifier = Modifier.padding(horizontal = Spacing.xl)) {
                             EmptyState("No habits yet. Complete onboarding to add them.")
@@ -328,7 +357,34 @@ fun HomeScreen(
                 }
 
                 // ── Wants section ─────────────────────────────────────────────
-                if (uiState.wantActivities.isNotEmpty()) {
+                if (TodaySection.WANTS !in ready) {
+                    item {
+                        Column(
+                            modifier = Modifier.padding(
+                                start = Spacing.xl,
+                                end = Spacing.xl,
+                                top = Spacing.xxl,
+                            ),
+                        ) {
+                            Text(
+                                text = "Wants",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            SectionSubtitleSkeleton(176.dp)
+                        }
+                    }
+                    items(WANT_SKELETONS) { (title, subtitle) ->
+                        WantCardSkeleton(
+                            titleWidth = title,
+                            subtitleWidth = subtitle,
+                            modifier = Modifier
+                                .padding(horizontal = Spacing.xl)
+                                .padding(top = Spacing.md),
+                        )
+                    }
+                } else if (uiState.wantActivities.isNotEmpty()) {
                     item {
                         Column(
                             modifier = Modifier.padding(
@@ -384,6 +440,7 @@ fun HomeScreen(
 
                 // Bottom padding handled by LazyColumn contentPadding
             }
+            }
         }
         if (uiState.isAuthenticated) {
             PullToRefreshBox(
@@ -394,6 +451,45 @@ fun HomeScreen(
         } else {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) { content() }
         }
+    }
+}
+
+// ── Loading skeletons ────────────────────────────────────────────────────────
+
+/** Title and subtitle widths, varied so the skeleton reads as a list. */
+private val HABIT_SKELETONS = listOf(120.dp to 168.dp, 96.dp to 148.dp, 136.dp to 156.dp)
+private val WANT_SKELETONS = listOf(110.dp to 140.dp, 88.dp to 128.dp)
+
+@Composable
+private fun LoadFailedNotice(onRetry: () -> Unit) {
+    val dark = isSystemInDarkTheme()
+    val onContainer = if (dark) OnWarnContainerDark else OnWarnContainer
+    Row(
+        modifier = Modifier
+            .padding(horizontal = Spacing.xl)
+            .padding(bottom = Spacing.md)
+            .fillMaxWidth()
+            .background(
+                if (dark) WarnContainerDark else WarnContainer,
+                RoundedCornerShape(14.dp),
+            )
+            .padding(start = Spacing.lg, end = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.CloudOff,
+            contentDescription = null,
+            tint = onContainer,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            "Couldn't finish loading. Pull down to try again.",
+            style = MaterialTheme.typography.bodySmall,
+            color = onContainer,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onRetry) { Text("Retry", color = onContainer) }
     }
 }
 
