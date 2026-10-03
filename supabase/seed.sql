@@ -9,39 +9,7 @@ insert into identities (id, name, description, icon) values
   ('00000000-0000-0000-0000-000000000007', 'Devotee', 'Deepen your spiritual practice', '🙏'),
   ('00000000-0000-0000-0000-000000000008', 'Health-Conscious', 'Build healthy daily habits for long-term wellness', '💪');
 
--- Habit templates
-insert into habit_templates (id, name, unit, default_threshold, default_daily_target) values
-  ('10000000-0000-0000-0000-000000000001', 'Read book / Kindle', 'pages', 3, 3),
-  ('10000000-0000-0000-0000-000000000002', 'Read article', 'minutes', 5, 2),
-  ('10000000-0000-0000-0000-000000000003', 'Read research paper', 'minutes', 10, 1),
-  ('10000000-0000-0000-0000-000000000004', 'Code project', 'minutes', 15, 3),
-  ('10000000-0000-0000-0000-000000000005', 'Write tests', 'minutes', 10, 2),
-  ('10000000-0000-0000-0000-000000000006', 'Learn new tech', 'minutes', 15, 2),
-  ('10000000-0000-0000-0000-000000000007', 'Review / refactor code', 'minutes', 10, 1),
-  ('10000000-0000-0000-0000-000000000008', 'Push up', 'reps', 15, 3),
-  ('10000000-0000-0000-0000-000000000009', 'Squat', 'reps', 20, 3),
-  ('10000000-0000-0000-0000-000000000010', 'Walk / run', 'minutes', 10, 2),
-  ('10000000-0000-0000-0000-000000000011', 'Cycling', 'minutes', 10, 2),
-  ('10000000-0000-0000-0000-000000000012', 'Stretching', 'minutes', 5, 2),
-  ('10000000-0000-0000-0000-000000000013', 'Plank', 'seconds', 30, 3),
-  ('10000000-0000-0000-0000-000000000014', 'Journaling', 'minutes', 5, 2),
-  ('10000000-0000-0000-0000-000000000015', 'Blog writing', 'minutes', 15, 2),
-  ('10000000-0000-0000-0000-000000000016', 'Creative writing', 'minutes', 10, 2),
-  ('10000000-0000-0000-0000-000000000017', 'Outline / draft', 'minutes', 10, 1),
-  ('10000000-0000-0000-0000-000000000018', 'Watch educational video', 'minutes', 10, 2),
-  ('10000000-0000-0000-0000-000000000019', 'Take online course', 'minutes', 15, 2),
-  ('10000000-0000-0000-0000-000000000020', 'Practice language', 'minutes', 10, 2),
-  ('10000000-0000-0000-0000-000000000021', 'Flashcard review', 'minutes', 5, 3),
-  ('10000000-0000-0000-0000-000000000022', 'Declutter space', 'minutes', 5, 1),
-  ('10000000-0000-0000-0000-000000000023', 'Organize items', 'minutes', 5, 1),
-  ('10000000-0000-0000-0000-000000000024', 'Digital cleanup', 'minutes', 5, 1),
-  ('10000000-0000-0000-0000-000000000025', 'Pray', 'sessions', 1, 3),
-  ('10000000-0000-0000-0000-000000000026', 'Meditate', 'minutes', 5, 2),
-  ('10000000-0000-0000-0000-000000000027', 'Gratitude journal', 'entries', 3, 1),
-  ('10000000-0000-0000-0000-000000000028', 'Drink water', 'ml', 250, 8),
-  ('10000000-0000-0000-0000-000000000029', 'Sleep on time', 'nights', 1, 1),
-  ('10000000-0000-0000-0000-000000000030', 'Meal prep', 'minutes', 10, 1),
-  ('10000000-0000-0000-0000-000000000031', 'No junk food day', 'days', 1, 1);
+-- Habit templates: 20260515000000_phase8_habit_template_catalog.sql inserts all 88.
 
 -- identity_habits mappings
 insert into identity_habits (identity_id, habit_template_id) values
@@ -80,20 +48,5 @@ insert into identity_habits (identity_id, habit_template_id) values
   ('00000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000030'),
   ('00000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000031');
 
--- Default want activities
-insert into want_activities (id, name, unit, cost_per_unit) values
-  ('20000000-0000-0000-0000-000000000001', 'Scroll (reel/TikTok/short)', 'minutes', 1.0),
-  ('20000000-0000-0000-0000-000000000002', 'Browse Twitter/X', 'minutes', 0.5),
-  ('20000000-0000-0000-0000-000000000003', 'Browse Instagram feed', 'minutes', 0.5),
-  ('20000000-0000-0000-0000-000000000004', 'YouTube long-form', 'minutes', 0.1),
-  ('20000000-0000-0000-0000-000000000005', 'YouTube shorts', 'minutes', 1.0),
-  ('20000000-0000-0000-0000-000000000006', 'Netflix / streaming', 'minutes', 0.067),
-  ('20000000-0000-0000-0000-000000000007', 'Casual mobile game', 'minutes', 0.2),
-  ('20000000-0000-0000-0000-000000000008', 'Valorant Deathmatch', 'matches', 1.0),
-  ('20000000-0000-0000-0000-000000000009', 'Valorant Ranked', 'matches', 3.0),
-  ('20000000-0000-0000-0000-000000000010', 'PC gaming session', 'minutes', 0.1),
-  ('20000000-0000-0000-0000-000000000011', 'Online shopping browse', 'minutes', 0.2),
-  ('20000000-0000-0000-0000-000000000012', 'Purchase session', 'sessions', 2.0),
-  ('20000000-0000-0000-0000-000000000013', 'Junk food / fast food', 'meals', 2.0),
-  ('20000000-0000-0000-0000-000000000014', 'Sugary drinks', 'drinks', 1.0),
-  ('20000000-0000-0000-0000-000000000015', 'Donut / dessert', 'pieces', 1.0);
+-- No default want activities. Since Phase 7, each client inserts its own 14 seed
+-- wants with fresh ids (see 20260512000000_phase7_pivot_wipe_want_activities.sql).

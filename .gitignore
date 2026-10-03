@@ -19,3 +19,4 @@ mobile/shared/build/
 
 # Supabase CLI link state (per-machine)
 supabase/.temp/
+supabase/.branches/
