@@ -1,5 +1,6 @@
 package com.habittracker.data.sync
 
+import com.habittracker.data.local.PullProgress
 import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.WatermarkReader
 import com.habittracker.data.repository.FakeHabitLogRepository
@@ -9,6 +10,9 @@ import com.habittracker.data.repository.FakeWantActivityRepository
 import com.habittracker.data.repository.FakeWantLogRepository
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -154,8 +158,12 @@ class SyncEngineTest {
 
 class InMemoryWatermarks : WatermarkReader {
     private val store = mutableMapOf<SyncTable, Long>()
+    private val _progress = MutableStateFlow(PullProgress())
+    override val progress: StateFlow<PullProgress> = _progress
     override fun get(table: SyncTable): Long = store[table] ?: 0L
     override fun set(table: SyncTable, valueMs: Long) { store[table] = valueMs }
+    override fun markPulled(table: SyncTable) = _progress.update { it.copy(tables = it.tables + table) }
+    override fun markRecentLogsPulled() = _progress.update { it.copy(recentLogs = true) }
 }
 
 class FakeAuthIdentity(
