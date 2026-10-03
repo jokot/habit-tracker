@@ -125,6 +125,28 @@ class PostgrestSupabaseSyncClientTest {
         assertEquals(expected.sorted(), pulled.sorted())
     }
 
+    @Test
+    fun `a first sync of 1500 habit logs pulls all of them through the default 1000-row cap`() = runTest {
+        // Issue #20: 3 habits × 500 days. Before paging, a fresh install got 1000.
+        val server = FakePostgrest(cap = 1000)
+        server.seed("habit_logs", rows(1500) { i, time ->
+            put("id", "log-$i")
+            put("user_id", USER)
+            put("habit_id", "habit-${i % 3}")
+            put("quantity", 1.0)
+            put("logged_at", time)
+            put("deleted_at", null as String?)
+            put("synced_at", time)
+        })
+
+        val pulled = PostgrestSupabaseSyncClient(server.client)
+            .fetchHabitLogsSince(USER, sinceMs = 0)
+            .map { it.id }
+
+        assertEquals(List(1500) { "log-$it" }.sorted(), pulled.sorted())
+        assertEquals(3, server.requests["habit_logs"]) // 1000, 500, then the empty page
+    }
+
     private companion object {
         const val USER = "user-1"
         const val OTHER_USER = "user-2"
