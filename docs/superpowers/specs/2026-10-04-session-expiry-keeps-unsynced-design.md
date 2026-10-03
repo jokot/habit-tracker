@@ -69,10 +69,11 @@ The guest migration then runs as today. It moves or deletes only the rows of the
 | 0 | `Session expired. Sign in again.` |
 | 1 | `Session expired. Sign in again to save 1 change.` |
 | N | `Session expired. Sign in again to save N changes.` |
+| unknown (the count failed) | `Session expired. Sign in again to save your changes.` |
 
 **Notice on the Auth screen.** While a held account exists, the Auth screen shows a notice card under the subtitle, above the form. It shows in both the sign-in mode and the sign-up mode.
 
-- Title: `3 changes not synced` (`1 change not synced` for one).
+- Title: `3 changes not synced` (`1 change not synced` for one, `Changes not synced` if the count fails).
 - Body with an email: `Sign in as a@b.com to save them. If you use another account, they are deleted from this phone.`
 - Body with no email: `Sign in with the account you used before to save them. If you use another account, they are deleted from this phone.`
 - If the email is known and the email field is empty, the app writes the email into the field.
@@ -92,7 +93,8 @@ The Auth screen reads the count again each time it opens, so the number is corre
 
 ## 5. Error handling
 
-- **The count fails** (a database error): the app keeps the rows and writes the held account. A false keep costs only disk space. A false delete loses data.
+- **The count fails** (a database error): the app keeps the rows and writes the held account. A false keep costs only disk space. A false delete loses data. The toast uses the text for an unknown count.
+- **The delete fails when the count is 0:** the app logs the error and continues the sign-out, as today.
 - **The process dies after the hold and before the sign-out:** at the next start, the supabase-kt session is not valid. The next sync fails with "Session expired" again, and `handleSessionExpired` runs again. The store already holds the same user, so the second hold writes the same values.
 - **The row delete for a different account fails:** the app logs the error and does not clear the held account. The sign-in continues. The next sign-in tries the delete again.
 - **The user stays a guest:** the kept rows stay on the phone with no time limit. They use little space.
