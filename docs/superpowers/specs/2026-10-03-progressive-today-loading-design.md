@@ -133,7 +133,7 @@ These rules apply when a sync ends in `Error` while some section is not ready:
   - `WantCardSkeleton` (shown ×2)
 - **Reduced motion:** when the system animator scale is 0, the skeleton is static.
 
-The final visual is in the design canvas "Today Loading States" (https://claude.ai/artifact/EcfigqZwVUrFuqe3qPD5ix), artboards 1 to 3.
+The final visual is in the Habitto design project, on the Today page: https://claude.ai/design/p/019dd32e-8a8d-7707-b080-fc31a631b693?file=today.html
 
 ### 4.7 Sign-in and startup
 
