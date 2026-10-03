@@ -31,9 +31,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -356,6 +358,8 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         }
                     }
                 }
+                // The combine walks the whole log history; keep it off the main thread.
+                .flowOn(Dispatchers.Default)
                 .collect { _uiState.value = it }
         }
     }
@@ -374,11 +378,13 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         container.computeStreakUseCase.observeRange(auth.userId, range)
                     }
                 }
+                .flowOn(Dispatchers.Default)
                 .collect { _streakStrip.value = it }
         }
         viewModelScope.launch {
             container.authState
                 .flatMapLatest { auth -> container.computeStreakUseCase.observeCurrent(auth.userId) }
+                .flowOn(Dispatchers.Default)
                 .collect { _streakSummary.value = it }
         }
     }
