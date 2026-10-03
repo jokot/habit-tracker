@@ -13,7 +13,7 @@
 **Tech Stack:** Kotlin Multiplatform 2.1.0, SQLDelight, supabase-kt 3.0.2, Ktor MockEngine (tests), kotlinx-datetime 0.6.1, Compose Material3.
 
 **Spec:** `docs/superpowers/specs/2026-10-03-progressive-today-loading-design.md`
-**Design:** https://claude.ai/artifact/EcfigqZwVUrFuqe3qPD5ix (artboards 1, 2 and 3)
+**Design:** the Habitto design project, Today page: https://claude.ai/design/p/019dd32e-8a8d-7707-b080-fc31a631b693?file=today.html
 
 ## Global Constraints
 
