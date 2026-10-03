@@ -64,7 +64,6 @@ class FetchAllPagesTest {
         val all = fetchAllPages(pageSize = 3) { server.page(it) }
 
         assertEquals(List(8) { it }, all)
-        assertEquals(all.distinct(), all)
         assertEquals(3, server.requests)
     }
 
