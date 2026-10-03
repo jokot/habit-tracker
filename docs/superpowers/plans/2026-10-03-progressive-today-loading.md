@@ -364,7 +364,7 @@ The line widths come from a `width` parameter, so three stacked cards do not loo
   - When `pointsLoading` is true:
     - each value text becomes `SkeletonBlock(36.dp, 22.dp)` above its label
     - the balance tap is off
-- [ ] **Step 3: Compile** with `./gradlew :mobile:androidApp:compileDebugKotlin`. Expected: BUILD SUCCESSFUL.
+- [ ] **Step 3: Compile** with `./gradlew :mobile:androidApp:compileDebugKotlinAndroid`. Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit** `feat(ui): shimmer skeletons for the Today sections`
 
 ### Task 5: Non-blocking sign-in and startup
@@ -428,7 +428,7 @@ startDestination = if (container.isAuthenticated() && !habitsPulled()) {
 ```
 
 - [ ] **Step 4: Run the checks**
-  - `./gradlew :mobile:androidApp:compileDebugKotlin :mobile:androidApp:testDebugUnitTest`
+  - `./gradlew :mobile:androidApp:compileDebugKotlinAndroid :mobile:androidApp:testDebugUnitTest`
   - Expected: PASS.
 - [ ] **Step 5: Commit** `feat(auth): open Home at once after sign-in and sync in the background`
 

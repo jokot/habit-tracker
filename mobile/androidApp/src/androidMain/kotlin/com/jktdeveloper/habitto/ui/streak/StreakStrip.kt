@@ -33,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.constraintlayout.compose.ConstraintLayout
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.StreakDay
 import com.habittracker.domain.model.StreakDayState
 import com.habittracker.domain.model.StreakRangeResult
+import com.jktdeveloper.habitto.ui.components.SkeletonBlock
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
 import com.jktdeveloper.habitto.ui.theme.FlameSoft
@@ -85,6 +88,10 @@ fun DailyStatusCard(
     onDayTap: (StreakDay) -> Unit,
     modifier: Modifier = Modifier,
     onBalanceTap: () -> Unit = {},
+    /** The streak half shows a skeleton: the log history is not local yet. */
+    streakLoading: Boolean = false,
+    /** The earned / spent / balance row shows a skeleton: recent logs are not local yet. */
+    pointsLoading: Boolean = false,
 ) {
     val isDark = isSystemInDarkTheme()
     val state = streakDisplayState(range, currentStreak)
@@ -124,93 +131,97 @@ fun DailyStatusCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column {
-            // ── Streak header (ConstraintLayout per canvas) ───────────────────
-            ConstraintLayout(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp),
-            ) {
-                val (iconRef, streakRef, daysRef, supportRef) = createRefs()
-
-                Box(
+            if (streakLoading) {
+                StreakHalfSkeleton()
+            } else {
+                // ── Streak header (ConstraintLayout per canvas) ───────────────────
+                ConstraintLayout(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(containerBg)
-                        .constrainAs(iconRef) {
-                            start.linkTo(parent.start)
-                            top.linkTo(parent.top)
-                        },
-                    contentAlignment = Alignment.Center,
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp),
                 ) {
-                    Icon(
-                        imageVector = iconImage,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(26.dp),
+                    val (iconRef, streakRef, daysRef, supportRef) = createRefs()
+
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(containerBg)
+                            .constrainAs(iconRef) {
+                                start.linkTo(parent.start)
+                                top.linkTo(parent.top)
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = iconImage,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+
+                    Text(
+                        text = currentStreak.toString(),
+                        style = NumeralStyle.copy(
+                            fontSize = 44.sp,
+                            lineHeight = 44.sp,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.constrainAs(streakRef) {
+                            start.linkTo(iconRef.end, margin = 12.dp)
+                            top.linkTo(iconRef.top)
+                            bottom.linkTo(iconRef.bottom)
+                        },
+                    )
+
+                    Text(
+                        text = if (currentStreak == 1) "day" else "days",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.constrainAs(daysRef) {
+                            start.linkTo(streakRef.end, margin = 6.dp)
+                            baseline.linkTo(streakRef.baseline)
+                        },
+                    )
+
+                    Text(
+                        text = supportingText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.constrainAs(supportRef) {
+                            start.linkTo(streakRef.start)
+                            top.linkTo(streakRef.bottom, margin = 2.dp)
+                            end.linkTo(parent.end)
+                            width = Dimension.fillToConstraints
+                        },
                     )
                 }
 
-                Text(
-                    text = currentStreak.toString(),
-                    style = NumeralStyle.copy(
-                        fontSize = 44.sp,
-                        lineHeight = 44.sp,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.constrainAs(streakRef) {
-                        start.linkTo(iconRef.end, margin = 12.dp)
-                        top.linkTo(iconRef.top)
-                        bottom.linkTo(iconRef.bottom)
-                    },
-                )
-
-                Text(
-                    text = if (currentStreak == 1) "day" else "days",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.constrainAs(daysRef) {
-                        start.linkTo(streakRef.end, margin = 6.dp)
-                        baseline.linkTo(streakRef.baseline)
-                    },
-                )
-
-                Text(
-                    text = supportingText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.constrainAs(supportRef) {
-                        start.linkTo(streakRef.start)
-                        top.linkTo(streakRef.bottom, margin = 2.dp)
-                        end.linkTo(parent.end)
-                        width = Dimension.fillToConstraints
-                    },
-                )
-            }
-
-            // ── 7-day heatmap row with weekday labels ─────────────────────────
-            val weekdayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
-            val sevenDays = range.days.takeLast(7)
-            Row(
-                modifier = Modifier
-                    .padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                sevenDays.forEachIndexed { index, day ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        StreakDayCell(day = day, onTap = { onDayTap(day) })
-                        Text(
-                            text = weekdayLabels.getOrElse(index) { "" },
-                            fontSize = 10.sp,
-                            fontWeight = if (index == sevenDays.lastIndex) FontWeight.SemiBold
-                                         else FontWeight.Normal,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                // ── 7-day heatmap row with weekday labels ─────────────────────────
+                val weekdayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
+                val sevenDays = range.days.takeLast(7)
+                Row(
+                    modifier = Modifier
+                        .padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    sevenDays.forEachIndexed { index, day ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            StreakDayCell(day = day, onTap = { onDayTap(day) })
+                            Text(
+                                text = weekdayLabels.getOrElse(index) { "" },
+                                fontSize = 10.sp,
+                                fontWeight = if (index == sevenDays.lastIndex) FontWeight.SemiBold
+                                             else FontWeight.Normal,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -227,6 +238,7 @@ fun DailyStatusCard(
             ) {
                 KpiCell(
                     label = "EARNED",
+                    loading = pointsLoading,
                     value = "+$earned",
                     valueColor = MaterialTheme.colorScheme.primary,
                     emphasized = false,
@@ -235,6 +247,7 @@ fun DailyStatusCard(
                 )
                 KpiCell(
                     label = "SPENT",
+                    loading = pointsLoading,
                     value = "−$spent",
                     valueColor = MaterialTheme.colorScheme.error,
                     emphasized = false,
@@ -243,12 +256,54 @@ fun DailyStatusCard(
                 )
                 KpiCell(
                     label = "BALANCE · PTS",
+                    loading = pointsLoading,
                     value = balance.toString(),
                     valueColor = MaterialTheme.colorScheme.onSurface,
                     emphasized = true,
                     showLeftBorder = true,
                     modifier = Modifier.weight(1f),
-                    onClick = onBalanceTap,
+                    onClick = onBalanceTap.takeUnless { pointsLoading },
+                )
+            }
+        }
+    }
+}
+
+// ── Streak half skeleton ──────────────────────────────────────────────────────
+
+/** Placeholder for the streak header and the 7-day row, same paddings as the real ones. */
+@Composable
+private fun StreakHalfSkeleton() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp)
+            .semantics { contentDescription = "Loading streak" },
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SkeletonBlock(44.dp, 44.dp, shape = RoundedCornerShape(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SkeletonBlock(96.dp, 30.dp, shape = RoundedCornerShape(8.dp))
+            SkeletonBlock(168.dp, 12.dp)
+        }
+    }
+    Row(
+        modifier = Modifier
+            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                SkeletonBlock(32.dp, 32.dp, shape = RoundedCornerShape(8.dp))
+                Text(
+                    text = label,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -266,6 +321,7 @@ private fun KpiCell(
     showLeftBorder: Boolean,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    loading: Boolean = false,
 ) {
     val outlineColor = MaterialTheme.colorScheme.outline
     Row(modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier) {
@@ -282,14 +338,18 @@ private fun KpiCell(
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = value,
-                    style = NumeralStyle.copy(
-                        fontSize = if (emphasized) 32.sp else 26.sp,
-                        lineHeight = if (emphasized) 35.2.sp else 28.6.sp,
-                    ),
-                    color = valueColor,
-                )
+                // While loading, the value stays laid out but unseen, so the row keeps its height.
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = value,
+                        style = NumeralStyle.copy(
+                            fontSize = if (emphasized) 32.sp else 26.sp,
+                            lineHeight = if (emphasized) 35.2.sp else 28.6.sp,
+                        ),
+                        color = if (loading) Color.Transparent else valueColor,
+                    )
+                    if (loading) SkeletonBlock(36.dp, 22.dp)
+                }
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = label,
