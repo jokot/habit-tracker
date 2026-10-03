@@ -143,16 +143,30 @@ class SyncWatermarkStore(private val prefs: SyncPreferences) : WatermarkReader {
         _progress.value = PullProgress()
     }
 
-    /** A watermark above 0 also counts: installs from before the flags existed pulled already. */
-    private fun load() = PullProgress(
-        tables = SyncTable.entries.filter { prefs.getLong(pulledKey(it)) == 1L || get(it) > 0L }.toSet(),
-        recentLogs = prefs.getLong(RECENT_LOGS_KEY) == 1L,
-    )
+    private fun load(): PullProgress {
+        if (prefs.getLong(FLAGS_KEY) == 0L) {
+            prefs.putLong(FLAGS_KEY, 1L)
+            // An install from before the flags existed: a watermark means it synced
+            // in full before, so every table counts, empty ones too.
+            if (SyncTable.entries.any { get(it) > 0L }) {
+                SyncTable.entries.forEach { prefs.putLong(pulledKey(it), 1L) }
+                prefs.putLong(RECENT_LOGS_KEY, 1L)
+            }
+        }
+        return PullProgress(
+            tables = SyncTable.entries.filter { prefs.getLong(pulledKey(it)) == 1L }.toSet(),
+            recentLogs = prefs.getLong(RECENT_LOGS_KEY) == 1L,
+        )
+    }
 
     private fun prefixed(table: SyncTable) = "watermark.${table.key}"
     private fun pulledKey(table: SyncTable) = "pulled.${table.key}"
 
-    private companion object { const val RECENT_LOGS_KEY = "pulled.recent_logs" }
+    private companion object {
+        const val RECENT_LOGS_KEY = "pulled.recent_logs"
+        /** Set once, on the first run of this version; never cleared by reset(). */
+        const val FLAGS_KEY = "pulled.flags_version"
+    }
 }
 ```
 
