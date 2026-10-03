@@ -146,7 +146,7 @@ class PostgrestSupabaseSyncClient(
 
 // ---- Paging -------------------------------------------------------------
 
-/** Postgrest caps one response at 1000 rows; ask for exactly that per page. */
+/** Rows asked for per page. Postgrest's default `max_rows` is also 1000. */
 internal const val SYNC_PAGE_SIZE = 1000L
 
 /**
@@ -158,7 +158,9 @@ internal const val SYNC_PAGE_SIZE = 1000L
 internal const val MAX_SYNC_PAGES = 1000
 
 /**
- * Walk pages until one comes back short — a short page is the last page.
+ * Walk pages until one comes back empty. A short page is not the last page: the
+ * server may cap a response below [pageSize] (`max_rows` is set per project), so
+ * the next page starts after the rows that arrived, not after [pageSize].
  *
  * Every fetch orders by its watermark column *and* a unique tie-break, because
  * rows sharing a timestamp have no defined order between two requests: without
@@ -172,9 +174,9 @@ internal suspend fun <T> fetchAllPages(
     var from = 0L
     repeat(MAX_SYNC_PAGES) {
         val page = fetchPage(from until from + pageSize)
+        if (page.isEmpty()) return all
         all += page
-        if (page.size < pageSize) return all
-        from += pageSize
+        from += page.size
     }
     error("Sync pull exceeded $MAX_SYNC_PAGES pages of $pageSize rows")
 }

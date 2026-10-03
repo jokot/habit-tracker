@@ -40,13 +40,13 @@ class FetchAllPagesTest {
     }
 
     @Test
-    fun `a short first page ends the walk`() = runTest {
+    fun `a short first page still needs the empty page to stop`() = runTest {
         val server = PagedServer(rowCount = 2)
 
         val all = fetchAllPages(pageSize = 3) { server.page(it) }
 
         assertEquals(listOf(0, 1), all)
-        assertEquals(1, server.requests)
+        assertEquals(2, server.requests)
     }
 
     @Test
@@ -67,7 +67,17 @@ class FetchAllPagesTest {
         val all = fetchAllPages(pageSize = 3) { server.page(it) }
 
         assertEquals(List(8) { it }, all)
-        assertEquals(3, server.requests)
+        assertEquals(4, server.requests)
+    }
+
+    @Test
+    fun `a server cap below the page size still pulls every row`() = runTest {
+        // Supabase max_rows is set per project. A short page is not the last page.
+        val server = PagedServer(rowCount = 8, cap = 2)
+
+        val all = fetchAllPages(pageSize = 3) { server.page(it) }
+
+        assertEquals(List(8) { it }, all)
     }
 
     @Test
