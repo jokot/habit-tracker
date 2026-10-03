@@ -35,7 +35,7 @@ class PostgrestSupabaseSyncClient(
     }
 
     override suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit> =
-        fetchAllPages { page ->
+        fetchAllPages { pageRange ->
             supabase.postgrest.from("habits")
                 .select {
                     filter {
@@ -44,14 +44,14 @@ class PostgrestSupabaseSyncClient(
                     }
                     order("updated_at", Order.ASCENDING)
                     order("id", Order.ASCENDING)
-                    range(page)
+                    range(pageRange)
                 }
                 .decodeList<HabitDto>()
                 .map { it.toDomain() }
         }
 
     override suspend fun fetchWantActivitiesSince(userId: String, sinceMs: Long): List<WantActivity> =
-        fetchAllPages { page ->
+        fetchAllPages { pageRange ->
             supabase.postgrest.from("want_activities")
                 .select {
                     filter {
@@ -60,14 +60,14 @@ class PostgrestSupabaseSyncClient(
                     }
                     order("updated_at", Order.ASCENDING)
                     order("id", Order.ASCENDING)
-                    range(page)
+                    range(pageRange)
                 }
                 .decodeList<WantActivityDto>()
                 .map { it.toDomain() }
         }
 
     override suspend fun fetchHabitLogsSince(userId: String, sinceMs: Long): List<HabitLog> =
-        fetchAllPages { page ->
+        fetchAllPages { pageRange ->
             supabase.postgrest.from("habit_logs")
                 .select {
                     filter {
@@ -76,14 +76,14 @@ class PostgrestSupabaseSyncClient(
                     }
                     order("synced_at", Order.ASCENDING)
                     order("id", Order.ASCENDING)
-                    range(page)
+                    range(pageRange)
                 }
                 .decodeList<HabitLogDto>()
                 .map { it.toDomain() }
         }
 
     override suspend fun fetchWantLogsSince(userId: String, sinceMs: Long): List<WantLog> =
-        fetchAllPages { page ->
+        fetchAllPages { pageRange ->
             supabase.postgrest.from("want_logs")
                 .select {
                     filter {
@@ -92,7 +92,7 @@ class PostgrestSupabaseSyncClient(
                     }
                     order("synced_at", Order.ASCENDING)
                     order("id", Order.ASCENDING)
-                    range(page)
+                    range(pageRange)
                 }
                 .decodeList<WantLogDto>()
                 .map { it.toDomain() }
@@ -111,13 +111,13 @@ class PostgrestSupabaseSyncClient(
         // changing added_at. Watermark by added_at would miss those updates.
         // Volume per user is small (≤10 rows) — fetch all rows for the user.
         @Suppress("UNUSED_PARAMETER") val _s = sinceMs
-        return fetchAllPages { page ->
+        return fetchAllPages { pageRange ->
             supabase.postgrest.from("user_identities")
                 .select {
                     filter { eq("user_id", userId) }
                     order("added_at", Order.ASCENDING)
                     order("identity_id", Order.ASCENDING)
-                    range(page)
+                    range(pageRange)
                 }
                 .decodeList<UserIdentityDto>()
                 .map { it.toDomain() }
@@ -127,7 +127,7 @@ class PostgrestSupabaseSyncClient(
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
         // RLS scopes to habits owned by current user; client-side userId arg is for parity
         @Suppress("UNUSED_PARAMETER") val _u = userId
-        return fetchAllPages { page ->
+        return fetchAllPages { pageRange ->
             supabase.postgrest.from("habit_identities")
                 .select {
                     filter {
@@ -136,7 +136,7 @@ class PostgrestSupabaseSyncClient(
                     order("updated_at", Order.ASCENDING)
                     order("habit_id", Order.ASCENDING)
                     order("identity_id", Order.ASCENDING)
-                    range(page)
+                    range(pageRange)
                 }
                 .decodeList<HabitIdentityDto>()
                 .map { it.toDomain() }
