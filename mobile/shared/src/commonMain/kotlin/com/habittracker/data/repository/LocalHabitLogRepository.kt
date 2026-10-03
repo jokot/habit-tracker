@@ -106,7 +106,13 @@ class LocalHabitLogRepository(
         db.habitTrackerDatabaseQueries.markHabitLogSynced(syncedAt.toEpochMilliseconds(), id)
     }
 
-    override suspend fun mergePulled(row: HabitLog) {
+    override suspend fun mergePulledAll(rows: List<HabitLog>) {
+        db.habitTrackerDatabaseQueries.transaction { rows.forEach { merge(it) } }
+    }
+
+    override suspend fun mergePulled(row: HabitLog) = merge(row)
+
+    private fun merge(row: HabitLog) {
         db.habitTrackerDatabaseQueries.mergePulledHabitLog(
             id = row.id,
             userId = row.userId,

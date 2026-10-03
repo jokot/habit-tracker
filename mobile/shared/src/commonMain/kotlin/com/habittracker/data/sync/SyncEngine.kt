@@ -155,8 +155,8 @@ class SyncEngine(
     private suspend fun pullRecentLogs(userId: String) {
         val today = clock.now().toLocalDateTime(timeZone).date
         val fromMs = today.minus(6, DateTimeUnit.DAY).atStartOfDayIn(timeZone).toEpochMilliseconds()
-        supabase.fetchHabitLogsLoggedFrom(userId, fromMs).forEach { habitLogRepo.mergePulled(it) }
-        supabase.fetchWantLogsLoggedFrom(userId, fromMs).forEach { wantLogRepo.mergePulled(it) }
+        habitLogRepo.mergePulledAll(supabase.fetchHabitLogsLoggedFrom(userId, fromMs))
+        wantLogRepo.mergePulledAll(supabase.fetchWantLogsLoggedFrom(userId, fromMs))
         watermarks.markRecentLogsPulled()
     }
 
@@ -196,7 +196,7 @@ class SyncEngine(
         val last = watermarks.get(SyncTable.HABIT_LOGS)
         val remote = supabase.fetchHabitLogsSince(userId, last)
         if (remote.isEmpty()) return 0
-        remote.forEach { row -> habitLogRepo.mergePulled(row) }
+        habitLogRepo.mergePulledAll(remote)
         val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
         watermarks.set(SyncTable.HABIT_LOGS, maxTs)
         return remote.size
@@ -206,7 +206,7 @@ class SyncEngine(
         val last = watermarks.get(SyncTable.WANT_LOGS)
         val remote = supabase.fetchWantLogsSince(userId, last)
         if (remote.isEmpty()) return 0
-        remote.forEach { row -> wantLogRepo.mergePulled(row) }
+        wantLogRepo.mergePulledAll(remote)
         val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
         watermarks.set(SyncTable.WANT_LOGS, maxTs)
         return remote.size
