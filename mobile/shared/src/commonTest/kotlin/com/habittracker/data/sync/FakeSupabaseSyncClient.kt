@@ -6,6 +6,7 @@ import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.WantLog
+import kotlinx.coroutines.CompletableDeferred
 
 class FakeSupabaseSyncClient : SupabaseSyncClient {
     val habits = mutableListOf<Habit>()
@@ -21,8 +22,12 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     /** The fetch with this name throws, every time. */
     var throwOn: String? = null
 
-    private fun fetch(name: String) {
+    /** A fetch with a name in this map waits for its deferred before it returns. */
+    val holds = mutableMapOf<String, CompletableDeferred<Unit>>()
+
+    private suspend fun fetch(name: String) {
         fetches += name
+        holds[name]?.await()
         if (throwOn == name) throw RuntimeException("fetch $name failed")
         failIfNeeded()
     }

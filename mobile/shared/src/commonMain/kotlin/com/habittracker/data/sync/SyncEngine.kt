@@ -8,6 +8,8 @@ import com.habittracker.data.repository.HabitRepository
 import com.habittracker.data.repository.IdentityRepository
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantLogRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -126,25 +128,40 @@ class SyncEngine(
      * Pulls in three stages, so each Today section can show as soon as its data is local:
      * the small tables first, then the last 7 days of logs (first pull only), then the
      * full log history.
+     *
+     * The fetches of a stage run at the same time. The merges run one at a time, in
+     * the order of [CORE_TABLES], the recent logs, then [HISTORY_TABLES]. On a first
+     * pull the history waits for the earlier stages, so it does not slow them. On a later
+     * pull every fetch is small, so all of them start at once.
      */
-    private suspend fun pull(userId: String): Int {
-        // Habits before habit_identities, so the links have their habits.
-        var pulled = step(SyncTable.USER_IDENTITIES) { pullUserIdentities(userId) } +
-            step(SyncTable.HABITS) { pullHabits(userId) } +
-            step(SyncTable.HABIT_IDENTITIES) { pullHabitIdentities(userId) } +
-            step(SyncTable.WANT_ACTIVITIES) { pullWantActivities(userId) }
-        if (!recentLogsLocal()) pullRecentLogs(userId)
-        pulled += step(SyncTable.HABIT_LOGS) { pullHabitLogs(userId) } +
-            step(SyncTable.WANT_LOGS) { pullWantLogs(userId) }
-        return pulled
+    private suspend fun pull(userId: String): Int = coroutineScope {
+        val firstPull = !recentLogsLocal()
+        val early = CORE_TABLES.associateWith { async { fetch(it, userId) } }
+        val recent = if (firstPull) async { fetchRecentLogs(userId) } else null
+        val late = if (firstPull) null else HISTORY_TABLES.associateWith { async { fetch(it, userId) } }
+
+        var pulled = early.entries.sumOf { (table, merge) -> step(table, merge.await()) }
+        recent?.await()?.invoke()
+        val history = late ?: HISTORY_TABLES.associateWith { async { fetch(it, userId) } }
+        pulled += history.entries.sumOf { (table, merge) -> step(table, merge.await()) }
+        pulled
     }
 
-    /** Runs one table's pull, then records the table as pulled, also when it had no new rows. */
-    private inline fun step(table: SyncTable, pull: () -> Int): Int =
-        pull().also { if (table !in watermarks.progress.value.tables) watermarks.markPulled(table) }
+    /** Runs one table's merge, then records the table as pulled, also when it had no new rows. */
+    private suspend fun step(table: SyncTable, merge: Merge): Int =
+        merge().also { if (table !in watermarks.progress.value.tables) watermarks.markPulled(table) }
 
     private fun recentLogsLocal(): Boolean = watermarks.progress.value.let {
         it.recentLogs || (SyncTable.HABIT_LOGS in it.tables && SyncTable.WANT_LOGS in it.tables)
+    }
+
+    private suspend fun fetch(table: SyncTable, userId: String): Merge = when (table) {
+        SyncTable.USER_IDENTITIES -> fetchUserIdentities(userId)
+        SyncTable.HABITS -> fetchHabits(userId)
+        SyncTable.HABIT_IDENTITIES -> fetchHabitIdentities(userId)
+        SyncTable.WANT_ACTIVITIES -> fetchWantActivities(userId)
+        SyncTable.HABIT_LOGS -> fetchHabitLogs(userId)
+        SyncTable.WANT_LOGS -> fetchWantLogs(userId)
     }
 
     /**
@@ -152,83 +169,109 @@ class SyncEngine(
      * Monday, so the week's points too. The history stage pulls these rows again, so
      * this moves no watermark. The merge replaces by id, so the second pull is safe.
      */
-    private suspend fun pullRecentLogs(userId: String) {
+    private suspend fun fetchRecentLogs(userId: String): Merge = coroutineScope {
         val today = clock.now().toLocalDateTime(timeZone).date
         val fromMs = today.minus(6, DateTimeUnit.DAY).atStartOfDayIn(timeZone).toEpochMilliseconds()
-        habitLogRepo.mergePulledAll(supabase.fetchHabitLogsLoggedFrom(userId, fromMs))
-        wantLogRepo.mergePulledAll(supabase.fetchWantLogsLoggedFrom(userId, fromMs))
-        watermarks.markRecentLogsPulled()
-    }
-
-    private suspend fun pullHabits(userId: String): Int {
-        val last = watermarks.get(SyncTable.HABITS)
-        val remote = supabase.fetchHabitsSince(userId, last)
-        if (remote.isEmpty()) return 0
-        val ids = remote.map { it.id }
-        val locals = habitRepo.getByIdsForUser(userId, ids).associateBy { it.id }
-        remote.forEach { row ->
-            val local = locals[row.id]
-            if (local == null || row.updatedAt > local.updatedAt) {
-                habitRepo.mergePulled(row.copy(syncedAt = row.updatedAt))
-            }
+        val habitLogs = async { supabase.fetchHabitLogsLoggedFrom(userId, fromMs) }
+        val wantLogs = async { supabase.fetchWantLogsLoggedFrom(userId, fromMs) }
+        val habitRows = habitLogs.await()
+        val wantRows = wantLogs.await()
+        val merge: Merge = {
+            habitLogRepo.mergePulledAll(habitRows)
+            wantLogRepo.mergePulledAll(wantRows)
+            watermarks.markRecentLogsPulled()
+            habitRows.size + wantRows.size
         }
-        watermarks.set(SyncTable.HABITS, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
-        return remote.size
+        merge
     }
 
-    private suspend fun pullWantActivities(userId: String): Int {
-        val last = watermarks.get(SyncTable.WANT_ACTIVITIES)
-        val remote = supabase.fetchWantActivitiesSince(userId, last)
-        if (remote.isEmpty()) return 0
-        val ids = remote.map { it.id }
-        val locals = wantActivityRepo.getByIdsForUser(userId, ids).associateBy { it.id }
-        remote.forEach { row ->
-            val local = locals[row.id]
-            if (local == null || row.updatedAt > local.updatedAt) {
-                wantActivityRepo.mergePulled(row.copy(syncedAt = row.updatedAt))
+    private suspend fun fetchHabits(userId: String): Merge {
+        val remote = supabase.fetchHabitsSince(userId, watermarks.get(SyncTable.HABITS))
+        return merge@{
+            if (remote.isEmpty()) return@merge 0
+            val ids = remote.map { it.id }
+            val locals = habitRepo.getByIdsForUser(userId, ids).associateBy { it.id }
+            remote.forEach { row ->
+                val local = locals[row.id]
+                if (local == null || row.updatedAt > local.updatedAt) {
+                    habitRepo.mergePulled(row.copy(syncedAt = row.updatedAt))
+                }
             }
+            watermarks.set(SyncTable.HABITS, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
+            remote.size
         }
-        watermarks.set(SyncTable.WANT_ACTIVITIES, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
-        return remote.size
     }
 
-    private suspend fun pullHabitLogs(userId: String): Int {
+    private suspend fun fetchWantActivities(userId: String): Merge {
+        val remote = supabase.fetchWantActivitiesSince(userId, watermarks.get(SyncTable.WANT_ACTIVITIES))
+        return merge@{
+            if (remote.isEmpty()) return@merge 0
+            val ids = remote.map { it.id }
+            val locals = wantActivityRepo.getByIdsForUser(userId, ids).associateBy { it.id }
+            remote.forEach { row ->
+                val local = locals[row.id]
+                if (local == null || row.updatedAt > local.updatedAt) {
+                    wantActivityRepo.mergePulled(row.copy(syncedAt = row.updatedAt))
+                }
+            }
+            watermarks.set(SyncTable.WANT_ACTIVITIES, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
+            remote.size
+        }
+    }
+
+    private suspend fun fetchHabitLogs(userId: String): Merge {
         val last = watermarks.get(SyncTable.HABIT_LOGS)
         val remote = supabase.fetchHabitLogsSince(userId, last)
-        if (remote.isEmpty()) return 0
-        habitLogRepo.mergePulledAll(remote)
-        val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
-        watermarks.set(SyncTable.HABIT_LOGS, maxTs)
-        return remote.size
+        return merge@{
+            if (remote.isEmpty()) return@merge 0
+            habitLogRepo.mergePulledAll(remote)
+            val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
+            watermarks.set(SyncTable.HABIT_LOGS, maxTs)
+            remote.size
+        }
     }
 
-    private suspend fun pullWantLogs(userId: String): Int {
+    private suspend fun fetchWantLogs(userId: String): Merge {
         val last = watermarks.get(SyncTable.WANT_LOGS)
         val remote = supabase.fetchWantLogsSince(userId, last)
-        if (remote.isEmpty()) return 0
-        wantLogRepo.mergePulledAll(remote)
-        val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
-        watermarks.set(SyncTable.WANT_LOGS, maxTs)
-        return remote.size
+        return merge@{
+            if (remote.isEmpty()) return@merge 0
+            wantLogRepo.mergePulledAll(remote)
+            val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
+            watermarks.set(SyncTable.WANT_LOGS, maxTs)
+            remote.size
+        }
     }
 
-    private suspend fun pullUserIdentities(userId: String): Int {
-        val last = watermarks.get(SyncTable.USER_IDENTITIES)
-        val remote = supabase.fetchUserIdentitiesSince(userId, last)
-        if (remote.isEmpty()) return 0
-        remote.forEach { row -> identityRepo.mergePulledUserIdentity(row) }
-        val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
-        watermarks.set(SyncTable.USER_IDENTITIES, maxTs)
-        return remote.size
+    private suspend fun fetchUserIdentities(userId: String): Merge {
+        val remote = supabase.fetchUserIdentitiesSince(userId, watermarks.get(SyncTable.USER_IDENTITIES))
+        return merge@{
+            if (remote.isEmpty()) return@merge 0
+            remote.forEach { row -> identityRepo.mergePulledUserIdentity(row) }
+            val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
+            watermarks.set(SyncTable.USER_IDENTITIES, maxTs)
+            remote.size
+        }
     }
 
-    private suspend fun pullHabitIdentities(userId: String): Int {
-        val last = watermarks.get(SyncTable.HABIT_IDENTITIES)
-        val remote = supabase.fetchHabitIdentitiesSince(userId, last)
-        if (remote.isEmpty()) return 0
-        remote.forEach { row -> identityRepo.mergePulledHabitIdentity(row) }
-        val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
-        watermarks.set(SyncTable.HABIT_IDENTITIES, maxTs)
-        return remote.size
+    private suspend fun fetchHabitIdentities(userId: String): Merge {
+        val remote = supabase.fetchHabitIdentitiesSince(userId, watermarks.get(SyncTable.HABIT_IDENTITIES))
+        return merge@{
+            if (remote.isEmpty()) return@merge 0
+            remote.forEach { row -> identityRepo.mergePulledHabitIdentity(row) }
+            val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
+            watermarks.set(SyncTable.HABIT_IDENTITIES, maxTs)
+            remote.size
+        }
     }
 }
+
+/** Writes one table's fetched rows and moves its watermark. Returns the row count. */
+private typealias Merge = suspend () -> Int
+
+/** Habits come before habit_identities, so the links have their habits. */
+private val CORE_TABLES = listOf(
+    SyncTable.USER_IDENTITIES, SyncTable.HABITS, SyncTable.HABIT_IDENTITIES, SyncTable.WANT_ACTIVITIES,
+)
+
+private val HISTORY_TABLES = listOf(SyncTable.HABIT_LOGS, SyncTable.WANT_LOGS)

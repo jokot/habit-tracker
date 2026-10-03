@@ -10,9 +10,13 @@ import com.habittracker.data.repository.FakeWantActivityRepository
 import com.habittracker.data.repository.FakeWantLogRepository
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -156,6 +160,71 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `a first pull fetches the small tables and the recent logs together, then the history`() = runTest {
+        val early = CORE + RECENT
+        early.forEach { supabase.holds[it] = CompletableDeferred() }
+        val sync = launch { engine.sync(SyncReason.POST_SIGN_IN).getOrThrow() }
+        runCurrent()
+
+        assertEquals(early.toSet(), supabase.fetches.toSet())
+
+        supabase.holds.values.forEach { it.complete(Unit) }
+        sync.join()
+        assertEquals(HISTORY, supabase.fetches.takeLast(2))
+    }
+
+    @Test
+    fun `a later pull fetches every table together`() = runTest {
+        engine.sync(SyncReason.POST_SIGN_IN).getOrThrow()
+        supabase.fetches.clear()
+        (CORE + HISTORY).forEach { supabase.holds[it] = CompletableDeferred() }
+        val sync = launch { engine.sync(SyncReason.MANUAL).getOrThrow() }
+        runCurrent()
+
+        assertEquals((CORE + HISTORY).toSet(), supabase.fetches.toSet())
+
+        supabase.holds.values.forEach { it.complete(Unit) }
+        sync.join()
+    }
+
+    @Test
+    fun `a table that arrives first still merges after the tables before it`() = runTest {
+        CORE.forEach { supabase.holds[it] = CompletableDeferred() }
+        val sync = launch { engine.sync(SyncReason.POST_SIGN_IN).getOrThrow() }
+        runCurrent()
+
+        // Finish the fetches in reverse order. Nothing merges until user_identities is in.
+        CORE.reversed().dropLast(1).forEach {
+            supabase.holds.getValue(it).complete(Unit)
+            runCurrent()
+            assertEquals(emptySet(), watermarks.progress.value.tables)
+        }
+        supabase.holds.getValue("user_identities").complete(Unit)
+        sync.join()
+        assertEquals(SyncTable.entries.toSet(), watermarks.progress.value.tables)
+    }
+
+    @Test
+    fun `a failed fetch keeps the tables merged before it and merges no later table`() = runTest {
+        supabase.habits.add(makeHabit("h1", updatedAt = tPlus(10)))
+        CORE.forEach { supabase.holds[it] = CompletableDeferred() }
+        supabase.throwOn = "habit_identities"
+        val sync = async { engine.sync(SyncReason.POST_SIGN_IN) }
+        runCurrent()
+
+        supabase.holds.getValue("user_identities").complete(Unit)
+        supabase.holds.getValue("habits").complete(Unit)
+        runCurrent()
+        supabase.holds.getValue("habit_identities").complete(Unit)
+
+        assertTrue(sync.await().isFailure)
+        val tables = watermarks.progress.value.tables
+        assertEquals(setOf(SyncTable.USER_IDENTITIES, SyncTable.HABITS), tables)
+        assertEquals(listOf("h1"), habitRepo.getHabitsForUser("user-1").map { it.id })
+        assertEquals(0L, watermarks.get(SyncTable.WANT_ACTIVITIES))
+    }
+
+    @Test
     fun `an empty server marks every table pulled`() = runTest {
         engine.sync(SyncReason.POST_SIGN_IN).getOrThrow()
         assertEquals(PullProgress(SyncTable.entries.toSet(), recentLogs = true), watermarks.progress.value)
@@ -217,6 +286,10 @@ class SyncEngineTest {
         assertEquals("reader", supabase.habitIdentities.first().identityId)
     }
 }
+
+private val CORE = listOf("user_identities", "habits", "habit_identities", "want_activities")
+private val RECENT = listOf("habit_logs_recent", "want_logs_recent")
+private val HISTORY = listOf("habit_logs", "want_logs")
 
 class InMemoryWatermarks : WatermarkReader {
     private val store = mutableMapOf<SyncTable, Long>()

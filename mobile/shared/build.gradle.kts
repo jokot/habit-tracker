@@ -53,6 +53,8 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(libs.sqldelight.sqlite.driver)
+            // RealPostgrestSyncTest talks to a local Supabase over HTTP.
+            implementation(libs.ktor.client.okhttp)
         }
 
         androidMain.dependencies {
