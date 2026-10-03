@@ -150,8 +150,10 @@ class PostgrestSupabaseSyncClient(
 internal const val SYNC_PAGE_SIZE = 1000L
 
 /**
- * Stop after this many pages. A server that ignores the range would otherwise
- * hand back the same full page forever and hang the pull.
+ * Fail after this many pages. A server that ignores the range would otherwise
+ * hand back the same full page forever and hang the pull. Failing — rather than
+ * returning what arrived — keeps the watermark where it was, so the rows past
+ * the cap are pulled on the next sync instead of being skipped for good.
  */
 internal const val MAX_SYNC_PAGES = 1000
 
@@ -174,7 +176,7 @@ internal suspend fun <T> fetchAllPages(
         if (page.size < pageSize) return all
         from += pageSize
     }
-    return all
+    error("Sync pull exceeded $MAX_SYNC_PAGES pages of $pageSize rows")
 }
 
 // ---- DTOs ---------------------------------------------------------------

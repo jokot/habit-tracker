@@ -3,6 +3,7 @@ package com.habittracker.data.sync
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * The fake sync client returns whole lists, so it can never reproduce the bug
@@ -67,15 +68,16 @@ class FetchAllPagesTest {
     }
 
     @Test
-    fun `a server ignoring the range terminates instead of hanging`() = runTest {
+    fun `a server ignoring the range fails instead of hanging or truncating`() = runTest {
         var requests = 0
 
-        val all = fetchAllPages(pageSize = 2) {
-            requests++
-            listOf(0, 1) // always a full page, never advances
+        assertFailsWith<IllegalStateException> {
+            fetchAllPages(pageSize = 2) {
+                requests++
+                listOf(0, 1) // always a full page, never advances
+            }
         }
 
         assertEquals(MAX_SYNC_PAGES, requests)
-        assertEquals(MAX_SYNC_PAGES * 2, all.size)
     }
 }
