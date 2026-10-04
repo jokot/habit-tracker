@@ -139,9 +139,16 @@ fun AppNavigation(container: AppContainer) {
     LaunchedEffect(Unit) {
         container.sessionExpiredEvents.collect { event ->
             Toast.makeText(context, sessionExpiredToast(event.unsyncedCount), Toast.LENGTH_LONG).show()
-            navController.navigate(Screen.Auth.route) {
+            // Auth gets a guest screen below it, so that back leaves Auth and does not close the app.
+            val guestRoute = if (container.isOnboardedUseCase.execute(container.currentUserId())) {
+                Screen.Home.route
+            } else {
+                Screen.Onboarding.route
+            }
+            navController.navigate(guestRoute) {
                 popUpTo(navController.graph.id) { inclusive = true }
             }
+            navController.navigate(Screen.Auth.route)
         }
     }
 
