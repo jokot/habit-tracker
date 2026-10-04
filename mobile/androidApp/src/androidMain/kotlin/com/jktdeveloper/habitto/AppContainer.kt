@@ -340,10 +340,12 @@ class AppContainer(context: Context) {
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
         // Before the guest migration and the first sync: rows of another held account
         // must go before this account pulls. See HeldAccounts.
-        heldAccounts.onSignedIn(authUserId)
+        // Kept rows make this an existing user, even when the server has no habits yet.
+        // Moving guest rows onto them could clash on the LocalUserIdentity key.
+        val keptHeldRows = heldAccounts.onSignedIn(authUserId)
         val localId = userIdentityProvider.localUserId()
         if (localId == authUserId) return
-        val serverHasData = runCatching {
+        val serverHasData = keptHeldRows || runCatching {
             supabaseSyncClient.fetchHabitsSince(authUserId, 0L).isNotEmpty()
         }.getOrDefault(false)
         if (serverHasData) {

@@ -34,18 +34,21 @@ class HeldAccounts(
 
     /**
      * Resolves the hold at sign-in. The same user keeps the rows, and the next push sends
-     * them. Another user cannot push them, so they are deleted.
+     * them. Another user cannot push them, so they are deleted. Returns true when this
+     * user kept rows: the caller must then treat the user as an existing user.
      */
-    suspend fun onSignedIn(userId: String) {
-        val held = store.get() ?: return
-        if (held.userId != userId) {
+    suspend fun onSignedIn(userId: String): Boolean {
+        val held = store.get() ?: return false
+        val kept = held.userId == userId
+        if (!kept) {
             val deleted = runCatching { deleteUserRows(held.userId) }
                 .onFailure { e -> Log.w(TAG, "Could not delete the rows of a held account", e) }
                 .isSuccess
             // Keep the hold, so the next sign-in tries the delete again.
-            if (!deleted) return
+            if (!deleted) return false
         }
         store.clear()
+        return kept
     }
 
     suspend fun summary(): HeldAccountSummary? {

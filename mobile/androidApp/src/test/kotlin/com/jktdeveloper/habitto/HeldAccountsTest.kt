@@ -6,7 +6,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,6 +84,25 @@ class HeldAccountsTest {
     @Test fun `sign-in with no hold deletes nothing`() = runTest {
         held.onSignedIn("auth-2")
         assertEquals(emptyList<String>(), deleted)
+    }
+
+    // The caller must not move guest rows onto the kept rows: LocalUserIdentity has a
+    // composite key, so the "new user" migration would fail on an identity clash.
+    @Test fun `sign-in as the held user reports that it kept rows`() = runTest {
+        store.hold(HeldAccount("auth-1", "a@b.com"))
+        assertTrue(held.onSignedIn("auth-1"))
+    }
+
+    @Test fun `sign-in as another user or with no hold reports no kept rows`() = runTest {
+        assertFalse(held.onSignedIn("auth-2"))
+        store.hold(HeldAccount("auth-1", "a@b.com"))
+        assertFalse(held.onSignedIn("auth-2"))
+    }
+
+    @Test fun `sign-in where the delete fails reports no kept rows`() = runTest {
+        store.hold(HeldAccount("auth-1", "a@b.com"))
+        deleteFails = true
+        assertFalse(held.onSignedIn("auth-2"))
     }
 
     @Test fun `summary gives the held email and the current count`() = runTest {
