@@ -285,7 +285,7 @@ class AppContainer(context: Context) {
         // authenticated id in between: in a cold process — a widget update, a reminder
         // worker — supabase-kt hasn't restored the session yet, and dropping straight to
         // the guest id queries rows that sign-in migrated away. See LastAuthUserStore.
-        userId = lastAuthUserStore.resolve(authRepository.currentUserId()) {
+        userId = lastAuthUserStore.resolve(authRepository.currentUserId(), authRepository.currentEmail()) {
             userIdentityProvider.localUserId()
         },
         isAuthenticated = userIdentityProvider.isAuthenticated(),
@@ -411,7 +411,7 @@ class AppContainer(context: Context) {
         // Reset pull watermarks so the next sign-in pulls everything from
         // the cloud instead of skipping rows older than the cached watermark.
         watermarks.reset()
-        // We just deleted this user's local rows, so stop claiming to be them on the
+        // The user is signed out, so stop claiming to be them on the
         // next cold start. Covers every sign-out path — they all come through here.
         lastAuthUserStore.clear()
     }
@@ -446,7 +446,9 @@ class AppContainer(context: Context) {
         }
         // The refresh failed, so no push is possible. HeldAccounts keeps unsynced changes
         // for the next sign-in instead of deleting them (#33).
-        val unsynced = heldAccounts.onSessionExpired(currentUserId(), authRepository.currentEmail())
+        // supabase-kt often cleared the session already, so the email comes from the store.
+        val email = authRepository.currentEmail() ?: lastAuthUserStore.lastEmail()
+        val unsynced = heldAccounts.onSessionExpired(currentUserId(), email)
         forgetSyncedUser()
         runCatching { authRepository.signOut() }
         refreshAuthState()
