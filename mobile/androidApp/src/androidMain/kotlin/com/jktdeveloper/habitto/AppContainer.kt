@@ -113,6 +113,11 @@ class AppContainer(context: Context) {
     val habitLogRepository = LocalHabitLogRepository(db)
     val wantActivityRepository = LocalWantActivityRepository(db)
     val wantLogRepository = LocalWantLogRepository(db)
+    private val heldAccounts = HeldAccounts(
+        store = HeldAccountStore(context),
+        countUnsynced = { userId -> countUnsyncedChanges(userId) },
+        deleteUserRows = { userId -> deleteUserRows(userId) },
+    )
     val wantTimerRepository: WantTimerRepository = LocalWantTimerRepository(db)
     val perIdentityReminderScheduler = PerIdentityReminderScheduler(appContext)
     val syncFailureCounter = SyncFailureCounter(appContext)
@@ -263,8 +268,8 @@ class AppContainer(context: Context) {
                 pullProgress.value.readySections(isAuthenticated()),
             )
 
-    private val _sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val sessionExpiredEvents: SharedFlow<Unit> = _sessionExpiredEvents.asSharedFlow()
+    private val _sessionExpiredEvents = MutableSharedFlow<SessionExpired>(extraBufferCapacity = 1)
+    val sessionExpiredEvents: SharedFlow<SessionExpired> = _sessionExpiredEvents.asSharedFlow()
 
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
@@ -333,6 +338,9 @@ class AppContainer(context: Context) {
      *   rows would be pushed under the existing user's id, producing duplicates.
      */
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
+        // Before the guest migration and the first sync: rows of another held account
+        // must go before this account pulls. See HeldAccounts.
+        heldAccounts.onSignedIn(authUserId)
         val localId = userIdentityProvider.localUserId()
         if (localId == authUserId) return
         val serverHasData = runCatching {
@@ -382,16 +390,24 @@ class AppContainer(context: Context) {
     }
 
     suspend fun clearAuthenticatedUserData(authUserId: String) {
+        deleteUserRows(authUserId)
+        forgetSyncedUser()
+    }
+
+    private fun deleteUserRows(userId: String) {
         db.habitTrackerDatabaseQueries.transaction {
             // Identity tables first — habit_identities subquery references LocalHabit.userId,
             // so it must run before LocalHabit rows are deleted.
-            db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(authUserId)
-            db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearHabitsForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearHabitLogsForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearWantLogsForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(authUserId)
+            db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(userId)
+            db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(userId)
+            db.habitTrackerDatabaseQueries.clearHabitsForUser(userId)
+            db.habitTrackerDatabaseQueries.clearHabitLogsForUser(userId)
+            db.habitTrackerDatabaseQueries.clearWantLogsForUser(userId)
+            db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(userId)
         }
+    }
+
+    private fun forgetSyncedUser() {
         // Reset pull watermarks so the next sign-in pulls everything from
         // the cloud instead of skipping rows older than the cached watermark.
         watermarks.reset()
@@ -399,6 +415,17 @@ class AppContainer(context: Context) {
         // next cold start. Covers every sign-out path — they all come through here.
         lastAuthUserStore.clear()
     }
+
+    /** Rows with `syncedAt = null` across the six synced tables. */
+    private suspend fun countUnsyncedChanges(userId: String): Int =
+        habitRepository.getUnsyncedFor(userId).size +
+            wantActivityRepository.getUnsyncedFor(userId).size +
+            habitLogRepository.getUnsyncedFor(userId).size +
+            wantLogRepository.getUnsyncedFor(userId).size +
+            identityRepository.getUnsyncedUserIdentitiesFor(userId).size +
+            identityRepository.getUnsyncedHabitIdentitiesFor(userId).size
+
+    suspend fun heldAccountSummary(): HeldAccountSummary? = heldAccounts.summary()
 
     private fun startSessionGuard() {
         applicationScope.launch {
@@ -417,11 +444,13 @@ class AppContainer(context: Context) {
             runCatching { syncEngine.sync(SyncReason.MANUAL) }
             return
         }
-        val userId = currentUserId()
-        runCatching { clearAuthenticatedUserData(userId) }
+        // The refresh failed, so no push is possible. HeldAccounts keeps unsynced changes
+        // for the next sign-in instead of deleting them (#33).
+        val unsynced = heldAccounts.onSessionExpired(currentUserId(), authRepository.currentEmail())
+        forgetSyncedUser()
         runCatching { authRepository.signOut() }
         refreshAuthState()
-        _sessionExpiredEvents.tryEmit(Unit)
+        _sessionExpiredEvents.tryEmit(SessionExpired(unsynced))
     }
 
     private fun startSyncNotifier() {
@@ -515,3 +544,6 @@ class AppContainer(context: Context) {
         startPerIdentityReconciler()
     }
 }
+
+/** The session ended with no push. [unsyncedCount] is the number of changes kept, null if unknown. */
+data class SessionExpired(val unsyncedCount: Int?)

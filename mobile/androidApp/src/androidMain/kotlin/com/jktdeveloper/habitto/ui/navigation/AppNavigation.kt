@@ -29,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import com.jktdeveloper.habitto.AppContainer
 import com.jktdeveloper.habitto.ui.auth.AuthScreen
 import com.jktdeveloper.habitto.ui.auth.AuthViewModel
+import com.jktdeveloper.habitto.ui.auth.sessionExpiredToast
 import com.jktdeveloper.habitto.ui.home.HomeScreen
 import com.jktdeveloper.habitto.ui.home.HomeViewModel
 import com.jktdeveloper.habitto.ui.habit.HabitDetailScreen
@@ -136,8 +137,8 @@ fun AppNavigation(container: AppContainer) {
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
-        container.sessionExpiredEvents.collect {
-            Toast.makeText(context, "Session expired — sign in again", Toast.LENGTH_LONG).show()
+        container.sessionExpiredEvents.collect { event ->
+            Toast.makeText(context, sessionExpiredToast(event.unsyncedCount), Toast.LENGTH_LONG).show()
             navController.navigate(Screen.Auth.route) {
                 popUpTo(navController.graph.id) { inclusive = true }
             }
