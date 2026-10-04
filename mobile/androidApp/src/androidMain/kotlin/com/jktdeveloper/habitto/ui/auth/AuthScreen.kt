@@ -2,6 +2,7 @@ package com.jktdeveloper.habitto.ui.auth
 
 import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.MarkEmailRead
@@ -65,11 +67,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jktdeveloper.habitto.HeldAccountSummary
 import com.jktdeveloper.habitto.R
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameSoft
 import com.jktdeveloper.habitto.ui.theme.NumeralStyle
+import com.jktdeveloper.habitto.ui.theme.OnWarnContainer
+import com.jktdeveloper.habitto.ui.theme.OnWarnContainerDark
 import com.jktdeveloper.habitto.ui.theme.Spacing
+import com.jktdeveloper.habitto.ui.theme.WarnContainer
+import com.jktdeveloper.habitto.ui.theme.WarnContainerDark
 import com.habittracker.data.remote.GoogleSignInLauncher
 import kotlinx.coroutines.launch
 
@@ -208,6 +215,10 @@ fun AuthScreen(
                     }
                 }
             } else {
+                uiState.heldAccount?.let { held ->
+                    HeldAccountNotice(held)
+                    Spacer(Modifier.height(Spacing.xl))
+                }
                 // signin / signup inputs
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     AuthInput(
@@ -486,5 +497,39 @@ private fun VisibilityToggle(visible: Boolean, onClick: () -> Unit) {
             contentDescription = if (visible) "Hide password" else "Show password",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun HeldAccountNotice(held: HeldAccountSummary) {
+    val dark = isSystemInDarkTheme()
+    val onContainer = if (dark) OnWarnContainerDark else OnWarnContainer
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (dark) WarnContainerDark else WarnContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(modifier = Modifier.padding(16.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.CloudOff,
+                contentDescription = null,
+                tint = onContainer,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = heldNoticeTitle(held.unsyncedCount),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = onContainer,
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = heldNoticeBody(held.email),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = onContainer,
+                )
+            }
+        }
     }
 }
