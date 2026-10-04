@@ -1,5 +1,7 @@
 package com.habittracker.data.repository
 
+import kotlinx.coroutines.flow.Flow
+
 data class UserSession(
     val userId: String,
     val email: String,
@@ -25,4 +27,11 @@ interface AuthRepository {
 
     /** Suspends until the auth client has finished loading any persisted session from storage. */
     suspend fun awaitSessionRestored()
+
+    /**
+     * Emits when the auth client has no session: no stored session at start, a refresh
+     * that the server rejected, or a sign-out. It does not emit while the app is in the
+     * background, or when a refresh fails because the phone is offline.
+     */
+    val noSession: Flow<Unit>
 }

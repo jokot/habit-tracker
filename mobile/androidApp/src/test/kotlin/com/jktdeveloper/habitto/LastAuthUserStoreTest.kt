@@ -60,4 +60,19 @@ class LastAuthUserStoreTest {
         store.clear()
         assertNull(store.lastEmail())
     }
+
+    @Test
+    fun `rememberedUserId is the last authenticated id until a clear`() {
+        assertNull(store.rememberedUserId())
+        store.resolve("auth-1") { "guest" }
+        assertEquals("auth-1", store.rememberedUserId())
+        store.clear()
+        assertNull(store.rememberedUserId())
+    }
+
+    @Test
+    fun `rememberedUserId is null for a guest`() {
+        store.resolve(null) { "guest" }
+        assertNull(store.rememberedUserId())
+    }
 }

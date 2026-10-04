@@ -71,14 +71,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.readySections
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -87,8 +86,11 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Observable snapshot of who the app is currently acting as. */
 data class AuthState(val userId: String, val isAuthenticated: Boolean)
@@ -268,8 +270,13 @@ class AppContainer(context: Context) {
                 pullProgress.value.readySections(isAuthenticated()),
             )
 
-    private val _sessionExpiredEvents = MutableSharedFlow<SessionExpired>(extraBufferCapacity = 1)
-    val sessionExpiredEvents: SharedFlow<SessionExpired> = _sessionExpiredEvents.asSharedFlow()
+    // A channel keeps an event until the UI collects it. A session end at a cold start
+    // can come before AppNavigation collects.
+    private val _sessionExpiredEvents = Channel<SessionExpired>(Channel.CONFLATED)
+    val sessionExpiredEvents: Flow<SessionExpired> = _sessionExpiredEvents.receiveAsFlow()
+
+    private val serverSessionEnd = ServerSessionEnd(lastAuthUserStore::rememberedUserId)
+    private val sessionEndLock = Mutex()
 
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
@@ -385,8 +392,11 @@ class AppContainer(context: Context) {
             kotlinx.coroutines.withTimeoutOrNull(5_000) {
                 syncEngine.sync(SyncReason.MANUAL)
             }
-            authRepository.signOut()
-            clearAuthenticatedUserData(userId)
+            // The user is still remembered after signOut() returns, so mark this sign-out as ours.
+            serverSessionEnd.ownSignOut {
+                authRepository.signOut()
+                clearAuthenticatedUserData(userId)
+            }
             refreshAuthState()
         }
     }
@@ -437,6 +447,13 @@ class AppContainer(context: Context) {
                 .distinctUntilChanged()
                 .collect { handleSessionExpired() }
         }
+        // A refresh that the server rejects makes no failed push. Without this, the app
+        // shows the data of the user as signed out, also after a cold start (#33).
+        applicationScope.launch {
+            authRepository.noSession.collect {
+                if (serverSessionEnd.endedByServer()) endSession()
+            }
+        }
     }
 
     private suspend fun handleSessionExpired() {
@@ -446,15 +463,23 @@ class AppContainer(context: Context) {
             runCatching { syncEngine.sync(SyncReason.MANUAL) }
             return
         }
-        // The refresh failed, so no push is possible. HeldAccounts keeps unsynced changes
-        // for the next sign-in instead of deleting them (#33).
+        endSession()
+    }
+
+    /**
+     * Ends a session that no refresh can save, so no push is possible. HeldAccounts keeps
+     * unsynced changes for the next sign-in instead of deleting them (#33).
+     */
+    private suspend fun endSession() = sessionEndLock.withLock {
+        // Both guards can find the same end. The first one forgets the user.
+        val userId = lastAuthUserStore.rememberedUserId() ?: return@withLock
         // supabase-kt often cleared the session already, so the email comes from the store.
         val email = authRepository.currentEmail() ?: lastAuthUserStore.lastEmail()
-        val unsynced = heldAccounts.onSessionExpired(currentUserId(), email)
+        val unsynced = heldAccounts.onSessionExpired(userId, email)
         forgetSyncedUser()
         runCatching { authRepository.signOut() }
         refreshAuthState()
-        _sessionExpiredEvents.tryEmit(SessionExpired(unsynced))
+        _sessionExpiredEvents.trySend(SessionExpired(unsynced))
     }
 
     private fun startSyncNotifier() {

@@ -14,10 +14,9 @@ import android.content.Context
  * onto the auth id — which is the empty widget. The last id we actually saw is the right
  * answer until a sign-out says otherwise.
  *
- * Known limit: if the refresh token is revoked server-side, the remembered id goes stale
- * until sync surfaces "Session expired" and clearAuthenticatedUserData wipes it. Showing
- * the user their own data in the meantime beats silently swapping them to a guest with
- * nothing in it.
+ * If the server revokes the refresh token, supabase-kt reports NotAuthenticated and
+ * AppContainer ends the session, which clears the remembered id (#33). RefreshFailure
+ * (offline) keeps it, so the offline widget still shows the user's own data.
  */
 class LastAuthUserStore(context: Context) {
     private val prefs =
@@ -50,6 +49,9 @@ class LastAuthUserStore(context: Context) {
      * auto-refresh fails, so a session expiry often finds no email on the session (#33).
      */
     fun lastEmail(): String? = prefs.getString(KEY_LAST_AUTH_EMAIL, null)
+
+    /** The id of the last authenticated user, or null after a sign-out or for a guest. */
+    fun rememberedUserId(): String? = prefs.getString(KEY_LAST_AUTH_USER_ID, null)
 
     fun clear() {
         prefs.edit().remove(KEY_LAST_AUTH_USER_ID).remove(KEY_LAST_AUTH_EMAIL).apply()

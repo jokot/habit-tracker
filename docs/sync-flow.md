@@ -303,11 +303,21 @@ flowchart TD
     ERR["Sync error:<br/>Session expired"] --> REFRESH{"Refresh the session token"}
     REFRESH -- "Success" --> AGAIN["Sync again: MANUAL"]
     REFRESH -- "Failure" --> COUNT{"Unsynced changes<br/>of the user?"}
+    NOSESSION["supabase-kt: NotAuthenticated,<br/>a user is remembered,<br/>no sign-out of the app runs"] --> COUNT
     COUNT -- "0" --> WIPE["Delete the local data of the user"]
     COUNT -- "1 or more, or the count fails" --> HOLD["Keep the rows.<br/>Hold the user id and the email."]
     WIPE & HOLD --> SIGNOUT["Reset the watermarks, sign out"]
-    SIGNOUT --> TOAST["Toast and notification:<br/>sign in again"]
+    SIGNOUT --> TOAST["Toast: sign in again.<br/>Auth opens."]
 ```
+
+Two guards start this flow:
+
+- **A failed push.** The sync stops with "Session expired". The app tries one refresh. This guard also shows a notification.
+- **No session.** supabase-kt deletes the session when the server rejects the refresh. With no unsynced changes, no push fails. So the app also watches for `NotAuthenticated`. This guard also runs at a cold start, when supabase-kt finds no stored session. Without it, the app shows the data of the remembered user to a signed-out phone.
+
+`ServerSessionEnd` tells this end apart from a sign-out of the app. `Initializing` (the app stops) and `RefreshFailure` (the phone is offline) keep the session, so they do not start the flow. A guest has no remembered user, so the flow does not start for a guest.
+
+The event goes through a channel, so a cold-start event waits until the navigation collects it. If the guard runs in a background process, such as a widget update, and the process stops, the toast does not show. The app then opens as a guest. The Auth notice still shows any held changes.
 
 The refresh failed, so the app cannot push the unsynced changes. `HeldAccounts` keeps them on the phone for the next sign-in. The kept rows have the user id of the held account, so a guest sees none of them.
 

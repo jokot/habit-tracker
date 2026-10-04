@@ -5,6 +5,10 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 class SupabaseAuthRepository(
     private val client: SupabaseClient,
@@ -61,9 +65,18 @@ class SupabaseAuthRepository(
     override fun isLoggedIn(): Boolean =
         client.auth.currentSessionOrNull() != null
 
+    override val noSession: Flow<Unit> =
+        client.auth.sessionStatus.filter { it.meansNoSession() }.map { }
+
     override suspend fun awaitSessionRestored() {
         // Wait for the first non-Initializing session status — session is either
         // Authenticated (loaded from storage) or NotAuthenticated (no session).
         client.auth.awaitInitialization()
     }
 }
+
+/**
+ * Only NotAuthenticated means that supabase-kt deleted the session. It sets Initializing
+ * when the app stops, and RefreshFailure when the phone is offline. Both keep the session.
+ */
+internal fun SessionStatus.meansNoSession(): Boolean = this is SessionStatus.NotAuthenticated

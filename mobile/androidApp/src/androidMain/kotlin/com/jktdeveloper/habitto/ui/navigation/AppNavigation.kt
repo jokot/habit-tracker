@@ -136,7 +136,18 @@ fun AppNavigation(container: AppContainer) {
     }
 
     val context = LocalContext.current
+    val start = startDestination
+    if (start == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     LaunchedEffect(Unit) {
+        // A session end at a cold start can come before the NavHost sets its graph.
+        // The first back stack entry shows that the graph exists.
+        navController.currentBackStackEntryFlow.first()
         container.sessionExpiredEvents.collect { event ->
             Toast.makeText(context, sessionExpiredToast(event.unsyncedCount), Toast.LENGTH_LONG).show()
             // Auth gets a guest screen below it, so that back leaves Auth and does not close the app.
@@ -150,14 +161,6 @@ fun AppNavigation(container: AppContainer) {
             }
             navController.navigate(Screen.Auth.route)
         }
-    }
-
-    val start = startDestination
-    if (start == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
     }
 
     // MainActivity is singleTop, so a deep link fired while the app is already running never
