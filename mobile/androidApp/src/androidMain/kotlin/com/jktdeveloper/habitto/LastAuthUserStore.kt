@@ -27,24 +27,37 @@ class LastAuthUserStore(context: Context) {
      * [sessionUserId] is the live session's id, or null when no session is visible — which
      * means either "not loaded yet" or "guest", and nothing here can tell those apart, so
      * a remembered id wins. [guestId] is a lambda because it mints a UUID on first call: it
-     * must not run for someone who has ever signed in.
+     * must not run for someone who has ever signed in. [sessionEmail] is the live session's
+     * email, kept with the id for [lastEmail].
      */
-    fun resolve(sessionUserId: String?, guestId: () -> String): String {
+    fun resolve(sessionUserId: String?, sessionEmail: String? = null, guestId: () -> String): String {
         if (sessionUserId != null) {
-            if (prefs.getString(KEY_LAST_AUTH_USER_ID, null) != sessionUserId) {
-                prefs.edit().putString(KEY_LAST_AUTH_USER_ID, sessionUserId).apply()
+            val sameUser = prefs.getString(KEY_LAST_AUTH_USER_ID, null) == sessionUserId
+            val email = sessionEmail ?: prefs.getString(KEY_LAST_AUTH_EMAIL, null).takeIf { sameUser }
+            if (!sameUser || prefs.getString(KEY_LAST_AUTH_EMAIL, null) != email) {
+                prefs.edit()
+                    .putString(KEY_LAST_AUTH_USER_ID, sessionUserId)
+                    .putString(KEY_LAST_AUTH_EMAIL, email)
+                    .apply()
             }
             return sessionUserId
         }
         return prefs.getString(KEY_LAST_AUTH_USER_ID, null) ?: guestId()
     }
 
+    /**
+     * The email of the remembered id. supabase-kt clears the session itself when its
+     * auto-refresh fails, so a session expiry often finds no email on the session (#33).
+     */
+    fun lastEmail(): String? = prefs.getString(KEY_LAST_AUTH_EMAIL, null)
+
     fun clear() {
-        prefs.edit().remove(KEY_LAST_AUTH_USER_ID).apply()
+        prefs.edit().remove(KEY_LAST_AUTH_USER_ID).remove(KEY_LAST_AUTH_EMAIL).apply()
     }
 
     private companion object {
         const val PREFS_NAME = "habit_tracker_auth"
         const val KEY_LAST_AUTH_USER_ID = "last_auth_user_id"
+        const val KEY_LAST_AUTH_EMAIL = "last_auth_email"
     }
 }

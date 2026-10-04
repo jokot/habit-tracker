@@ -3,6 +3,7 @@ package com.jktdeveloper.habitto.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jktdeveloper.habitto.AppContainer
+import com.jktdeveloper.habitto.HeldAccountSummary
 import com.habittracker.data.repository.SignUpResult
 import com.habittracker.data.repository.UserSession
 import com.habittracker.data.sync.SyncReason
@@ -28,6 +29,13 @@ data class AuthUiState(
     val isConfirmPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
+    val heldAccount: HeldAccountSummary? = null,
+)
+
+/** Shows the held account, and fills the email field with its email if the field is empty. */
+internal fun AuthUiState.withHeldAccount(held: HeldAccountSummary?): AuthUiState = copy(
+    heldAccount = held,
+    email = if (email.isEmpty() && held?.email != null) held.email else email,
 )
 
 class AuthViewModel(private val container: AppContainer) : ViewModel() {
@@ -37,6 +45,13 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _events = MutableSharedFlow<AuthEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<AuthEvent> = _events.asSharedFlow()
+
+    init {
+        // Count again on each open, so the number is correct after a process restart.
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.withHeldAccount(container.heldAccountSummary())
+        }
+    }
 
     fun onEmailChange(value: String) {
         _uiState.value = _uiState.value.copy(email = value, error = null)
