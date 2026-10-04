@@ -302,14 +302,24 @@ This is the flow from the Today screen. Sign-out from Settings shows no dialog. 
 flowchart TD
     ERR["Sync error:<br/>Session expired"] --> REFRESH{"Refresh the session token"}
     REFRESH -- "Success" --> AGAIN["Sync again: MANUAL"]
-    REFRESH -- "Failure" --> WIPE["Delete the local data of the user"]
-    WIPE --> SIGNOUT["Sign out"]
+    REFRESH -- "Failure" --> COUNT{"Unsynced changes<br/>of the user?"}
+    COUNT -- "0" --> WIPE["Delete the local data of the user"]
+    COUNT -- "1 or more, or the count fails" --> HOLD["Keep the rows.<br/>Hold the user id and the email."]
+    WIPE & HOLD --> SIGNOUT["Reset the watermarks, sign out"]
     SIGNOUT --> TOAST["Toast and notification:<br/>sign in again"]
 ```
 
+The refresh failed, so the app cannot push the unsynced changes. `HeldAccounts` keeps them on the phone for the next sign-in. The kept rows have the user id of the held account, so a guest sees none of them.
+
+The Auth screen shows a notice while the hold exists. The notice shows the count of unsynced changes and the email of the held account. The email comes from `LastAuthUserStore`, because supabase-kt can clear the session before the app reads it.
+
+The next sign-in resolves the hold before the guest migration:
+
+- **Same account:** the app keeps the rows. The first sync pushes them.
+- **Another account:** the app deletes the rows of the held account. If the delete fails, the hold stays, and the next sign-in tries again.
+
 ## 7. Known risks
 
-- **A session expiry can delete pending rows.** When the token refresh fails, the app deletes the local data with no push first. A row logged offline and never pushed is lost.
 - **A widget log does not start a sync.** `SyncReason.WIDGET_WRITE` exists, but no code uses it. The row waits until the app comes to the front, or until another trigger runs.
 - **The push uses the phone clock.** `synced_at` is the push time on the phone. A phone with a slow clock writes a time that is earlier than the real time. Another device with a watermark after that time never pulls the row.
 - **The push sends one request per row.** After a long time offline, a push of 200 logs needs 200 requests in series.

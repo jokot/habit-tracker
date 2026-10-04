@@ -73,9 +73,9 @@ Out of scope by decision: posted notification copy in the workers,
 Found on 2026-10-03 while tracing the sync flow for `docs/sync-flow.md`. Each bug has
 an issue, #33 to #37. Most severe first:
 
-1. **#33 A session expiry can delete unsynced rows.** When the token refresh fails,
-   `AppContainer.handleSessionExpired` calls `clearAuthenticatedUserData` with no push
-   first. A log made offline and never pushed is lost.
+1. **#33 A session expiry can delete unsynced rows.** Fixed on `fix/session-expiry-push`.
+   When the token refresh fails and unsynced changes exist, the app now keeps the rows.
+   The next sign-in with the same account pushes them. See `docs/sync-flow.md` §6.
 2. **#34 A widget log does not start a sync.** `SyncReason.WIDGET_WRITE` exists, but no
    code uses it. `LogHabitAction` and `LogWantAction` write only the local row. The row
    waits until the app comes to the front, or until another trigger runs.
