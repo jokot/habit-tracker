@@ -71,7 +71,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
 import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.readySections
 import kotlinx.coroutines.flow.Flow
@@ -86,7 +85,6 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -270,10 +268,14 @@ class AppContainer(context: Context) {
                 pullProgress.value.readySections(isAuthenticated()),
             )
 
-    // A channel keeps an event until the UI collects it. A session end at a cold start
-    // can come before AppNavigation collects.
-    private val _sessionExpiredEvents = Channel<SessionExpired>(Channel.CONFLATED)
-    val sessionExpiredEvents: Flow<SessionExpired> = _sessionExpiredEvents.receiveAsFlow()
+    // The session end stays pending until the UI consumes it. A session end at a cold
+    // start can come before AppNavigation collects, and the start screen must know of it.
+    private val _pendingSessionExpired = MutableStateFlow<SessionExpired?>(null)
+    val pendingSessionExpired: StateFlow<SessionExpired?> = _pendingSessionExpired.asStateFlow()
+
+    fun consumeSessionExpired() {
+        _pendingSessionExpired.value = null
+    }
 
     private val serverSessionEnd = ServerSessionEnd(lastAuthUserStore::rememberedUserId)
     private val sessionEndLock = Mutex()
@@ -456,6 +458,14 @@ class AppContainer(context: Context) {
         }
     }
 
+    /**
+     * At a cold start, the session guard and the start screen react to the same status.
+     * Call before the start screen is chosen, so that the guard finished its work.
+     */
+    suspend fun endSessionIfServerEnded() {
+        if (authRepository.hasNoSession() && serverSessionEnd.endedByServer()) endSession()
+    }
+
     private suspend fun handleSessionExpired() {
         if (!isAuthenticated()) return
         val refresh = authRepository.tryRefreshSession()
@@ -479,7 +489,7 @@ class AppContainer(context: Context) {
         forgetSyncedUser()
         runCatching { authRepository.signOut() }
         refreshAuthState()
-        _sessionExpiredEvents.trySend(SessionExpired(unsynced))
+        _pendingSessionExpired.value = SessionExpired(unsynced)
     }
 
     private fun startSyncNotifier() {

@@ -62,4 +62,6 @@ class FakeAuthRepository(
     }
 
     override val noSession: Flow<Unit> = emptyFlow()
+
+    override fun hasNoSession(): Boolean = false
 }

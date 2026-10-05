@@ -34,4 +34,7 @@ interface AuthRepository {
      * background, or when a refresh fails because the phone is offline.
      */
     val noSession: Flow<Unit>
+
+    /** True while the auth client has no session, with the same rules as [noSession]. */
+    fun hasNoSession(): Boolean
 }

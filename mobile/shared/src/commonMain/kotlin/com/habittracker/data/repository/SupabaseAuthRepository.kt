@@ -68,6 +68,8 @@ class SupabaseAuthRepository(
     override val noSession: Flow<Unit> =
         client.auth.sessionStatus.filter { it.meansNoSession() }.map { }
 
+    override fun hasNoSession(): Boolean = client.auth.sessionStatus.value.meansNoSession()
+
     override suspend fun awaitSessionRestored() {
         // Wait for the first non-Initializing session status — session is either
         // Authenticated (loaded from storage) or NotAuthenticated (no session).

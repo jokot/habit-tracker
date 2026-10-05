@@ -317,7 +317,9 @@ Two guards start this flow:
 
 `ServerSessionEnd` tells this end apart from a sign-out of the app. `Initializing` (the app stops) and `RefreshFailure` (the phone is offline) keep the session, so they do not start the flow. A guest has no remembered user, so the flow does not start for a guest.
 
-The event goes through a channel, so a cold-start event waits until the navigation collects it. If the guard runs in a background process, such as a widget update, and the process stops, the toast does not show. The app then opens as a guest. The Auth notice still shows any held changes.
+The event stays pending until the navigation consumes it. At a cold start, the guard and the start screen react to the same status. So the navigation runs the guard check before it selects the start screen. If an event is pending, a spinner covers the guest start screen until Auth shows. Thus the guest screen does not show before Auth.
+
+If the guard runs in a background process, such as a widget update, and the process stops, the toast does not show. The app then opens as a guest. The Auth notice still shows any held changes.
 
 The refresh failed, so the app cannot push the unsynced changes. `HeldAccounts` keeps them on the phone for the next sign-in. The kept rows have the user id of the held account, so a guest sees none of them.
 
