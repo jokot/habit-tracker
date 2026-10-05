@@ -64,7 +64,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -108,8 +107,6 @@ fun HomeScreen(
     onOpenExchangeRate: () -> Unit = {},
     onOpenWantDetail: (id: String, openTimer: Boolean) -> Unit = { _, _ -> },
     onOpenTimer: (String) -> Unit = {},
-    onHabitsClick: () -> Unit = {},
-    onWantsClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingMap by viewModel.pending.collectAsState()
@@ -302,7 +299,12 @@ fun HomeScreen(
                             top = Spacing.xxl,
                         ),
                     ) {
-                        SectionTitleRow(title = "Today's habits", onSeeAll = onHabitsClick)
+                        Text(
+                            text = "Today's habits",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                         if (TodaySection.HABITS !in ready) {
                             SectionSubtitleSkeleton(88.dp)
                         } else if (uiState.habitsWithProgress.isNotEmpty()) {
@@ -360,7 +362,12 @@ fun HomeScreen(
                                 top = Spacing.xxl,
                             ),
                         ) {
-                            SectionTitleRow(title = "Wants", onSeeAll = onWantsClick)
+                            Text(
+                                text = "Wants",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
                             SectionSubtitleSkeleton(176.dp)
                         }
                     }
@@ -382,7 +389,12 @@ fun HomeScreen(
                                 top = Spacing.xxl,
                             ),
                         ) {
-                            SectionTitleRow(title = "Wants", onSeeAll = onWantsClick)
+                            Text(
+                                text = "Wants",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
                             Spacer(Modifier.height(Spacing.xs))
                             Text(
                                 text = "Tap to spend points · ${uiState.pointBalance.balance} available",
@@ -965,35 +977,3 @@ private fun EmptyState(message: String) {
     }
 }
 
-/** A section title with a "See all" link to the list screen of the section. */
-@Composable
-private fun SectionTitleRow(title: String, onSeeAll: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .clickable(role = Role.Button, onClick = onSeeAll)
-                .padding(start = 8.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "See all",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-}
