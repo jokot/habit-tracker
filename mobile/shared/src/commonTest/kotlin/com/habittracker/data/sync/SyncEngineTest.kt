@@ -176,6 +176,19 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `a reset after a sign-out removes the error of the last user`() = runTest {
+        // Offline, the sync before a sign-out fails. Today for the guest must not show that error.
+        habitRepo.saveHabit(makeHabit("h1"))
+        supabase.shouldThrowOnNext = RuntimeException("boom")
+        engine.sync(SyncReason.MANUAL)
+        assertTrue(engine.syncState.value is SyncState.Error)
+
+        engine.reset()
+
+        assertEquals(SyncState.Idle, engine.syncState.value)
+    }
+
+    @Test
     fun `watermark advances to max server timestamp pulled`() = runTest {
         supabase.habits.add(makeHabit("h1", updatedAt = tPlus(10)))
         supabase.habits.add(makeHabit("h2", updatedAt = tPlus(20)))

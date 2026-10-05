@@ -407,6 +407,9 @@ class AppContainer(context: Context) {
     suspend fun clearAuthenticatedUserData(authUserId: String) {
         deleteUserRows(authUserId)
         forgetSyncedUser()
+        // Offline, the sync before a sign-out fails. Today for the guest must not show it.
+        // A session end does not come here: its "Session expired" error must reach the guards.
+        syncEngine.reset()
     }
 
     private fun deleteUserRows(userId: String) {

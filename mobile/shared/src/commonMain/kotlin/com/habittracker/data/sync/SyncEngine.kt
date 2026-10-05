@@ -90,6 +90,11 @@ class SyncEngine(
         }
     }
 
+    /** Forgets the result of the last sync. Call after a sign-out, so the next user does not see it. */
+    fun reset() {
+        _state.value = SyncState.Idle
+    }
+
     private fun categorize(e: Throwable): String {
         val name = e::class.simpleName.orEmpty()
         val msg = e.message.orEmpty()

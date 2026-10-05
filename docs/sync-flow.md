@@ -294,7 +294,7 @@ flowchart TD
 
 The sync before sign-out can fail, for example offline. The local data is deleted after it anyway.
 
-The Settings screen has the only **Sign out** button. The sync before sign-out stops after 5 s. After the sign-out, the app opens Today for the guest.
+The Settings screen has the only **Sign out** button. The sync before sign-out stops after 5 s. After the sign-out, the app opens Today for the guest. The sign-out sets the sync state to Idle, so Today for the guest does not show the error of a failed sync.
 
 supabase-kt sends a logout request before it deletes the session on the phone. Offline, that request fails, and supabase-kt keeps the session. So `SupabaseAuthRepository.signOut` then deletes the session on the phone itself. The session on the server stays until its refresh token expires.
 
