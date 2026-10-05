@@ -4,8 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
@@ -71,8 +73,12 @@ fun IdentityMorePill(extraCount: Int, onClick: () -> Unit) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Text(
-            text = "+$extraCount more",
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            text = if (extraCount > 0) "+$extraCount more" else "See all",
+            // The same height as IdentityChip (a 22 dp glyph and 4 dp padding), so a row stays level.
+            modifier = Modifier
+                .height(30.dp)
+                .wrapContentHeight(Alignment.CenterVertically)
+                .padding(horizontal = 10.dp),
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
