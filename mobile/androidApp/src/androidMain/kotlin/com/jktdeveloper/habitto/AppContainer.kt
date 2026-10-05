@@ -136,7 +136,7 @@ class AppContainer(context: Context) {
     private val syncIdentity = object : SyncIdentity {
         override fun currentUserId(): String = this@AppContainer.currentUserId()
         override fun isAuthenticated(): Boolean = this@AppContainer.isAuthenticated()
-        override fun hasLiveSession(): Boolean = authRepository.hasLiveSession()
+        override suspend fun awaitSessionReadiness() = authRepository.awaitSessionReadiness()
     }
 
     val syncEngine = SyncEngine(

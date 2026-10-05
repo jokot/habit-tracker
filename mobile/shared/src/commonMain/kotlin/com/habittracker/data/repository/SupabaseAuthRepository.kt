@@ -6,10 +6,13 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 
 class SupabaseAuthRepository(
     private val client: SupabaseClient,
@@ -50,7 +53,16 @@ class SupabaseAuthRepository(
     }
 
     override suspend fun signOut(): Result<Unit> = runCatching {
-        client.auth.signOut()
+        try {
+            client.auth.signOut()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // supabase-kt sends the logout request first, and it clears the session only after a
+            // reply. Offline, the request fails and the user stays signed in. So clear it here.
+            // The server session stays until its refresh token expires.
+            client.auth.clearSession()
+        }
     }
 
     override suspend fun tryRefreshSession(): Result<Unit> = runCatching {
@@ -68,6 +80,9 @@ class SupabaseAuthRepository(
     override fun hasLiveSession(): Boolean = client.auth.sessionStatus.value.isLive()
 
     override val sessionRecovered: Flow<Unit> = client.auth.sessionStatus.recoveries()
+
+    override suspend fun awaitSessionReadiness(): SessionReadiness =
+        client.auth.sessionStatus.awaitReadiness()
 
     override val noSession: Flow<Unit> =
         client.auth.sessionStatus.filter { it.meansNoSession() }.map { }
@@ -115,3 +130,18 @@ internal fun Flow<SessionStatus>.recoveries(): Flow<Unit> = flow {
         }
     }
 }
+
+/** supabase-kt sets Initializing while it loads or refreshes the session. */
+internal suspend fun Flow<SessionStatus>.awaitReadiness(): SessionReadiness {
+    val settled = withTimeoutOrNull(SESSION_LOAD_TIMEOUT_MS) {
+        first { it !is SessionStatus.Initializing }
+    }
+    return when {
+        settled == null -> SessionReadiness.UNAVAILABLE
+        settled.isLive() -> SessionReadiness.LIVE
+        settled is SessionStatus.RefreshFailure -> SessionReadiness.REFRESH_FAILED
+        else -> SessionReadiness.UNAVAILABLE
+    }
+}
+
+private const val SESSION_LOAD_TIMEOUT_MS = 10_000L

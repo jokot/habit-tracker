@@ -8,6 +8,7 @@ import com.habittracker.data.repository.FakeHabitRepository
 import com.habittracker.data.repository.FakeIdentityRepository
 import com.habittracker.data.repository.FakeWantActivityRepository
 import com.habittracker.data.repository.FakeWantLogRepository
+import com.habittracker.data.repository.SessionReadiness
 import com.habittracker.domain.model.Habit
 import com.habittracker.domain.model.HabitLog
 import kotlinx.coroutines.CompletableDeferred
@@ -131,14 +132,15 @@ class SyncEngineTest {
         assertEquals(0, result.pulled)
     }
 
+    private fun engineWith(readiness: SessionReadiness) = SyncEngine(
+        habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo, identityRepo,
+        supabase, watermarks, FakeAuthIdentity("user-1", authenticated = true, readiness = readiness),
+    )
+
     @Test
-    fun `a kept session without a token fails without touching network`() = runTest {
+    fun `a failed refresh fails without touching network`() = runTest {
         // An offline cold start keeps the session, but supabase-kt has no token to send.
-        val keptAuth = FakeAuthIdentity("user-1", authenticated = true, live = false)
-        val keptEngine = SyncEngine(
-            habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo, identityRepo,
-            supabase, watermarks, keptAuth,
-        )
+        val keptEngine = engineWith(SessionReadiness.REFRESH_FAILED)
         habitRepo.saveHabit(makeHabit("h1"))
         val result = keptEngine.sync(SyncReason.MANUAL)
         assertTrue(result.isFailure)
@@ -149,6 +151,19 @@ class SyncEngineTest {
         val state = keptEngine.syncState.value
         assertTrue(state is SyncState.Error)
         assertEquals("Server unreachable", state.message)
+    }
+
+    @Test
+    fun `a session that is not loaded fails without touching network or showing an error`() = runTest {
+        // In the background, supabase-kt does not load the session. Nobody sees the app.
+        val backgroundEngine = engineWith(SessionReadiness.UNAVAILABLE)
+        habitRepo.saveHabit(makeHabit("h1"))
+        val result = backgroundEngine.sync(SyncReason.POST_LOG)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() !is IllegalStateException, "the worker must retry")
+        assertTrue(supabase.habits.isEmpty())
+        assertTrue(supabase.fetches.isEmpty())
+        assertEquals(SyncState.Idle, backgroundEngine.syncState.value)
     }
 
     @Test
@@ -325,9 +340,9 @@ class InMemoryWatermarks : WatermarkReader {
 class FakeAuthIdentity(
     private val uid: String,
     private val authenticated: Boolean,
-    private val live: Boolean = authenticated,
+    private val readiness: SessionReadiness = SessionReadiness.LIVE,
 ) : SyncIdentity {
     override fun currentUserId(): String = uid
     override fun isAuthenticated(): Boolean = authenticated
-    override fun hasLiveSession(): Boolean = live
+    override suspend fun awaitSessionReadiness(): SessionReadiness = readiness
 }

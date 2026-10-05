@@ -61,6 +61,9 @@ class FakeAuthRepository(
 
     override val sessionRecovered: Flow<Unit> = emptyFlow()
 
+    override suspend fun awaitSessionReadiness(): SessionReadiness =
+        if (session != null) SessionReadiness.LIVE else SessionReadiness.UNAVAILABLE
+
     override suspend fun awaitSessionRestored() {
         // No storage; nothing to wait for.
     }

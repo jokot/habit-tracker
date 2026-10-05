@@ -35,6 +35,12 @@ interface AuthRepository {
     /** Emits when a refresh succeeds after an offline refresh failed. */
     val sessionRecovered: Flow<Unit>
 
+    /**
+     * Waits at most 10 s for the auth client to load the session, then tells if a request
+     * can use it. After a resume, supabase-kt refreshes an expired token before it is ready.
+     */
+    suspend fun awaitSessionReadiness(): SessionReadiness
+
     /** Suspends until the auth client has finished loading any persisted session from storage. */
     suspend fun awaitSessionRestored()
 
@@ -47,4 +53,16 @@ interface AuthRepository {
 
     /** True while the auth client has no session, with the same rules as [noSession]. */
     fun hasNoSession(): Boolean
+}
+
+/** What the session can give a request to the server. */
+enum class SessionReadiness {
+    /** A valid token. */
+    LIVE,
+
+    /** The session exists, but the auth client could not refresh the token. */
+    REFRESH_FAILED,
+
+    /** No session, or the auth client did not load it. The app is in the background then. */
+    UNAVAILABLE,
 }

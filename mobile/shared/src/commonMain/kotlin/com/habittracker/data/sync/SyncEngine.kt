@@ -1,5 +1,6 @@
 package com.habittracker.data.sync
 
+import com.habittracker.data.repository.SessionReadiness
 import com.habittracker.data.local.PullProgress
 import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.WatermarkReader
@@ -27,11 +28,11 @@ interface SyncIdentity {
     fun currentUserId(): String
     fun isAuthenticated(): Boolean
 
-    /** False while an offline refresh keeps the session without a token. */
-    fun hasLiveSession(): Boolean
+    /** Waits until the auth client has loaded the session, then tells if a request can use it. */
+    suspend fun awaitSessionReadiness(): SessionReadiness
 }
 
-/** The session exists, but the auth client could not refresh its token. */
+/** The session has no token that a request can use. */
 class NoLiveSessionException : Exception("The session has no valid token")
 
 class SyncEngine(
@@ -60,9 +61,14 @@ class SyncEngine(
         }
         // Without a token, a request goes out as anon. The server rejects it with
         // "Unauthorized", and the session guard then ends a session that is still valid.
-        if (!identity.hasLiveSession()) {
-            _state.value = SyncState.Error(message = "Server unreachable", since = clock.now())
-            return@withLock Result.failure(NoLiveSessionException())
+        when (identity.awaitSessionReadiness()) {
+            SessionReadiness.LIVE -> Unit
+            SessionReadiness.REFRESH_FAILED -> {
+                _state.value = SyncState.Error(message = "Server unreachable", since = clock.now())
+                return@withLock Result.failure(NoLiveSessionException())
+            }
+            // The app is in the background, so the state does not change. The job retries.
+            SessionReadiness.UNAVAILABLE -> return@withLock Result.failure(NoLiveSessionException())
         }
         val userId = identity.currentUserId()
         val start = clock.now()

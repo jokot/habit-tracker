@@ -294,7 +294,9 @@ flowchart TD
 
 The sync before sign-out can fail, for example offline. The local data is deleted after it anyway.
 
-This is the flow from the Today screen. Sign-out from Settings shows no dialog. It tries one sync for at most 5 s, then deletes the local data.
+The Settings screen has the only **Sign out** button. The sync before sign-out stops after 5 s. After the sign-out, the app opens Today for the guest.
+
+supabase-kt sends a logout request before it deletes the session on the phone. Offline, that request fails, and supabase-kt keeps the session. So `SupabaseAuthRepository.signOut` then deletes the session on the phone itself. The session on the server stays until its refresh token expires.
 
 ### Session expiry
 
@@ -323,7 +325,7 @@ An access token expires after 1 hour. If the phone cannot reach the server at a 
 
 `currentSessionOrNull()` is null during `RefreshFailure`. So the app does not use it to decide the sign-in state:
 
-| Status | Signed in (`isLoggedIn`) | Requests can run (`hasLiveSession`) |
+| Status | Signed in (`isLoggedIn`) | Requests can run (`awaitSessionReadiness`) |
 |---|---|---|
 | `Authenticated` | Yes | Yes |
 | `RefreshFailure` | Yes | No |
@@ -333,6 +335,8 @@ An access token expires after 1 hour. If the phone cannot reach the server at a 
 - Today shows the data of the user and no **Sign in** button.
 - `SyncEngine` sends no request without a token. A request without a token goes out as anon. The server rejects it with "Unauthorized", and the session guard would then end a valid session. Instead, the sync stops with "Server unreachable", and the job asks for a retry.
 - The guard for "Session expired" does nothing while no token exists. A manual refresh would fail at once and end the session.
+- When the app goes to the background, supabase-kt sets `Initializing`. At the next start, it refreshes an expired token, and the status stays `Initializing` during the request. So `SyncEngine` waits at most 10 s for a different status before it starts.
+- If the status stays `Initializing` for 10 s, the app is in the background. The sync then sends no request and keeps its state. The job asks for a retry.
 - When a refresh succeeds after `RefreshFailure`, `sessionRecovered` emits. The app reads the auth state again and starts a sync with `APP_FOREGROUND`. The user does not need to pull to refresh.
 - If the server rejects the refresh, supabase-kt sets `NotAuthenticated`. The "No session" guard then ends the session.
 
