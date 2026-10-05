@@ -136,6 +136,7 @@ class AppContainer(context: Context) {
     private val syncIdentity = object : SyncIdentity {
         override fun currentUserId(): String = this@AppContainer.currentUserId()
         override fun isAuthenticated(): Boolean = this@AppContainer.isAuthenticated()
+        override fun hasLiveSession(): Boolean = authRepository.hasLiveSession()
     }
 
     val syncEngine = SyncEngine(
@@ -456,6 +457,14 @@ class AppContainer(context: Context) {
                 if (serverSessionEnd.endedByServer()) endSession()
             }
         }
+        // An offline cold start keeps the session without a token, so no sync could run.
+        // When the network comes back and supabase-kt refreshes the token, sync at once.
+        applicationScope.launch {
+            authRepository.sessionRecovered.collect {
+                refreshAuthState()
+                runCatching { syncEngine.sync(SyncReason.APP_FOREGROUND) }
+            }
+        }
     }
 
     /**
@@ -468,6 +477,9 @@ class AppContainer(context: Context) {
 
     private suspend fun handleSessionExpired() {
         if (!isAuthenticated()) return
+        // Without a token, tryRefreshSession() fails at once and the session would end.
+        // supabase-kt retries the refresh itself, and sessionRecovered then syncs.
+        if (!authRepository.hasLiveSession()) return
         val refresh = authRepository.tryRefreshSession()
         if (refresh.isSuccess) {
             runCatching { syncEngine.sync(SyncReason.MANUAL) }

@@ -16,7 +16,8 @@ import android.content.Context
  *
  * If the server revokes the refresh token, supabase-kt reports NotAuthenticated and
  * AppContainer ends the session, which clears the remembered id (#33). RefreshFailure
- * (offline) keeps it, so the offline widget still shows the user's own data.
+ * (offline) keeps it, so the offline widget still shows the user's own data. The user also
+ * stays signed in: AuthRepository.isLoggedIn() reads the status, not the session.
  */
 class LastAuthUserStore(context: Context) {
     private val prefs =

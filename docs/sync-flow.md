@@ -248,7 +248,7 @@ stateDiagram-v2
 ```mermaid
 flowchart TD
     FAIL["Sync fails"] --> CAT{"Error category"}
-    CAT -- "No network,<br/>Network timeout,<br/>Sync rejected by server,<br/>Sync failed" --> CHIP["Sync chip shows the error<br/>with Retry"]
+    CAT -- "No network,<br/>Network timeout,<br/>Server unreachable,<br/>Sync rejected by server,<br/>Sync failed" --> CHIP["Sync chip shows the error<br/>with Retry"]
     CHIP --> COUNT["Failure counter + 1"]
     COUNT --> THREE{"3 failures in a row?"}
     THREE -- "Yes" --> NOTIF["Notification:<br/>Sync has been failing"]
@@ -316,6 +316,27 @@ Two guards start this flow:
 - **No session.** supabase-kt deletes the session when the server rejects the refresh. With no unsynced changes, no push fails. So the app also watches for `NotAuthenticated`. This guard also runs at a cold start, when supabase-kt finds no stored session. Without it, the app shows the data of the remembered user to a signed-out phone.
 
 `ServerSessionEnd` tells this end apart from a sign-out of the app. `Initializing` (the app stops) and `RefreshFailure` (the phone is offline) keep the session, so they do not start the flow. A guest has no remembered user, so the flow does not start for a guest.
+
+### Offline refresh
+
+An access token expires after 1 hour. If the phone cannot reach the server at a cold start, supabase-kt cannot refresh the token. It sets `RefreshFailure`, keeps the stored session, and tries again every 10 s.
+
+`currentSessionOrNull()` is null during `RefreshFailure`. So the app does not use it to decide the sign-in state:
+
+| Status | Signed in (`isLoggedIn`) | Requests can run (`hasLiveSession`) |
+|---|---|---|
+| `Authenticated` | Yes | Yes |
+| `RefreshFailure` | Yes | No |
+| `Initializing` | No | No |
+| `NotAuthenticated` | No | No |
+
+- Today shows the data of the user and no **Sign in** button.
+- `SyncEngine` sends no request without a token. A request without a token goes out as anon. The server rejects it with "Unauthorized", and the session guard would then end a valid session. Instead, the sync stops with "Server unreachable", and the job asks for a retry.
+- The guard for "Session expired" does nothing while no token exists. A manual refresh would fail at once and end the session.
+- When a refresh succeeds after `RefreshFailure`, `sessionRecovered` emits. The app reads the auth state again and starts a sync with `APP_FOREGROUND`. The user does not need to pull to refresh.
+- If the server rejects the refresh, supabase-kt sets `NotAuthenticated`. The "No session" guard then ends the session.
+
+### Session end at a cold start
 
 The event stays pending until the navigation consumes it. At a cold start, the guard and the start screen react to the same status. So the navigation runs the guard check before it selects the start screen. If an event is pending, a spinner covers the guest start screen until Auth shows. Thus the guest screen does not show before Auth.
 

@@ -26,7 +26,13 @@ import kotlinx.datetime.toLocalDateTime
 interface SyncIdentity {
     fun currentUserId(): String
     fun isAuthenticated(): Boolean
+
+    /** False while an offline refresh keeps the session without a token. */
+    fun hasLiveSession(): Boolean
 }
+
+/** The session exists, but the auth client could not refresh its token. */
+class NoLiveSessionException : Exception("The session has no valid token")
 
 class SyncEngine(
     private val habitRepo: HabitRepository,
@@ -51,6 +57,12 @@ class SyncEngine(
     suspend fun sync(reason: SyncReason): Result<SyncOutcome> = mutex.withLock {
         if (!identity.isAuthenticated()) {
             return@withLock Result.success(SyncOutcome(0, 0))
+        }
+        // Without a token, a request goes out as anon. The server rejects it with
+        // "Unauthorized", and the session guard then ends a session that is still valid.
+        if (!identity.hasLiveSession()) {
+            _state.value = SyncState.Error(message = "Server unreachable", since = clock.now())
+            return@withLock Result.failure(NoLiveSessionException())
         }
         val userId = identity.currentUserId()
         val start = clock.now()

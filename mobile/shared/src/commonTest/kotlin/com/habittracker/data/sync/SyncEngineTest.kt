@@ -25,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SyncEngineTest {
@@ -128,6 +129,26 @@ class SyncEngineTest {
         val result = offlineEngine.sync(SyncReason.MANUAL).getOrThrow()
         assertEquals(0, result.pushed)
         assertEquals(0, result.pulled)
+    }
+
+    @Test
+    fun `a kept session without a token fails without touching network`() = runTest {
+        // An offline cold start keeps the session, but supabase-kt has no token to send.
+        val keptAuth = FakeAuthIdentity("user-1", authenticated = true, live = false)
+        val keptEngine = SyncEngine(
+            habitRepo, habitLogRepo, wantActivityRepo, wantLogRepo, identityRepo,
+            supabase, watermarks, keptAuth,
+        )
+        habitRepo.saveHabit(makeHabit("h1"))
+        val result = keptEngine.sync(SyncReason.MANUAL)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() !is IllegalStateException, "the worker must retry")
+        assertTrue(supabase.habits.isEmpty())
+        assertTrue(supabase.fetches.isEmpty())
+        assertNull(habitRepo.habits.first().syncedAt)
+        val state = keptEngine.syncState.value
+        assertTrue(state is SyncState.Error)
+        assertEquals("Server unreachable", state.message)
     }
 
     @Test
@@ -304,7 +325,9 @@ class InMemoryWatermarks : WatermarkReader {
 class FakeAuthIdentity(
     private val uid: String,
     private val authenticated: Boolean,
+    private val live: Boolean = authenticated,
 ) : SyncIdentity {
     override fun currentUserId(): String = uid
     override fun isAuthenticated(): Boolean = authenticated
+    override fun hasLiveSession(): Boolean = live
 }

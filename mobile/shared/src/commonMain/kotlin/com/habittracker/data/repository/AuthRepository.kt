@@ -23,7 +23,17 @@ interface AuthRepository {
 
     fun currentUserId(): String?
     fun currentEmail(): String?
+    /** True while a session exists. An offline refresh keeps the session. */
     fun isLoggedIn(): Boolean
+
+    /**
+     * True when the session has a token that a request can send. False after an offline
+     * refresh failed, although [isLoggedIn] is still true.
+     */
+    fun hasLiveSession(): Boolean
+
+    /** Emits when a refresh succeeds after an offline refresh failed. */
+    val sessionRecovered: Flow<Unit>
 
     /** Suspends until the auth client has finished loading any persisted session from storage. */
     suspend fun awaitSessionRestored()
