@@ -136,7 +136,8 @@ class AppContainer(context: Context) {
     private val syncIdentity = object : SyncIdentity {
         override fun currentUserId(): String = this@AppContainer.currentUserId()
         override fun isAuthenticated(): Boolean = this@AppContainer.isAuthenticated()
-        override suspend fun awaitSessionReadiness() = authRepository.awaitSessionReadiness()
+        override suspend fun awaitSessionReadiness(waitForRefresh: Boolean) =
+            authRepository.awaitSessionReadiness(waitForRefresh)
     }
 
     val syncEngine = SyncEngine(
@@ -298,7 +299,10 @@ class AppContainer(context: Context) {
         userId = lastAuthUserStore.resolve(authRepository.currentUserId(), authRepository.currentEmail()) {
             userIdentityProvider.localUserId()
         },
-        isAuthenticated = userIdentityProvider.isAuthenticated(),
+        isAuthenticated = lastAuthUserStore.isSignedIn(
+            sessionLoggedIn = userIdentityProvider.isAuthenticated(),
+            sessionEnded = authRepository.hasNoSession(),
+        ),
     )
 
     suspend fun seedLocalDataIfEmpty() {

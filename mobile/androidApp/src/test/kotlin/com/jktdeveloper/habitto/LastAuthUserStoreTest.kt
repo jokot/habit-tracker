@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -74,5 +76,25 @@ class LastAuthUserStoreTest {
     fun `rememberedUserId is null for a guest`() {
         store.resolve(null) { "guest" }
         assertNull(store.rememberedUserId())
+    }
+
+    @Test
+    fun `a remembered user is signed in while the session loads`() {
+        store.resolve("auth-1") { "guest" }
+        // A cold process: a widget tap or a sync job starts before supabase-kt loads the session.
+        assertTrue(store.isSignedIn(sessionLoggedIn = false, sessionEnded = false))
+    }
+
+    @Test
+    fun `an ended session or a guest is not signed in`() {
+        store.resolve("auth-1") { "guest" }
+        assertFalse(store.isSignedIn(sessionLoggedIn = false, sessionEnded = true))
+        store.clear()
+        assertFalse(store.isSignedIn(sessionLoggedIn = false, sessionEnded = false))
+    }
+
+    @Test
+    fun `a loaded session is signed in`() {
+        assertTrue(store.isSignedIn(sessionLoggedIn = true, sessionEnded = false))
     }
 }

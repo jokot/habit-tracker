@@ -81,8 +81,11 @@ class SupabaseAuthRepository(
 
     override val sessionRecovered: Flow<Unit> = client.auth.sessionStatus.recoveries()
 
-    override suspend fun awaitSessionReadiness(): SessionReadiness =
-        client.auth.sessionStatus.awaitReadiness()
+    override suspend fun awaitSessionReadiness(waitForRefresh: Boolean): SessionReadiness =
+        client.auth.sessionStatus.awaitReadiness(
+            loadSession = { client.auth.loadFromStorage() },
+            waitForRefresh = waitForRefresh,
+        )
 
     override val noSession: Flow<Unit> =
         client.auth.sessionStatus.filter { it.meansNoSession() }.map { }
@@ -131,10 +134,27 @@ internal fun Flow<SessionStatus>.recoveries(): Flow<Unit> = flow {
     }
 }
 
-/** supabase-kt sets Initializing while it loads or refreshes the session. */
-internal suspend fun Flow<SessionStatus>.awaitReadiness(): SessionReadiness {
-    val settled = withTimeoutOrNull(SESSION_LOAD_TIMEOUT_MS) {
-        first { it !is SessionStatus.Initializing }
+/**
+ * supabase-kt sets Initializing while it loads or refreshes the session. It also sets it when
+ * the app goes to the background, and it loads the session again only when the app comes back.
+ * So a status that stays Initializing for 10 s means a background process: [loadSession] then
+ * loads the session from storage. A cold start or a resume settles before that, so supabase-kt
+ * never loads the session twice.
+ */
+internal suspend fun Flow<SessionStatus>.awaitReadiness(
+    loadSession: suspend () -> Unit,
+    waitForRefresh: Boolean = false,
+): SessionReadiness {
+    val first = settled() ?: run {
+        loadSession()
+        settled()
+    }
+    // supabase-kt retries a failed refresh every 10 s, and each failure is a new status. A job
+    // that WorkManager starts on reconnect runs before that retry, so it waits for the result.
+    val settled = if (first is SessionStatus.RefreshFailure && waitForRefresh) {
+        withTimeoutOrNull(REFRESH_RETRY_WAIT_MS) { first { it != first } } ?: first
+    } else {
+        first
     }
     return when {
         settled == null -> SessionReadiness.UNAVAILABLE
@@ -144,4 +164,10 @@ internal suspend fun Flow<SessionStatus>.awaitReadiness(): SessionReadiness {
     }
 }
 
+private suspend fun Flow<SessionStatus>.settled(): SessionStatus? =
+    withTimeoutOrNull(SESSION_LOAD_TIMEOUT_MS) { first { it !is SessionStatus.Initializing } }
+
 private const val SESSION_LOAD_TIMEOUT_MS = 10_000L
+
+/** One supabase-kt retry delay (10 s), plus time for the refresh request. */
+private const val REFRESH_RETRY_WAIT_MS = 15_000L
