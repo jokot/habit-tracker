@@ -7,6 +7,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -245,25 +247,27 @@ private fun AddIdentityCtaCard(onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StatsRow(streak: Int, habitCount: Int, daysActive: Int) {
     val divider = MaterialTheme.colorScheme.outlineVariant
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    // The stats wrap to a second line when the card is too narrow, as in the design.
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Icon(Icons.Filled.LocalFireDepartment, contentDescription = null, tint = FlameOrange, modifier = Modifier.size(14.dp))
             Text(streak.toString(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text("day streak", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Box(modifier = Modifier.width(1.dp).height(12.dp).background(divider))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(modifier = Modifier.align(Alignment.CenterVertically).width(1.dp).height(12.dp).background(divider))
+        Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(habitCount.toString(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text(if (habitCount == 1) "habit" else "habits", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Box(modifier = Modifier.width(1.dp).height(12.dp).background(divider))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(modifier = Modifier.align(Alignment.CenterVertically).width(1.dp).height(12.dp).background(divider))
+        Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(daysActive.toString(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text("days as", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

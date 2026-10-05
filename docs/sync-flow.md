@@ -248,7 +248,7 @@ stateDiagram-v2
 ```mermaid
 flowchart TD
     FAIL["Sync fails"] --> CAT{"Error category"}
-    CAT -- "No network,<br/>Network timeout,<br/>Sync rejected by server,<br/>Sync failed" --> CHIP["Sync chip shows the error<br/>with Retry"]
+    CAT -- "No network,<br/>Network timeout,<br/>Server unreachable,<br/>Sync rejected by server,<br/>Sync failed" --> CHIP["Sync chip shows the error<br/>with Retry"]
     CHIP --> COUNT["Failure counter + 1"]
     COUNT --> THREE{"3 failures in a row?"}
     THREE -- "Yes" --> NOTIF["Notification:<br/>Sync has been failing"]
@@ -294,7 +294,9 @@ flowchart TD
 
 The sync before sign-out can fail, for example offline. The local data is deleted after it anyway.
 
-This is the flow from the Today screen. Sign-out from Settings shows no dialog. It tries one sync for at most 5 s, then deletes the local data.
+The Settings screen has the only **Sign out** button. The sync before sign-out stops after 5 s. After the sign-out, the app opens Today for the guest. The sign-out sets the sync state to Idle, so Today for the guest does not show the error of a failed sync.
+
+supabase-kt sends a logout request before it deletes the session on the phone. Offline, that request fails, and supabase-kt keeps the session. So `SupabaseAuthRepository.signOut` then deletes the session on the phone itself. The session on the server stays until its refresh token expires.
 
 ### Session expiry
 
@@ -302,14 +304,59 @@ This is the flow from the Today screen. Sign-out from Settings shows no dialog. 
 flowchart TD
     ERR["Sync error:<br/>Session expired"] --> REFRESH{"Refresh the session token"}
     REFRESH -- "Success" --> AGAIN["Sync again: MANUAL"]
-    REFRESH -- "Failure" --> WIPE["Delete the local data of the user"]
-    WIPE --> SIGNOUT["Sign out"]
-    SIGNOUT --> TOAST["Toast and notification:<br/>sign in again"]
+    REFRESH -- "Failure" --> COUNT{"Unsynced changes<br/>of the user?"}
+    NOSESSION["supabase-kt: NotAuthenticated,<br/>a user is remembered,<br/>no sign-out of the app runs"] --> COUNT
+    COUNT -- "0" --> WIPE["Delete the local data of the user"]
+    COUNT -- "1 or more, or the count fails" --> HOLD["Keep the rows.<br/>Hold the user id and the email."]
+    WIPE & HOLD --> SIGNOUT["Reset the watermarks, sign out"]
+    SIGNOUT --> TOAST["Toast: sign in again.<br/>Auth opens."]
 ```
+
+Two guards start this flow:
+
+- **A failed push.** The sync stops with "Session expired". The app tries one refresh. This guard also shows a notification.
+- **No session.** supabase-kt deletes the session when the server rejects the refresh. With no unsynced changes, no push fails. So the app also watches for `NotAuthenticated`. This guard also runs at a cold start, when supabase-kt finds no stored session. Without it, the app shows the data of the remembered user to a signed-out phone.
+
+`ServerSessionEnd` tells this end apart from a sign-out of the app. `Initializing` (the app stops) and `RefreshFailure` (the phone is offline) keep the session, so they do not start the flow. A guest has no remembered user, so the flow does not start for a guest.
+
+### Offline refresh
+
+An access token expires after 1 hour. If the phone cannot reach the server at a cold start, supabase-kt cannot refresh the token. It sets `RefreshFailure`, keeps the stored session, and tries again every 10 s.
+
+`currentSessionOrNull()` is null during `RefreshFailure`. So the app does not use it to decide the sign-in state:
+
+| Status | Signed in (`isLoggedIn`) | Requests can run (`awaitSessionReadiness`) |
+|---|---|---|
+| `Authenticated` | Yes | Yes |
+| `RefreshFailure` | Yes | No |
+| `Initializing` | No | No |
+| `NotAuthenticated` | No | No |
+
+- Today shows the data of the user and no **Sign in** button.
+- `SyncEngine` sends no request without a token. A request without a token goes out as anon. The server rejects it with "Unauthorized", and the session guard would then end a valid session. Instead, the sync stops with "Server unreachable", and the job asks for a retry.
+- The guard for "Session expired" does nothing while no token exists. A manual refresh would fail at once and end the session.
+- When the app goes to the background, supabase-kt sets `Initializing`. At the next start, it refreshes an expired token, and the status stays `Initializing` during the request. So `SyncEngine` waits at most 10 s for a different status before it starts.
+- If the status stays `Initializing` for 10 s, the app is in the background. The sync then sends no request and keeps its state. The job asks for a retry.
+- When a refresh succeeds after `RefreshFailure`, `sessionRecovered` emits. The app reads the auth state again and starts a sync with `APP_FOREGROUND`. The user does not need to pull to refresh.
+- If the server rejects the refresh, supabase-kt sets `NotAuthenticated`. The "No session" guard then ends the session.
+
+### Session end at a cold start
+
+The event stays pending until the navigation consumes it. At a cold start, the guard and the start screen react to the same status. So the navigation runs the guard check before it selects the start screen. If an event is pending, a spinner covers the guest start screen until Auth shows. Thus the guest screen does not show before Auth.
+
+If the guard runs in a background process, such as a widget update, and the process stops, the toast does not show. The app then opens as a guest. The Auth notice still shows any held changes.
+
+The refresh failed, so the app cannot push the unsynced changes. `HeldAccounts` keeps them on the phone for the next sign-in. The kept rows have the user id of the held account, so a guest sees none of them.
+
+The Auth screen shows a notice while the hold exists. The notice shows the count of unsynced changes and the email of the held account. The email comes from `LastAuthUserStore`, because supabase-kt can clear the session before the app reads it.
+
+The next sign-in resolves the hold before the guest migration:
+
+- **Same account:** the app keeps the rows. The first sync pushes them.
+- **Another account:** the app deletes the rows of the held account. If the delete fails, the hold stays, and the next sign-in tries again.
 
 ## 7. Known risks
 
-- **A session expiry can delete pending rows.** When the token refresh fails, the app deletes the local data with no push first. A row logged offline and never pushed is lost.
 - **A widget log does not start a sync.** `SyncReason.WIDGET_WRITE` exists, but no code uses it. The row waits until the app comes to the front, or until another trigger runs.
 - **The push uses the phone clock.** `synced_at` is the push time on the phone. A phone with a slow clock writes a time that is earlier than the real time. Another device with a watermark after that time never pulls the row.
 - **The push sends one request per row.** After a long time offline, a push of 200 logs needs 200 requests in series.

@@ -14,10 +14,10 @@ import android.content.Context
  * onto the auth id — which is the empty widget. The last id we actually saw is the right
  * answer until a sign-out says otherwise.
  *
- * Known limit: if the refresh token is revoked server-side, the remembered id goes stale
- * until sync surfaces "Session expired" and clearAuthenticatedUserData wipes it. Showing
- * the user their own data in the meantime beats silently swapping them to a guest with
- * nothing in it.
+ * If the server revokes the refresh token, supabase-kt reports NotAuthenticated and
+ * AppContainer ends the session, which clears the remembered id (#33). RefreshFailure
+ * (offline) keeps it, so the offline widget still shows the user's own data. The user also
+ * stays signed in: AuthRepository.isLoggedIn() reads the status, not the session.
  */
 class LastAuthUserStore(context: Context) {
     private val prefs =
@@ -27,24 +27,40 @@ class LastAuthUserStore(context: Context) {
      * [sessionUserId] is the live session's id, or null when no session is visible — which
      * means either "not loaded yet" or "guest", and nothing here can tell those apart, so
      * a remembered id wins. [guestId] is a lambda because it mints a UUID on first call: it
-     * must not run for someone who has ever signed in.
+     * must not run for someone who has ever signed in. [sessionEmail] is the live session's
+     * email, kept with the id for [lastEmail].
      */
-    fun resolve(sessionUserId: String?, guestId: () -> String): String {
+    fun resolve(sessionUserId: String?, sessionEmail: String? = null, guestId: () -> String): String {
         if (sessionUserId != null) {
-            if (prefs.getString(KEY_LAST_AUTH_USER_ID, null) != sessionUserId) {
-                prefs.edit().putString(KEY_LAST_AUTH_USER_ID, sessionUserId).apply()
+            val sameUser = prefs.getString(KEY_LAST_AUTH_USER_ID, null) == sessionUserId
+            val email = sessionEmail ?: prefs.getString(KEY_LAST_AUTH_EMAIL, null).takeIf { sameUser }
+            if (!sameUser || prefs.getString(KEY_LAST_AUTH_EMAIL, null) != email) {
+                prefs.edit()
+                    .putString(KEY_LAST_AUTH_USER_ID, sessionUserId)
+                    .putString(KEY_LAST_AUTH_EMAIL, email)
+                    .apply()
             }
             return sessionUserId
         }
         return prefs.getString(KEY_LAST_AUTH_USER_ID, null) ?: guestId()
     }
 
+    /**
+     * The email of the remembered id. supabase-kt clears the session itself when its
+     * auto-refresh fails, so a session expiry often finds no email on the session (#33).
+     */
+    fun lastEmail(): String? = prefs.getString(KEY_LAST_AUTH_EMAIL, null)
+
+    /** The id of the last authenticated user, or null after a sign-out or for a guest. */
+    fun rememberedUserId(): String? = prefs.getString(KEY_LAST_AUTH_USER_ID, null)
+
     fun clear() {
-        prefs.edit().remove(KEY_LAST_AUTH_USER_ID).apply()
+        prefs.edit().remove(KEY_LAST_AUTH_USER_ID).remove(KEY_LAST_AUTH_EMAIL).apply()
     }
 
     private companion object {
         const val PREFS_NAME = "habit_tracker_auth"
         const val KEY_LAST_AUTH_USER_ID = "last_auth_user_id"
+        const val KEY_LAST_AUTH_EMAIL = "last_auth_email"
     }
 }

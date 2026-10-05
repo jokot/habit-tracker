@@ -1,5 +1,6 @@
 package com.habittracker.data.sync
 
+import com.habittracker.data.repository.SessionReadiness
 import com.habittracker.data.local.PullProgress
 import com.habittracker.data.local.SyncTable
 import com.habittracker.data.local.WatermarkReader
@@ -26,7 +27,13 @@ import kotlinx.datetime.toLocalDateTime
 interface SyncIdentity {
     fun currentUserId(): String
     fun isAuthenticated(): Boolean
+
+    /** Waits until the auth client has loaded the session, then tells if a request can use it. */
+    suspend fun awaitSessionReadiness(): SessionReadiness
 }
+
+/** The session has no token that a request can use. */
+class NoLiveSessionException : Exception("The session has no valid token")
 
 class SyncEngine(
     private val habitRepo: HabitRepository,
@@ -52,6 +59,17 @@ class SyncEngine(
         if (!identity.isAuthenticated()) {
             return@withLock Result.success(SyncOutcome(0, 0))
         }
+        // Without a token, a request goes out as anon. The server rejects it with
+        // "Unauthorized", and the session guard then ends a session that is still valid.
+        when (identity.awaitSessionReadiness()) {
+            SessionReadiness.LIVE -> Unit
+            SessionReadiness.REFRESH_FAILED -> {
+                _state.value = SyncState.Error(message = "Server unreachable", since = clock.now())
+                return@withLock Result.failure(NoLiveSessionException())
+            }
+            // The app is in the background, so the state does not change. The job retries.
+            SessionReadiness.UNAVAILABLE -> return@withLock Result.failure(NoLiveSessionException())
+        }
         val userId = identity.currentUserId()
         val start = clock.now()
         _state.value = SyncState.Running(start, reason)
@@ -70,6 +88,11 @@ class SyncEngine(
                 since = clock.now(),
             )
         }
+    }
+
+    /** Forgets the result of the last sync. Call after a sign-out, so the next user does not see it. */
+    fun reset() {
+        _state.value = SyncState.Idle
     }
 
     private fun categorize(e: Throwable): String {

@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,5 +37,42 @@ class LastAuthUserStoreTest {
         store.resolve("auth-1") { "guest" }
         store.clear()
         assertEquals("guest", store.resolve(null) { "guest" })
+    }
+
+    @Test
+    fun `keeps the email of the last session after the session is gone`() {
+        store.resolve("auth-1", "a@b.com") { "guest" }
+        // supabase-kt cleared the session after a failed refresh (#33).
+        store.resolve(null, null) { "guest" }
+        assertEquals("a@b.com", store.lastEmail())
+    }
+
+    @Test
+    fun `a session of another user does not keep the old email`() {
+        store.resolve("auth-1", "a@b.com") { "guest" }
+        store.resolve("auth-2", null) { "guest" }
+        assertNull(store.lastEmail())
+    }
+
+    @Test
+    fun `sign-out clears the email`() {
+        store.resolve("auth-1", "a@b.com") { "guest" }
+        store.clear()
+        assertNull(store.lastEmail())
+    }
+
+    @Test
+    fun `rememberedUserId is the last authenticated id until a clear`() {
+        assertNull(store.rememberedUserId())
+        store.resolve("auth-1") { "guest" }
+        assertEquals("auth-1", store.rememberedUserId())
+        store.clear()
+        assertNull(store.rememberedUserId())
+    }
+
+    @Test
+    fun `rememberedUserId is null for a guest`() {
+        store.resolve(null) { "guest" }
+        assertNull(store.rememberedUserId())
     }
 }

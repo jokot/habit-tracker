@@ -1,5 +1,7 @@
 package com.habittracker.data.repository
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -55,7 +57,18 @@ class FakeAuthRepository(
 
     override fun isLoggedIn(): Boolean = session != null
 
+    override fun hasLiveSession(): Boolean = session != null
+
+    override val sessionRecovered: Flow<Unit> = emptyFlow()
+
+    override suspend fun awaitSessionReadiness(): SessionReadiness =
+        if (session != null) SessionReadiness.LIVE else SessionReadiness.UNAVAILABLE
+
     override suspend fun awaitSessionRestored() {
         // No storage; nothing to wait for.
     }
+
+    override val noSession: Flow<Unit> = emptyFlow()
+
+    override fun hasNoSession(): Boolean = false
 }

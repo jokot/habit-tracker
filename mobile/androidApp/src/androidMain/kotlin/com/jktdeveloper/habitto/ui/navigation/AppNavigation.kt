@@ -4,10 +4,12 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -21,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.core.util.Consumer
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import com.jktdeveloper.habitto.AppContainer
 import com.jktdeveloper.habitto.ui.auth.AuthScreen
 import com.jktdeveloper.habitto.ui.auth.AuthViewModel
+import com.jktdeveloper.habitto.ui.auth.sessionExpiredToast
 import com.jktdeveloper.habitto.ui.home.HomeScreen
 import com.jktdeveloper.habitto.ui.home.HomeViewModel
 import com.jktdeveloper.habitto.ui.habit.HabitDetailScreen
@@ -42,6 +46,7 @@ import com.jktdeveloper.habitto.ui.onboarding.OnboardingViewModel
 import com.jktdeveloper.habitto.devtools.devToolsRoute
 import com.habittracker.data.local.SyncTable
 import com.habittracker.data.sync.SyncReason
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -99,6 +104,9 @@ sealed class Screen(val route: String) {
 fun AppNavigation(container: AppContainer) {
     val navController = rememberNavController()
     var startDestination by remember { mutableStateOf<String?>(null) }
+    // True from a session end at a cold start until Auth shows. The guest start screen
+    // stays hidden below a spinner, so it does not show before Auth.
+    var coverUntilAuth by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         // Wait for supabase-kt to finish loading any persisted session from storage
@@ -108,6 +116,8 @@ fun AppNavigation(container: AppContainer) {
         withTimeoutOrNull(3_000L) {
             container.authRepository.awaitSessionRestored()
         }
+        container.endSessionIfServerEnded()
+        coverUntilAuth = container.pendingSessionExpired.value != null
         container.refreshAuthState()
 
         container.seedLocalDataIfEmpty()
@@ -135,21 +145,40 @@ fun AppNavigation(container: AppContainer) {
     }
 
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        container.sessionExpiredEvents.collect {
-            Toast.makeText(context, "Session expired — sign in again", Toast.LENGTH_LONG).show()
-            navController.navigate(Screen.Auth.route) {
-                popUpTo(navController.graph.id) { inclusive = true }
-            }
-        }
-    }
-
     val start = startDestination
     if (start == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
+    }
+
+    LaunchedEffect(Unit) {
+        // A session end at a cold start can come before the NavHost sets its graph.
+        // The first back stack entry shows that the graph exists.
+        navController.currentBackStackEntryFlow.first()
+        container.pendingSessionExpired.filterNotNull().collect { event ->
+            container.consumeSessionExpired()
+            Toast.makeText(context, sessionExpiredToast(event.unsyncedCount), Toast.LENGTH_LONG).show()
+            // Auth gets a guest screen below it, so that back leaves Auth and does not close the app.
+            val guestRoute = if (container.isOnboardedUseCase.execute(container.currentUserId())) {
+                Screen.Home.route
+            } else {
+                Screen.Onboarding.route
+            }
+            navController.navigate(guestRoute) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+            navController.navigate(Screen.Auth.route)
+            if (coverUntilAuth) {
+                // Auth fades in over the guest screen. Auth is resumed when the fade ends.
+                withTimeoutOrNull(2_000L) {
+                    navController.currentBackStackEntry?.lifecycle?.currentStateFlow
+                        ?.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+                }
+                coverUntilAuth = false
+            }
+        }
     }
 
     // MainActivity is singleTop, so a deep link fired while the app is already running never
@@ -171,7 +200,7 @@ fun AppNavigation(container: AppContainer) {
 
     Scaffold(
         bottomBar = {
-            if (showBottomNav) BottomNav(currentRoute = currentRoute, navController = navController)
+            if (showBottomNav && !coverUntilAuth) BottomNav(currentRoute = currentRoute, navController = navController)
         },
     ) { padding ->
         NavHost(
@@ -529,6 +558,16 @@ fun AppNavigation(container: AppContainer) {
                         navController.popBackStack(Screen.HabitDetail.route, inclusive = true)
                     },
                 )
+            }
+        }
+        if (coverUntilAuth) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
             }
         }
     }

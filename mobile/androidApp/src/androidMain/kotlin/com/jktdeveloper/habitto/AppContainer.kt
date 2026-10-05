@@ -73,12 +73,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.readySections
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -89,6 +87,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Observable snapshot of who the app is currently acting as. */
 data class AuthState(val userId: String, val isAuthenticated: Boolean)
@@ -113,6 +113,11 @@ class AppContainer(context: Context) {
     val habitLogRepository = LocalHabitLogRepository(db)
     val wantActivityRepository = LocalWantActivityRepository(db)
     val wantLogRepository = LocalWantLogRepository(db)
+    private val heldAccounts = HeldAccounts(
+        store = HeldAccountStore(context),
+        countUnsynced = { userId -> countUnsyncedChanges(userId) },
+        deleteUserRows = { userId -> deleteUserRows(userId) },
+    )
     val wantTimerRepository: WantTimerRepository = LocalWantTimerRepository(db)
     val perIdentityReminderScheduler = PerIdentityReminderScheduler(appContext)
     val syncFailureCounter = SyncFailureCounter(appContext)
@@ -131,6 +136,7 @@ class AppContainer(context: Context) {
     private val syncIdentity = object : SyncIdentity {
         override fun currentUserId(): String = this@AppContainer.currentUserId()
         override fun isAuthenticated(): Boolean = this@AppContainer.isAuthenticated()
+        override suspend fun awaitSessionReadiness() = authRepository.awaitSessionReadiness()
     }
 
     val syncEngine = SyncEngine(
@@ -263,8 +269,17 @@ class AppContainer(context: Context) {
                 pullProgress.value.readySections(isAuthenticated()),
             )
 
-    private val _sessionExpiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val sessionExpiredEvents: SharedFlow<Unit> = _sessionExpiredEvents.asSharedFlow()
+    // The session end stays pending until the UI consumes it. A session end at a cold
+    // start can come before AppNavigation collects, and the start screen must know of it.
+    private val _pendingSessionExpired = MutableStateFlow<SessionExpired?>(null)
+    val pendingSessionExpired: StateFlow<SessionExpired?> = _pendingSessionExpired.asStateFlow()
+
+    fun consumeSessionExpired() {
+        _pendingSessionExpired.value = null
+    }
+
+    private val serverSessionEnd = ServerSessionEnd(lastAuthUserStore::rememberedUserId)
+    private val sessionEndLock = Mutex()
 
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
@@ -280,7 +295,7 @@ class AppContainer(context: Context) {
         // authenticated id in between: in a cold process — a widget update, a reminder
         // worker — supabase-kt hasn't restored the session yet, and dropping straight to
         // the guest id queries rows that sign-in migrated away. See LastAuthUserStore.
-        userId = lastAuthUserStore.resolve(authRepository.currentUserId()) {
+        userId = lastAuthUserStore.resolve(authRepository.currentUserId(), authRepository.currentEmail()) {
             userIdentityProvider.localUserId()
         },
         isAuthenticated = userIdentityProvider.isAuthenticated(),
@@ -333,9 +348,14 @@ class AppContainer(context: Context) {
      *   rows would be pushed under the existing user's id, producing duplicates.
      */
     suspend fun migrateLocalToAuthenticated(authUserId: String) {
+        // Before the guest migration and the first sync: rows of another held account
+        // must go before this account pulls. See HeldAccounts.
+        // Kept rows make this an existing user, even when the server has no habits yet.
+        // Moving guest rows onto them could clash on the LocalUserIdentity key.
+        val keptHeldRows = heldAccounts.onSignedIn(authUserId)
         val localId = userIdentityProvider.localUserId()
         if (localId == authUserId) return
-        val serverHasData = runCatching {
+        val serverHasData = keptHeldRows || runCatching {
             supabaseSyncClient.fetchHabitsSince(authUserId, 0L).isNotEmpty()
         }.getOrDefault(false)
         if (serverHasData) {
@@ -375,30 +395,55 @@ class AppContainer(context: Context) {
             kotlinx.coroutines.withTimeoutOrNull(5_000) {
                 syncEngine.sync(SyncReason.MANUAL)
             }
-            authRepository.signOut()
-            clearAuthenticatedUserData(userId)
+            // The user is still remembered after signOut() returns, so mark this sign-out as ours.
+            serverSessionEnd.ownSignOut {
+                authRepository.signOut()
+                clearAuthenticatedUserData(userId)
+            }
             refreshAuthState()
         }
     }
 
     suspend fun clearAuthenticatedUserData(authUserId: String) {
+        deleteUserRows(authUserId)
+        forgetSyncedUser()
+        // Offline, the sync before a sign-out fails. Today for the guest must not show it.
+        // A session end does not come here: its "Session expired" error must reach the guards.
+        syncEngine.reset()
+    }
+
+    private fun deleteUserRows(userId: String) {
         db.habitTrackerDatabaseQueries.transaction {
             // Identity tables first — habit_identities subquery references LocalHabit.userId,
             // so it must run before LocalHabit rows are deleted.
-            db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(authUserId)
-            db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearHabitsForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearHabitLogsForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearWantLogsForUser(authUserId)
-            db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(authUserId)
+            db.habitTrackerDatabaseQueries.clearHabitIdentitiesForUser(userId)
+            db.habitTrackerDatabaseQueries.deleteAllUserIdentitiesForUser(userId)
+            db.habitTrackerDatabaseQueries.clearHabitsForUser(userId)
+            db.habitTrackerDatabaseQueries.clearHabitLogsForUser(userId)
+            db.habitTrackerDatabaseQueries.clearWantLogsForUser(userId)
+            db.habitTrackerDatabaseQueries.clearCustomWantActivitiesForUser(userId)
         }
+    }
+
+    private fun forgetSyncedUser() {
         // Reset pull watermarks so the next sign-in pulls everything from
         // the cloud instead of skipping rows older than the cached watermark.
         watermarks.reset()
-        // We just deleted this user's local rows, so stop claiming to be them on the
+        // The user is signed out, so stop claiming to be them on the
         // next cold start. Covers every sign-out path — they all come through here.
         lastAuthUserStore.clear()
     }
+
+    /** Rows with `syncedAt = null` across the six synced tables. */
+    private suspend fun countUnsyncedChanges(userId: String): Int =
+        habitRepository.getUnsyncedFor(userId).size +
+            wantActivityRepository.getUnsyncedFor(userId).size +
+            habitLogRepository.getUnsyncedFor(userId).size +
+            wantLogRepository.getUnsyncedFor(userId).size +
+            identityRepository.getUnsyncedUserIdentitiesFor(userId).size +
+            identityRepository.getUnsyncedHabitIdentitiesFor(userId).size
+
+    suspend fun heldAccountSummary(): HeldAccountSummary? = heldAccounts.summary()
 
     private fun startSessionGuard() {
         applicationScope.launch {
@@ -408,20 +453,58 @@ class AppContainer(context: Context) {
                 .distinctUntilChanged()
                 .collect { handleSessionExpired() }
         }
+        // A refresh that the server rejects makes no failed push. Without this, the app
+        // shows the data of the user as signed out, also after a cold start (#33).
+        applicationScope.launch {
+            authRepository.noSession.collect {
+                if (serverSessionEnd.endedByServer()) endSession()
+            }
+        }
+        // An offline cold start keeps the session without a token, so no sync could run.
+        // When the network comes back and supabase-kt refreshes the token, sync at once.
+        applicationScope.launch {
+            authRepository.sessionRecovered.collect {
+                refreshAuthState()
+                runCatching { syncEngine.sync(SyncReason.APP_FOREGROUND) }
+            }
+        }
+    }
+
+    /**
+     * At a cold start, the session guard and the start screen react to the same status.
+     * Call before the start screen is chosen, so that the guard finished its work.
+     */
+    suspend fun endSessionIfServerEnded() {
+        if (authRepository.hasNoSession() && serverSessionEnd.endedByServer()) endSession()
     }
 
     private suspend fun handleSessionExpired() {
         if (!isAuthenticated()) return
+        // Without a token, tryRefreshSession() fails at once and the session would end.
+        // supabase-kt retries the refresh itself, and sessionRecovered then syncs.
+        if (!authRepository.hasLiveSession()) return
         val refresh = authRepository.tryRefreshSession()
         if (refresh.isSuccess) {
             runCatching { syncEngine.sync(SyncReason.MANUAL) }
             return
         }
-        val userId = currentUserId()
-        runCatching { clearAuthenticatedUserData(userId) }
+        endSession()
+    }
+
+    /**
+     * Ends a session that no refresh can save, so no push is possible. HeldAccounts keeps
+     * unsynced changes for the next sign-in instead of deleting them (#33).
+     */
+    private suspend fun endSession() = sessionEndLock.withLock {
+        // Both guards can find the same end. The first one forgets the user.
+        val userId = lastAuthUserStore.rememberedUserId() ?: return@withLock
+        // supabase-kt often cleared the session already, so the email comes from the store.
+        val email = authRepository.currentEmail() ?: lastAuthUserStore.lastEmail()
+        val unsynced = heldAccounts.onSessionExpired(userId, email)
+        forgetSyncedUser()
         runCatching { authRepository.signOut() }
         refreshAuthState()
-        _sessionExpiredEvents.tryEmit(Unit)
+        _pendingSessionExpired.value = SessionExpired(unsynced)
     }
 
     private fun startSyncNotifier() {
@@ -515,3 +598,6 @@ class AppContainer(context: Context) {
         startPerIdentityReconciler()
     }
 }
+
+/** The session ended with no push. [unsyncedCount] is the number of changes kept, null if unknown. */
+data class SessionExpired(val unsyncedCount: Int?)
