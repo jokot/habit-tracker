@@ -7,15 +7,19 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 class SupabaseAuthRepository(
     private val client: SupabaseClient,
+    /** False while the app has no visible screen. The sync then has less time to run. */
+    private val isAppInForeground: () -> Boolean = { true },
 ) : AuthRepository {
 
     override suspend fun signUp(email: String, password: String): Result<SignUpResult> = runCatching {
@@ -85,6 +89,7 @@ class SupabaseAuthRepository(
         client.auth.sessionStatus.awaitReadiness(
             loadSession = { client.auth.loadFromStorage() },
             waitForRefresh = waitForRefresh,
+            inForeground = isAppInForeground(),
         )
 
     override val noSession: Flow<Unit> =
@@ -137,21 +142,33 @@ internal fun Flow<SessionStatus>.recoveries(): Flow<Unit> = flow {
 /**
  * supabase-kt sets Initializing while it loads or refreshes the session. It also sets it when
  * the app goes to the background, and it loads the session again only when the app comes back.
- * So a status that stays Initializing for 10 s means a background process: [loadSession] then
- * loads the session from storage. A cold start or a resume settles before that, so supabase-kt
- * never loads the session twice.
+ * So a status that stays Initializing means that nothing loads the session: [loadSession] then
+ * loads it from storage.
+ *
+ * In the foreground, a resume loads the session in less than 10 s, so a second load does not
+ * occur. In the background, ColorOS freezes the app 5 s after a job starts, so the wait is 1 s
+ * and the whole check ends in 4 s. A second load at a cold start refreshes the same token twice
+ * at the same time, which the server accepts.
  */
 internal suspend fun Flow<SessionStatus>.awaitReadiness(
     loadSession: suspend () -> Unit,
     waitForRefresh: Boolean = false,
+    inForeground: Boolean = true,
 ): SessionReadiness {
-    val first = settled() ?: run {
-        loadSession()
-        settled()
+    val wait = if (inForeground) FOREGROUND_LOAD_WAIT_MS else BACKGROUND_LOAD_WAIT_MS
+    val afterLoad = if (inForeground) FOREGROUND_LOAD_WAIT_MS else BACKGROUND_AFTER_LOAD_MS
+    var loaded = false
+    val first = settled(wait) ?: coroutineScope {
+        loaded = true
+        // Offline, loadFromStorage() retries the refresh and does not return. So the load runs
+        // beside the wait, and stops when the wait ends.
+        val load = launch { loadSession() }
+        settled(afterLoad).also { load.cancel() }
     }
     // supabase-kt retries a failed refresh every 10 s, and each failure is a new status. A job
     // that WorkManager starts on reconnect runs before that retry, so it waits for the result.
-    val settled = if (first is SessionStatus.RefreshFailure && waitForRefresh) {
+    // After a load of its own, no retry follows, because the load stopped.
+    val settled = if (first is SessionStatus.RefreshFailure && waitForRefresh && !loaded) {
         withTimeoutOrNull(REFRESH_RETRY_WAIT_MS) { first { it != first } } ?: first
     } else {
         first
@@ -164,10 +181,12 @@ internal suspend fun Flow<SessionStatus>.awaitReadiness(
     }
 }
 
-private suspend fun Flow<SessionStatus>.settled(): SessionStatus? =
-    withTimeoutOrNull(SESSION_LOAD_TIMEOUT_MS) { first { it !is SessionStatus.Initializing } }
+private suspend fun Flow<SessionStatus>.settled(timeoutMs: Long): SessionStatus? =
+    withTimeoutOrNull(timeoutMs) { first { it !is SessionStatus.Initializing } }
 
-private const val SESSION_LOAD_TIMEOUT_MS = 10_000L
+private const val FOREGROUND_LOAD_WAIT_MS = 10_000L
+private const val BACKGROUND_LOAD_WAIT_MS = 1_000L
+private const val BACKGROUND_AFTER_LOAD_MS = 3_000L
 
 /** One supabase-kt retry delay (10 s), plus time for the refresh request. */
 private const val REFRESH_RETRY_WAIT_MS = 15_000L

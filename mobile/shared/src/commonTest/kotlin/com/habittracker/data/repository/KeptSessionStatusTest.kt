@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.user.UserSession as SupabaseSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
@@ -156,6 +157,41 @@ class KeptSessionStatusTest {
         val status = MutableStateFlow<SessionStatus>(offline)
         assertEquals(SessionReadiness.REFRESH_FAILED, status.awaitReadiness(loadSession = {}, waitForRefresh = false))
         assertEquals(0, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `in the background a session that stays initializing loads after 1 s`() = runTest {
+        // ColorOS freezes a background app 5 s after a job starts, so a 10 s wait never ends.
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        var loads = 0
+        val readiness = status.awaitReadiness(
+            loadSession = { loads++; status.value = loaded },
+            inForeground = false,
+        )
+        assertEquals(SessionReadiness.LIVE, readiness)
+        assertEquals(1, loads)
+        assertEquals(1_000, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `in the background the whole check ends in 4 s`() = runTest {
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        val readiness = status.awaitReadiness(loadSession = {}, inForeground = false)
+        assertEquals(SessionReadiness.UNAVAILABLE, readiness)
+        assertEquals(4_000, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `a load that never returns does not block the sync`() = runTest {
+        // Offline, supabase-kt retries the refresh inside loadFromStorage() and never returns.
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        val readiness = status.awaitReadiness(
+            loadSession = { status.value = offline; awaitCancellation() },
+            waitForRefresh = true,
+            inForeground = false,
+        )
+        assertEquals(SessionReadiness.REFRESH_FAILED, readiness)
+        assertEquals(1_000, testScheduler.currentTime)
     }
 
     @Test

@@ -107,7 +107,7 @@ class AppContainer(context: Context) {
     private val localUserIdStore = LocalUserIdStore(context)
     private val lastAuthUserStore = LastAuthUserStore(context)
 
-    val authRepository = SupabaseAuthRepository(supabase)
+    val authRepository = SupabaseAuthRepository(supabase, isAppInForeground = ::isAppInForeground)
     val identityRepository = LocalIdentityRepository(db)
     val habitRepository = LocalHabitRepository(db)
     val habitLogRepository = LocalHabitLogRepository(db)
@@ -281,6 +281,12 @@ class AppContainer(context: Context) {
 
     private val serverSessionEnd = ServerSessionEnd(lastAuthUserStore::rememberedUserId)
     private val sessionEndLock = Mutex()
+
+    private fun isAppInForeground(): Boolean {
+        val info = android.app.ActivityManager.RunningAppProcessInfo()
+        android.app.ActivityManager.getMyMemoryState(info)
+        return info.importance <= android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+    }
 
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
