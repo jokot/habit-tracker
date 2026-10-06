@@ -1,5 +1,12 @@
 package com.habittracker.data.sync
 
+import com.habittracker.domain.model.DeviceMode
+import com.habittracker.domain.model.HabitLog
+import com.habittracker.domain.model.WantActivity
+import com.habittracker.domain.model.WantLog
+import kotlinx.datetime.Clock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import com.habittracker.domain.model.Habit
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
@@ -45,7 +52,7 @@ class RealPostgrestSyncTest {
         }.id
         try {
             val habitId = Uuid.random().toString()
-            sync.upsertHabit(habit(habitId, userId))
+            sync.upsertHabits(listOf(habit(habitId, userId)))
             // 500 rows share each synced_at, so every page seam falls inside a
             // run of equal timestamps. Only the id tie-break keeps those rows
             // from being lost or read twice.
@@ -72,10 +79,75 @@ class RealPostgrestSyncTest {
             val keys = pulled.map { checkNotNull(it.syncedAt) to it.id }
             assertEquals(keys.sortedWith(compareBy({ it.first }, { it.second })), keys)
 
+            // The server stamps synced_at in microseconds, and the watermark is in milliseconds.
+            // It rounds down, so the rows of its last millisecond come again, and no row is lost.
             val watermark = pulled.maxOf { checkNotNull(it.syncedAt).toEpochMilliseconds() }
-            assertTrue(sync.fetchHabitLogsSince(userId, watermark).isEmpty())
+            val again = sync.fetchHabitLogsSince(userId, watermark)
+            assertTrue(again.all { checkNotNull(it.syncedAt).toEpochMilliseconds() == watermark })
+            assertTrue(sync.fetchHabitLogsSince(userId, watermark + 1).isEmpty())
         } finally {
             // Deleting the user cascades to its habits and habit logs.
+            supabase.auth.admin.deleteUser(userId)
+        }
+    }
+
+    @Test
+    fun `the server sets synced_at and updated_at, not the phone`() = withUser { supabase, sync, userId ->
+        // A phone with a slow clock wrote a time in the past, and other devices skipped the row (#35).
+        val hourAgo = Clock.System.now() - 1.hours
+        val habitId = Uuid.random().toString()
+        sync.upsertHabits(listOf(habit(habitId, userId).copy(updatedAt = hourAgo)))
+        sync.upsertHabitLogs(listOf(HabitLog(Uuid.random().toString(), userId, habitId, 1.0, hourAgo, syncedAt = hourAgo)))
+
+        val now = Clock.System.now()
+        val log = sync.fetchHabitLogsSince(userId, 0).single()
+        assertTrue((now - checkNotNull(log.syncedAt)).absoluteValue < 1.minutes, "synced_at = ${log.syncedAt}")
+        val pulledHabit = sync.fetchHabitsSince(userId, 0).single()
+        assertTrue((now - pulledHabit.updatedAt).absoluteValue < 1.minutes, "updated_at = ${pulledHabit.updatedAt}")
+    }
+
+    @Test
+    fun `one request saves a batch of 600 logs`() = withUser { _, sync, userId ->
+        val habitId = Uuid.random().toString()
+        sync.upsertHabits(listOf(habit(habitId, userId)))
+        val logs = (0 until 600).map { HabitLog(Uuid.random().toString(), userId, habitId, 1.0, BASE) }
+        sync.upsertHabitLogs(logs)
+        assertEquals(logs.map { it.id }.toSet(), sync.fetchHabitLogsSince(userId, 0).map { it.id }.toSet())
+    }
+
+    @Test
+    fun `a batch keeps the points of each want log`() = withUser { _, sync, userId ->
+        // points_spent = 1 is the default. A row that left it out got NULL in a list upsert.
+        val activity = WantActivity(Uuid.random().toString(), "Scroll", "min", 1, isCustom = true, updatedAt = BASE)
+        sync.upsertWantActivities(listOf(activity), ownerUserId = userId)
+        val logs = listOf(1, 3).map { points ->
+            WantLog(Uuid.random().toString(), userId, activity.id, 1.0, points, DeviceMode.OTHER, BASE)
+        }
+        sync.upsertWantLogs(logs)
+        assertEquals(setOf(1, 3), sync.fetchWantLogsSince(userId, 0).map { it.pointsSpent }.toSet())
+    }
+
+    @Test
+    fun `an un-hidden want reaches the server`() = withUser { _, sync, userId ->
+        val activity = WantActivity(Uuid.random().toString(), "Scroll", "min", 1, isCustom = true, updatedAt = BASE)
+        sync.upsertWantActivities(listOf(activity.copy(hiddenAt = BASE)), ownerUserId = userId)
+        sync.upsertWantActivities(listOf(activity), ownerUserId = userId)
+        val pulled = sync.fetchWantActivitiesSince(userId, 0).single { it.id == activity.id }
+        assertEquals(null, pulled.hiddenAt)
+    }
+
+    /** Runs [block] with a new user, and deletes the user and all its rows after it. */
+    private fun withUser(block: suspend (SupabaseClient, PostgrestSupabaseSyncClient, String) -> Unit) = runBlocking {
+        assumeTrue("SUPABASE_IT_URL and SUPABASE_IT_SERVICE_KEY are not set", url != null && serviceKey != null)
+        val supabase = adminClient()
+        val userId = supabase.auth.admin.createUserWithEmail {
+            email = "sync-it-${Uuid.random()}@example.com"
+            password = Uuid.random().toString()
+            autoConfirm = true
+        }.id
+        try {
+            block(supabase, PostgrestSupabaseSyncClient(supabase), userId)
+        } finally {
             supabase.auth.admin.deleteUser(userId)
         }
     }

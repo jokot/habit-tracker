@@ -76,17 +76,16 @@ an issue, #33 to #37. Most severe first:
 1. **#33 A session expiry can delete unsynced rows.** Fixed in PR #38.
    When the token refresh fails and unsynced changes exist, the app now keeps the rows.
    The next sign-in with the same account pushes them. See `docs/sync-flow.md` §6.
-2. **#34 A widget log does not start a sync.** Fixed on `fix/sync-triggers`. A signed-in
+2. **#34 A widget log does not start a sync.** Fixed in PR #40. A signed-in
    widget log queues a `WIDGET_WRITE` job. A background process loads the session from
    storage, and counts the remembered user as signed in. See `docs/sync-flow.md` §2 and §6.
-3. **#35 The push stamps `synced_at` with the phone clock.** A phone with a slow clock
-   writes a time earlier than the real time. Another device with a watermark after that
-   time never pulls the row.
-4. **#36 The background sync jobs have no network constraint.** Fixed on
-   `fix/sync-triggers`. Every job except `MANUAL` waits for `NetworkType.CONNECTED`. A
+3. **#35 The push stamps `synced_at` with the phone clock.** Fixed on `fix/batch-push`.
+   Server triggers set `synced_at` and `updated_at`, and a pull asks again for the last 5 s
+   before the watermark. See `docs/sync-flow.md` §4.
+4. **#36 The background sync jobs have no network constraint.** Fixed in PR #40. Every job except `MANUAL` waits for `NetworkType.CONNECTED`. A
    job that starts on a reconnect waits for the token refresh. See `docs/sync-flow.md` §2.
-5. **#37 The push sends one request per row, in series.** After a long time offline, a push
-   of 200 logs needs 200 requests.
+5. **#37 The push sends one request per row, in series.** Fixed on `fix/batch-push`. The
+   push sends 500 rows per request. On a phone, 222 logs took 1 request and 7 s.
 
 ## Open work, not started
 

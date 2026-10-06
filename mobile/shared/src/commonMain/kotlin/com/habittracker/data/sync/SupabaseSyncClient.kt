@@ -8,12 +8,16 @@ import com.habittracker.domain.model.WantActivity
 import com.habittracker.domain.model.WantLog
 
 interface SupabaseSyncClient {
-    suspend fun upsertHabit(row: Habit)
-    suspend fun upsertWantActivity(row: WantActivity, ownerUserId: String)
-    suspend fun upsertHabitLog(row: HabitLog)
-    suspend fun upsertWantLog(row: WantLog)
-    suspend fun upsertUserIdentity(row: UserIdentityRow)
-    suspend fun upsertHabitIdentity(row: HabitIdentityRow)
+    /**
+     * Each upsert sends all [rows] in one request, so the server saves all of them or none.
+     * An empty list sends no request. The server sets `synced_at` and `updated_at` itself.
+     */
+    suspend fun upsertHabits(rows: List<Habit>)
+    suspend fun upsertWantActivities(rows: List<WantActivity>, ownerUserId: String)
+    suspend fun upsertHabitLogs(rows: List<HabitLog>)
+    suspend fun upsertWantLogs(rows: List<WantLog>)
+    suspend fun upsertUserIdentities(rows: List<UserIdentityRow>)
+    suspend fun upsertHabitIdentities(rows: List<HabitIdentityRow>)
 
     suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit>
     suspend fun fetchWantActivitiesSince(userId: String, sinceMs: Long): List<WantActivity>
