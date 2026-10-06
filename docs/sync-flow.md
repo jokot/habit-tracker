@@ -41,7 +41,7 @@ flowchart TD
     SIGNIN["Sign in, or app start<br/>while habits are not pulled"] --> DIRECT
     PTR["Pull to refresh on Today"] --> DIRECT
     SIGNOUT["Sign out"] --> DIRECT
-    WIDGET["Log from a widget"] -. "no trigger" .-> NEXT["Waits for the next trigger"]
+    WIDGET["Log from a widget,<br/>signed in"] --> WM
 
     WM["WorkManager job<br/>SyncTriggers.enqueue"] --> ENG
     DIRECT["Direct call<br/>syncEngine.sync"] --> ENG
@@ -56,13 +56,14 @@ flowchart TD
 | Pull to refresh | `MANUAL` | Direct | No |
 | Sign in | `POST_SIGN_IN` | Direct, in the app scope | No |
 | Sign out | `MANUAL` | Direct, before the local data is cleared | No |
-| Log from a widget | none | none | The row waits for the next trigger |
+| Log from a widget, signed in | `WIDGET_WRITE` | WorkManager | Yes |
 
 WorkManager job rules:
 
 - Each reason has one unique job name, for example `sync-post-log`. The policy is `KEEP`. While a job for a reason waits or runs, a new request for the same reason is dropped. The job that waits pushes all the pending rows when it runs.
-- The jobs have no network constraint. Offline, a job runs, fails, and asks for a retry.
-- The retry backoff is exponential. It starts at 30 s and doubles each time, up to the WorkManager limit of 5 hours.
+- A `MANUAL` job runs at once, also offline, so the user sees "No network". All other jobs have the constraint `NetworkType.CONNECTED`. Offline, they wait, and WorkManager starts them when the network connects. A job that waits does not count as a sync failure.
+- The retry backoff is exponential. It starts at 30 s and doubles each time, up to the WorkManager limit of 5 hours. A retry also waits for the network.
+- A widget log only puts a job in the queue. Android delivers widget taps one at a time, so the tap does not wait for the sync.
 - An `IllegalStateException` stops the job with no retry. Every other error asks for a retry.
 
 ## 3. One sync run, online
@@ -209,15 +210,12 @@ sequenceDiagram
     U->>L: Log a habit
     Note over L: Row saved, syncedAt = null<br/>Today updates at once
     L->>W: enqueue POST_LOG
-    W->>E: sync(POST_LOG)
-    E-xS: Upsert fails: no network
-    E->>E: state = Error, for example "No network"
-    E-->>W: Failure
-    W->>W: Retry after 30 s, 60 s, 120 s, ...
+    Note over W: The job waits: NetworkType.CONNECTED
     U->>L: Log another habit
     L-xW: enqueue POST_LOG is dropped: KEEP,<br/>a job already waits
     Note over S: Network comes back
-    W->>E: Retry: sync(POST_LOG)
+    W->>E: sync(POST_LOG)
+    E->>E: Wait for the token refresh,<br/>at most 15 s
     E->>L: Read rows with syncedAt = null: 2 rows
     E->>S: Upsert both rows
     E->>L: Set syncedAt on both rows
@@ -226,6 +224,8 @@ sequenceDiagram
 ```
 
 - The app works with no network. All the data on the screens comes from the phone.
+- A job that ColorOS stops counts as one attempt, and the next attempt waits for the backoff. With `KEEP`, a new log joins that job, so it also waits for the backoff and not for the network.
+- A job waits for a network connection, not for a server that answers. If the server is down, the job runs, fails, counts as a sync failure, and asks for a retry.
 - The failed sync changes no local data. The rows stay pending until a push succeeds.
 - When a push fails in the middle, the rows sent before the failure stay synced. The next push sends only the rest. An upsert of the same row again is safe.
 - A pull that fails keeps the watermarks of the tables merged before the failure. The failed table and the tables after it keep their old watermarks. The next pull starts from there.
@@ -336,7 +336,13 @@ An access token expires after 1 hour. If the phone cannot reach the server at a 
 - `SyncEngine` sends no request without a token. A request without a token goes out as anon. The server rejects it with "Unauthorized", and the session guard would then end a valid session. Instead, the sync stops with "Server unreachable", and the job asks for a retry.
 - The guard for "Session expired" does nothing while no token exists. A manual refresh would fail at once and end the session.
 - When the app goes to the background, supabase-kt sets `Initializing`. At the next start, it refreshes an expired token, and the status stays `Initializing` during the request. So `SyncEngine` waits at most 10 s for a different status before it starts.
-- If the status stays `Initializing` for 10 s, the app is in the background. The sync then sends no request and keeps its state. The job asks for a retry.
+- If the status stays `Initializing`, `awaitSessionReadiness` loads the session from storage with `loadFromStorage()`. supabase-kt loads the session only when the app comes to the front, so a background job such as a widget sync needs this.
+  - In the foreground, the wait before the load is 10 s, and the wait after it is 10 s. A resume settles in the first 10 s, so the session does not load twice.
+  - In the background, the wait before the load is 1 s, and the wait after it is 3 s. ColorOS (OPPO) freezes a background app 5 s after a job starts, and it stops the job. A cold start can then load the session twice and refresh the same token twice at the same time. The server accepts that.
+  - Offline, `loadFromStorage()` retries the refresh and does not return. So the load runs beside the wait and stops when the wait ends.
+- If the session does not load from storage either, the sync sends no request and keeps its state. The job asks for a retry.
+- A process that starts in the background, for a widget tap or a sync job, builds its auth state before supabase-kt loads the session. So `LastAuthUserStore.isSignedIn` counts the remembered user as signed in until the status is `NotAuthenticated`. A sign-out and a session end clear the remembered user.
+- During `RefreshFailure`, supabase-kt tries the refresh again every 10 s. A background job waits at most 15 s for that attempt. On a reconnect, the attempt succeeds and the job pushes. A `MANUAL` sync does not wait, so pull to refresh offline shows "Server unreachable" at once. After a load of its own, the job does not wait, because the load stopped and no retry follows.
 - When a refresh succeeds after `RefreshFailure`, `sessionRecovered` emits. The app reads the auth state again and starts a sync with `APP_FOREGROUND`. The user does not need to pull to refresh.
 - If the server rejects the refresh, supabase-kt sets `NotAuthenticated`. The "No session" guard then ends the session.
 
@@ -357,6 +363,5 @@ The next sign-in resolves the hold before the guest migration:
 
 ## 7. Known risks
 
-- **A widget log does not start a sync.** `SyncReason.WIDGET_WRITE` exists, but no code uses it. The row waits until the app comes to the front, or until another trigger runs.
 - **The push uses the phone clock.** `synced_at` is the push time on the phone. A phone with a slow clock writes a time that is earlier than the real time. Another device with a watermark after that time never pulls the row.
 - **The push sends one request per row.** After a long time offline, a push of 200 logs needs 200 requests in series.

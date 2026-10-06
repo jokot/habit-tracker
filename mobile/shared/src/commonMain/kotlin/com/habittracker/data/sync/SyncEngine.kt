@@ -28,8 +28,11 @@ interface SyncIdentity {
     fun currentUserId(): String
     fun isAuthenticated(): Boolean
 
-    /** Waits until the auth client has loaded the session, then tells if a request can use it. */
-    suspend fun awaitSessionReadiness(): SessionReadiness
+    /**
+     * Waits until the auth client has loaded the session, then tells if a request can use it.
+     * With [waitForRefresh], a failed refresh waits for the next refresh attempt.
+     */
+    suspend fun awaitSessionReadiness(waitForRefresh: Boolean): SessionReadiness
 }
 
 /** The session has no token that a request can use. */
@@ -61,7 +64,8 @@ class SyncEngine(
         }
         // Without a token, a request goes out as anon. The server rejects it with
         // "Unauthorized", and the session guard then ends a session that is still valid.
-        when (identity.awaitSessionReadiness()) {
+        // A manual sync answers at once. A background job can wait for the next token refresh.
+        when (identity.awaitSessionReadiness(waitForRefresh = reason != SyncReason.MANUAL)) {
             SessionReadiness.LIVE -> Unit
             SessionReadiness.REFRESH_FAILED -> {
                 _state.value = SyncState.Error(message = "Server unreachable", since = clock.now())

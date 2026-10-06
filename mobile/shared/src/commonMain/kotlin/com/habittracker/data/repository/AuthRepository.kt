@@ -36,10 +36,12 @@ interface AuthRepository {
     val sessionRecovered: Flow<Unit>
 
     /**
-     * Waits at most 10 s for the auth client to load the session, then tells if a request
-     * can use it. After a resume, supabase-kt refreshes an expired token before it is ready.
+     * Waits for the auth client to load the session, then tells if a request can use it.
+     * After a resume, supabase-kt refreshes an expired token before it is ready. In a
+     * background process, the session is loaded from storage after 10 s. With
+     * [waitForRefresh], a failed refresh waits at most 15 s for the next refresh attempt.
      */
-    suspend fun awaitSessionReadiness(): SessionReadiness
+    suspend fun awaitSessionReadiness(waitForRefresh: Boolean): SessionReadiness
 
     /** Suspends until the auth client has finished loading any persisted session from storage. */
     suspend fun awaitSessionRestored()

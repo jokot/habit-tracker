@@ -167,6 +167,14 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `only a background sync waits for the next token refresh`() = runTest {
+        engine.sync(SyncReason.MANUAL)
+        engine.sync(SyncReason.POST_LOG)
+        engine.sync(SyncReason.WIDGET_WRITE)
+        assertEquals(listOf(false, true, true), auth.waits)
+    }
+
+    @Test
     fun `push failure surfaces Error state`() = runTest {
         habitRepo.saveHabit(makeHabit("h1"))
         supabase.shouldThrowOnNext = RuntimeException("boom")
@@ -355,7 +363,12 @@ class FakeAuthIdentity(
     private val authenticated: Boolean,
     private val readiness: SessionReadiness = SessionReadiness.LIVE,
 ) : SyncIdentity {
+    /** The waitForRefresh value of each readiness check, in order. */
+    val waits = mutableListOf<Boolean>()
     override fun currentUserId(): String = uid
     override fun isAuthenticated(): Boolean = authenticated
-    override suspend fun awaitSessionReadiness(): SessionReadiness = readiness
+    override suspend fun awaitSessionReadiness(waitForRefresh: Boolean): SessionReadiness {
+        waits += waitForRefresh
+        return readiness
+    }
 }

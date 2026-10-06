@@ -107,7 +107,7 @@ class AppContainer(context: Context) {
     private val localUserIdStore = LocalUserIdStore(context)
     private val lastAuthUserStore = LastAuthUserStore(context)
 
-    val authRepository = SupabaseAuthRepository(supabase)
+    val authRepository = SupabaseAuthRepository(supabase, isAppInForeground = ::isAppInForeground)
     val identityRepository = LocalIdentityRepository(db)
     val habitRepository = LocalHabitRepository(db)
     val habitLogRepository = LocalHabitLogRepository(db)
@@ -136,7 +136,8 @@ class AppContainer(context: Context) {
     private val syncIdentity = object : SyncIdentity {
         override fun currentUserId(): String = this@AppContainer.currentUserId()
         override fun isAuthenticated(): Boolean = this@AppContainer.isAuthenticated()
-        override suspend fun awaitSessionReadiness() = authRepository.awaitSessionReadiness()
+        override suspend fun awaitSessionReadiness(waitForRefresh: Boolean) =
+            authRepository.awaitSessionReadiness(waitForRefresh)
     }
 
     val syncEngine = SyncEngine(
@@ -281,6 +282,12 @@ class AppContainer(context: Context) {
     private val serverSessionEnd = ServerSessionEnd(lastAuthUserStore::rememberedUserId)
     private val sessionEndLock = Mutex()
 
+    private fun isAppInForeground(): Boolean {
+        val info = android.app.ActivityManager.RunningAppProcessInfo()
+        android.app.ActivityManager.getMyMemoryState(info)
+        return info.importance <= android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+    }
+
     fun currentUserId(): String = _authState.value.userId
     fun isAuthenticated(): Boolean = _authState.value.isAuthenticated
     fun currentAccountEmail(): String? = authRepository.currentEmail()
@@ -298,7 +305,10 @@ class AppContainer(context: Context) {
         userId = lastAuthUserStore.resolve(authRepository.currentUserId(), authRepository.currentEmail()) {
             userIdentityProvider.localUserId()
         },
-        isAuthenticated = userIdentityProvider.isAuthenticated(),
+        isAuthenticated = lastAuthUserStore.isSignedIn(
+            sessionLoggedIn = userIdentityProvider.isAuthenticated(),
+            sessionEnded = authRepository.hasNoSession(),
+        ),
     )
 
     suspend fun seedLocalDataIfEmpty() {

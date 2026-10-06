@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.user.UserSession as SupabaseSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
@@ -76,12 +77,12 @@ class KeptSessionStatusTest {
 
     @Test
     fun `a loaded session is ready at once`() = runTest {
-        assertEquals(SessionReadiness.LIVE, MutableStateFlow<SessionStatus>(loaded).awaitReadiness())
+        assertEquals(SessionReadiness.LIVE, MutableStateFlow<SessionStatus>(loaded).awaitReadiness(loadSession = {}))
     }
 
     @Test
     fun `an offline refresh is a refresh failure`() = runTest {
-        assertEquals(SessionReadiness.REFRESH_FAILED, MutableStateFlow<SessionStatus>(offline).awaitReadiness())
+        assertEquals(SessionReadiness.REFRESH_FAILED, MutableStateFlow<SessionStatus>(offline).awaitReadiness(loadSession = {}))
     }
 
     @Test
@@ -89,7 +90,7 @@ class KeptSessionStatusTest {
         // supabase-kt sets Initializing when the app stops, and refreshes the token at the next start.
         val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
         var readiness: SessionReadiness? = null
-        launch { readiness = status.awaitReadiness() }
+        launch { readiness = status.awaitReadiness(loadSession = {}) }
         advanceTimeBy(2_000)
         assertNull(readiness)
         status.value = loaded
@@ -98,15 +99,103 @@ class KeptSessionStatusTest {
     }
 
     @Test
-    fun `a session that does not load in 10 s is unavailable`() = runTest {
-        // In the background, supabase-kt does not load the session again.
+    fun `a session that stays initializing is loaded from storage`() = runTest {
+        // In the background, supabase-kt does not load the session again. A widget sync must load it.
         val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
-        assertEquals(SessionReadiness.UNAVAILABLE, status.awaitReadiness())
+        var loads = 0
+        val readiness = status.awaitReadiness(loadSession = { loads++; status.value = loaded })
+        assertEquals(SessionReadiness.LIVE, readiness)
+        assertEquals(1, loads)
         assertEquals(10_000, testScheduler.currentTime)
     }
 
     @Test
+    fun `a session that settles in time is not loaded again`() = runTest {
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        var loads = 0
+        launch { advanceTimeBy(3_000); status.value = loaded }
+        assertEquals(SessionReadiness.LIVE, status.awaitReadiness(loadSession = { loads++ }))
+        assertEquals(0, loads)
+    }
+
+    @Test
+    fun `a session that does not load from storage either is unavailable`() = runTest {
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        assertEquals(SessionReadiness.UNAVAILABLE, status.awaitReadiness(loadSession = {}))
+        assertEquals(20_000, testScheduler.currentTime)
+    }
+
+    private fun offlineAgain() =
+        SessionStatus.RefreshFailure(RefreshFailureCause.NetworkError(Exception("still offline")))
+
+    @Test
+    fun `after a reconnect a background sync waits for the next refresh`() = runTest {
+        // supabase-kt retries a failed refresh every 10 s. A job that starts on reconnect is first.
+        val status = MutableStateFlow<SessionStatus>(offline)
+        launch { advanceTimeBy(4_000); status.value = loaded }
+        assertEquals(SessionReadiness.LIVE, status.awaitReadiness(loadSession = {}, waitForRefresh = true))
+    }
+
+    @Test
+    fun `a background sync fails when the next refresh fails too`() = runTest {
+        val status = MutableStateFlow<SessionStatus>(offline)
+        launch { advanceTimeBy(10_000); status.value = offlineAgain() }
+        assertEquals(SessionReadiness.REFRESH_FAILED, status.awaitReadiness(loadSession = {}, waitForRefresh = true))
+        assertEquals(10_000, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `a background sync waits at most 15 s for the next refresh`() = runTest {
+        val status = MutableStateFlow<SessionStatus>(offline)
+        assertEquals(SessionReadiness.REFRESH_FAILED, status.awaitReadiness(loadSession = {}, waitForRefresh = true))
+        assertEquals(15_000, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `a manual sync does not wait for the next refresh`() = runTest {
+        // Pull to refresh offline must show "Server unreachable" at once.
+        val status = MutableStateFlow<SessionStatus>(offline)
+        assertEquals(SessionReadiness.REFRESH_FAILED, status.awaitReadiness(loadSession = {}, waitForRefresh = false))
+        assertEquals(0, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `in the background a session that stays initializing loads after 1 s`() = runTest {
+        // ColorOS freezes a background app 5 s after a job starts, so a 10 s wait never ends.
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        var loads = 0
+        val readiness = status.awaitReadiness(
+            loadSession = { loads++; status.value = loaded },
+            inForeground = false,
+        )
+        assertEquals(SessionReadiness.LIVE, readiness)
+        assertEquals(1, loads)
+        assertEquals(1_000, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `in the background the whole check ends in 4 s`() = runTest {
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        val readiness = status.awaitReadiness(loadSession = {}, inForeground = false)
+        assertEquals(SessionReadiness.UNAVAILABLE, readiness)
+        assertEquals(4_000, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `a load that never returns does not block the sync`() = runTest {
+        // Offline, supabase-kt retries the refresh inside loadFromStorage() and never returns.
+        val status = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
+        val readiness = status.awaitReadiness(
+            loadSession = { status.value = offline; awaitCancellation() },
+            waitForRefresh = true,
+            inForeground = false,
+        )
+        assertEquals(SessionReadiness.REFRESH_FAILED, readiness)
+        assertEquals(1_000, testScheduler.currentTime)
+    }
+
+    @Test
     fun `no session is unavailable`() = runTest {
-        assertEquals(SessionReadiness.UNAVAILABLE, MutableStateFlow<SessionStatus>(noSession).awaitReadiness())
+        assertEquals(SessionReadiness.UNAVAILABLE, MutableStateFlow<SessionStatus>(noSession).awaitReadiness(loadSession = {}))
     }
 }

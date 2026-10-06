@@ -54,6 +54,14 @@ class LastAuthUserStore(context: Context) {
     /** The id of the last authenticated user, or null after a sign-out or for a guest. */
     fun rememberedUserId(): String? = prefs.getString(KEY_LAST_AUTH_USER_ID, null)
 
+    /**
+     * A cold process (a widget tap, a sync job) starts before supabase-kt loads the session.
+     * The remembered user is signed in until the session loads. A sign-out or a session end
+     * clears the remembered id, and [sessionEnded] covers a session that the server ended.
+     */
+    fun isSignedIn(sessionLoggedIn: Boolean, sessionEnded: Boolean): Boolean =
+        sessionLoggedIn || (!sessionEnded && rememberedUserId() != null)
+
     fun clear() {
         prefs.edit().remove(KEY_LAST_AUTH_USER_ID).remove(KEY_LAST_AUTH_EMAIL).apply()
     }

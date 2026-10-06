@@ -6,6 +6,7 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
 import com.habittracker.domain.model.DeviceMode
 import com.jktdeveloper.habitto.HabitTrackerApplication
+import com.jktdeveloper.habitto.sync.syncAfterWidgetLog
 
 /**
  * Logs one tap on a non-timed want. Minute-unit wants never reach this action — they
@@ -25,15 +26,16 @@ class LogWantAction : ActionCallback {
         // the next periodic refresh reconciles state (spec: Error handling).
         // LogWantUseCase.execute already refuses unaffordable spend via Result, so a
         // stale widget tapped at zero balance fails safely on its own.
-        // One local write and nothing else — see [LogHabitAction] for why updating the
+        // One local write and a queued sync — see [LogHabitAction] for why updating the
         // widgets does not belong on this path.
-        runCatching {
+        val logged = runCatching {
             container.logWantUseCase.execute(
                 userId = container.currentUserId(),
                 activityId = activityId,
                 taps = 1,
                 deviceMode = DeviceMode.OTHER,
-            )
-        }
+            ).getOrThrow()
+        }.isSuccess
+        syncAfterWidgetLog(context, logged, container.isAuthenticated())
     }
 }
