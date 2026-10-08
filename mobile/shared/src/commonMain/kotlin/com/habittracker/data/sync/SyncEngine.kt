@@ -111,45 +111,52 @@ class SyncEngine(
         }
     }
 
+    /**
+     * Sends each table in batches of [PUSH_BATCH_SIZE] rows, one request per batch. A batch is
+     * marked synced only after its request succeeds, so a failure keeps the earlier batches.
+     * The server sets `synced_at` and `updated_at`, so the time of this phone goes nowhere.
+     */
     private suspend fun push(userId: String): Int {
-        var count = 0
         val now = clock.now()
-        habitRepo.getUnsyncedFor(userId).forEach { row ->
-            supabase.upsertHabit(row)
-            habitRepo.markSynced(row.id, now)
-            count++
+        return pushBatches(habitRepo.getUnsyncedFor(userId), { supabase.upsertHabits(it) }) {
+            habitRepo.markSynced(it.id, now)
+        } + pushBatches(wantActivityRepo.getUnsyncedFor(userId), { supabase.upsertWantActivities(it, userId) }) {
+            wantActivityRepo.markSynced(it.id, now)
+        } + pushBatches(habitLogRepo.getUnsyncedFor(userId), { supabase.upsertHabitLogs(it) }) {
+            habitLogRepo.markSynced(it.id, now)
+        } + pushBatches(wantLogRepo.getUnsyncedFor(userId), { supabase.upsertWantLogs(it) }) {
+            wantLogRepo.markSynced(it.id, now)
+        } + pushBatches(identityRepo.getUnsyncedUserIdentitiesFor(userId), { supabase.upsertUserIdentities(it) }) {
+            identityRepo.markUserIdentitySynced(it.userId, it.identityId, now)
+        } + pushBatches(identityRepo.getUnsyncedHabitIdentitiesFor(userId), { supabase.upsertHabitIdentities(it) }) {
+            identityRepo.markHabitIdentitySynced(it.habitId, it.identityId, now)
         }
-        wantActivityRepo.getUnsyncedFor(userId).forEach { row ->
-            supabase.upsertWantActivity(row, userId)
-            wantActivityRepo.markSynced(row.id, now)
-            count++
-        }
-        habitLogRepo.getUnsyncedFor(userId).forEach { row ->
-            val stamped = row.copy(syncedAt = now)
-            supabase.upsertHabitLog(stamped)
-            habitLogRepo.markSynced(row.id, now)
-            count++
-        }
-        wantLogRepo.getUnsyncedFor(userId).forEach { row ->
-            val stamped = row.copy(syncedAt = now)
-            supabase.upsertWantLog(stamped)
-            wantLogRepo.markSynced(row.id, now)
-            count++
-        }
-        identityRepo.getUnsyncedUserIdentitiesFor(userId).forEach { row ->
-            val stamped = row.copy(syncedAt = now)
-            supabase.upsertUserIdentity(stamped)
-            identityRepo.markUserIdentitySynced(row.userId, row.identityId, now)
-            count++
-        }
-        identityRepo.getUnsyncedHabitIdentitiesFor(userId).forEach { row ->
-            val stamped = row.copy(syncedAt = now)
-            supabase.upsertHabitIdentity(stamped)
-            identityRepo.markHabitIdentitySynced(row.habitId, row.identityId, now)
-            count++
-        }
-        return count
     }
+
+    private suspend fun <T> pushBatches(
+        rows: List<T>,
+        upsert: suspend (List<T>) -> Unit,
+        markSynced: suspend (T) -> Unit,
+    ): Int {
+        rows.chunked(PUSH_BATCH_SIZE).forEach { batch ->
+            upsert(batch)
+            batch.forEach { markSynced(it) }
+        }
+        return rows.size
+    }
+
+    /**
+     * The watermark of [table], less [WATERMARK_OVERLAP_MS]. The server stamps a row with the
+     * start time of its transaction. A transaction that commits after a pull of this device has
+     * a time below the watermark of that pull, so the next pull asks for those seconds again.
+     * The merges are by id, so a row that comes again changes nothing.
+     */
+    private fun since(table: SyncTable): Long =
+        (watermarks.get(table) - WATERMARK_OVERLAP_MS).coerceAtLeast(0)
+
+    /** Rows of the overlap are older than the watermark, so they must not move it back. */
+    private fun advance(table: SyncTable, maxMs: Long) =
+        watermarks.set(table, maxOf(watermarks.get(table), maxMs))
 
     /**
      * Pulls in three stages, so each Today section can show as soon as its data is local:
@@ -213,7 +220,7 @@ class SyncEngine(
     }
 
     private suspend fun fetchHabits(userId: String): Merge {
-        val remote = supabase.fetchHabitsSince(userId, watermarks.get(SyncTable.HABITS))
+        val remote = supabase.fetchHabitsSince(userId, since(SyncTable.HABITS))
         return merge@{
             if (remote.isEmpty()) return@merge 0
             val ids = remote.map { it.id }
@@ -224,13 +231,13 @@ class SyncEngine(
                     habitRepo.mergePulled(row.copy(syncedAt = row.updatedAt))
                 }
             }
-            watermarks.set(SyncTable.HABITS, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
+            advance(SyncTable.HABITS, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
             remote.size
         }
     }
 
     private suspend fun fetchWantActivities(userId: String): Merge {
-        val remote = supabase.fetchWantActivitiesSince(userId, watermarks.get(SyncTable.WANT_ACTIVITIES))
+        val remote = supabase.fetchWantActivitiesSince(userId, since(SyncTable.WANT_ACTIVITIES))
         return merge@{
             if (remote.isEmpty()) return@merge 0
             val ids = remote.map { it.id }
@@ -241,53 +248,53 @@ class SyncEngine(
                     wantActivityRepo.mergePulled(row.copy(syncedAt = row.updatedAt))
                 }
             }
-            watermarks.set(SyncTable.WANT_ACTIVITIES, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
+            advance(SyncTable.WANT_ACTIVITIES, remote.maxOf { it.updatedAt.toEpochMilliseconds() })
             remote.size
         }
     }
 
     private suspend fun fetchHabitLogs(userId: String): Merge {
         val last = watermarks.get(SyncTable.HABIT_LOGS)
-        val remote = supabase.fetchHabitLogsSince(userId, last)
+        val remote = supabase.fetchHabitLogsSince(userId, since(SyncTable.HABIT_LOGS))
         return merge@{
             if (remote.isEmpty()) return@merge 0
             habitLogRepo.mergePulledAll(remote)
             val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
-            watermarks.set(SyncTable.HABIT_LOGS, maxTs)
+            advance(SyncTable.HABIT_LOGS, maxTs)
             remote.size
         }
     }
 
     private suspend fun fetchWantLogs(userId: String): Merge {
         val last = watermarks.get(SyncTable.WANT_LOGS)
-        val remote = supabase.fetchWantLogsSince(userId, last)
+        val remote = supabase.fetchWantLogsSince(userId, since(SyncTable.WANT_LOGS))
         return merge@{
             if (remote.isEmpty()) return@merge 0
             wantLogRepo.mergePulledAll(remote)
             val maxTs = remote.mapNotNull { it.syncedAt?.toEpochMilliseconds() }.maxOrNull() ?: last
-            watermarks.set(SyncTable.WANT_LOGS, maxTs)
+            advance(SyncTable.WANT_LOGS, maxTs)
             remote.size
         }
     }
 
     private suspend fun fetchUserIdentities(userId: String): Merge {
-        val remote = supabase.fetchUserIdentitiesSince(userId, watermarks.get(SyncTable.USER_IDENTITIES))
+        val remote = supabase.fetchUserIdentitiesSince(userId, since(SyncTable.USER_IDENTITIES))
         return merge@{
             if (remote.isEmpty()) return@merge 0
             remote.forEach { row -> identityRepo.mergePulledUserIdentity(row) }
             val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
-            watermarks.set(SyncTable.USER_IDENTITIES, maxTs)
+            advance(SyncTable.USER_IDENTITIES, maxTs)
             remote.size
         }
     }
 
     private suspend fun fetchHabitIdentities(userId: String): Merge {
-        val remote = supabase.fetchHabitIdentitiesSince(userId, watermarks.get(SyncTable.HABIT_IDENTITIES))
+        val remote = supabase.fetchHabitIdentitiesSince(userId, since(SyncTable.HABIT_IDENTITIES))
         return merge@{
             if (remote.isEmpty()) return@merge 0
             remote.forEach { row -> identityRepo.mergePulledHabitIdentity(row) }
             val maxTs = remote.maxOf { it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds() }
-            watermarks.set(SyncTable.HABIT_IDENTITIES, maxTs)
+            advance(SyncTable.HABIT_IDENTITIES, maxTs)
             remote.size
         }
     }
@@ -302,3 +309,9 @@ private val CORE_TABLES = listOf(
 )
 
 private val HISTORY_TABLES = listOf(SyncTable.HABIT_LOGS, SyncTable.WANT_LOGS)
+
+/** Rows per upsert request. A batch of 500 logs is about 100 KB. */
+internal const val PUSH_BATCH_SIZE = 500
+
+/** A pull asks again for this time before the watermark. See SyncEngine.since. */
+internal const val WATERMARK_OVERLAP_MS = 5_000L

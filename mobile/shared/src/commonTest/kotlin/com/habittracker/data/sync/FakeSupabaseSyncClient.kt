@@ -32,6 +32,21 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
         failIfNeeded()
     }
 
+    /** Each upsert request, in order: the table and the row count. */
+    val upserts = mutableListOf<Pair<String, Int>>()
+
+    /** The upsert request with this 1-based number throws. */
+    var throwOnUpsert: Int? = null
+
+    /** The `sinceMs` value of the last fetch of each table. */
+    val sinces = mutableMapOf<String, Long>()
+
+    private fun upsert(table: String, rows: Int) {
+        upserts += table to rows
+        if (upserts.size == throwOnUpsert) throw RuntimeException("upsert ${upserts.size} failed")
+        failIfNeeded()
+    }
+
     private fun failIfNeeded() {
         shouldThrowOnNext?.let { err ->
             shouldThrowOnNext = null
@@ -39,36 +54,49 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
         }
     }
 
-    override suspend fun upsertHabit(row: Habit) {
-        failIfNeeded()
-        habits.removeAll { it.id == row.id }
-        habits.add(row)
+    override suspend fun upsertHabits(rows: List<Habit>) {
+        upsert("habits", rows.size)
+        rows.forEach { row ->
+            habits.removeAll { it.id == row.id }
+            habits.add(row)
+        }
     }
 
-    override suspend fun upsertWantActivity(row: WantActivity, ownerUserId: String) {
-        failIfNeeded()
-        wantActivities.removeAll { it.id == row.id }
-        wantActivities.add(row.copy(createdByUserId = if (row.isCustom) ownerUserId else null))
+    override suspend fun upsertWantActivities(rows: List<WantActivity>, ownerUserId: String) {
+        upsert("want_activities", rows.size)
+        rows.forEach { row ->
+            wantActivities.removeAll { it.id == row.id }
+            wantActivities.add(row.copy(createdByUserId = if (row.isCustom) ownerUserId else null))
+        }
     }
 
-    override suspend fun upsertHabitLog(row: HabitLog) {
-        failIfNeeded()
-        habitLogs.removeAll { it.id == row.id }
-        habitLogs.add(row)
+    /** Server time for `synced_at`, as the trigger sets it. */
+    var serverNow: () -> kotlinx.datetime.Instant = { kotlinx.datetime.Clock.System.now() }
+
+    override suspend fun upsertHabitLogs(rows: List<HabitLog>) {
+        upsert("habit_logs", rows.size)
+        rows.forEach { row ->
+            habitLogs.removeAll { it.id == row.id }
+            habitLogs.add(row.copy(syncedAt = serverNow()))
+        }
     }
 
-    override suspend fun upsertWantLog(row: WantLog) {
-        failIfNeeded()
-        wantLogs.removeAll { it.id == row.id }
-        wantLogs.add(row)
+    override suspend fun upsertWantLogs(rows: List<WantLog>) {
+        upsert("want_logs", rows.size)
+        rows.forEach { row ->
+            wantLogs.removeAll { it.id == row.id }
+            wantLogs.add(row.copy(syncedAt = serverNow()))
+        }
     }
 
     override suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit> {
+        sinces["habits"] = sinceMs
         fetch("habits")
         return habits.filter { it.userId == userId && it.updatedAt.toEpochMilliseconds() > sinceMs }
     }
 
     override suspend fun fetchWantActivitiesSince(userId: String, sinceMs: Long): List<WantActivity> {
+        sinces["want_activities"] = sinceMs
         fetch("want_activities")
         return wantActivities.filter {
             (it.createdByUserId == userId || it.createdByUserId == null) &&
@@ -77,6 +105,7 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     }
 
     override suspend fun fetchHabitLogsSince(userId: String, sinceMs: Long): List<HabitLog> {
+        sinces["habit_logs"] = sinceMs
         fetch("habit_logs")
         return habitLogs.filter {
             it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: 0L) > sinceMs
@@ -84,6 +113,7 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     }
 
     override suspend fun fetchWantLogsSince(userId: String, sinceMs: Long): List<WantLog> {
+        sinces["want_logs"] = sinceMs
         fetch("want_logs")
         return wantLogs.filter {
             it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: 0L) > sinceMs
@@ -93,24 +123,30 @@ class FakeSupabaseSyncClient : SupabaseSyncClient {
     val userIdentities = mutableListOf<UserIdentityRow>()
     val habitIdentities = mutableListOf<HabitIdentityRow>()
 
-    override suspend fun upsertUserIdentity(row: UserIdentityRow) {
-        failIfNeeded()
-        userIdentities.removeAll { it.userId == row.userId && it.identityId == row.identityId }
-        userIdentities.add(row)
+    override suspend fun upsertUserIdentities(rows: List<UserIdentityRow>) {
+        upsert("user_identities", rows.size)
+        rows.forEach { row ->
+            userIdentities.removeAll { it.userId == row.userId && it.identityId == row.identityId }
+            userIdentities.add(row)
+        }
     }
 
-    override suspend fun upsertHabitIdentity(row: HabitIdentityRow) {
-        failIfNeeded()
-        habitIdentities.removeAll { it.habitId == row.habitId && it.identityId == row.identityId }
-        habitIdentities.add(row)
+    override suspend fun upsertHabitIdentities(rows: List<HabitIdentityRow>) {
+        upsert("habit_identities", rows.size)
+        rows.forEach { row ->
+            habitIdentities.removeAll { it.habitId == row.habitId && it.identityId == row.identityId }
+            habitIdentities.add(row)
+        }
     }
 
     override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> {
+        sinces["user_identities"] = sinceMs
         fetch("user_identities")
         return userIdentities.filter { it.userId == userId && (it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds()) > sinceMs }
     }
 
     override suspend fun fetchHabitIdentitiesSince(userId: String, sinceMs: Long): List<HabitIdentityRow> {
+        sinces["habit_identities"] = sinceMs
         fetch("habit_identities")
         @Suppress("UNUSED_PARAMETER") val _u = userId
         return habitIdentities.filter { (it.syncedAt?.toEpochMilliseconds() ?: it.addedAt.toEpochMilliseconds()) > sinceMs }

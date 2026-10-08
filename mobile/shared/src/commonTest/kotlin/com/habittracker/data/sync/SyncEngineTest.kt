@@ -174,6 +174,66 @@ class SyncEngineTest {
         assertEquals(listOf(false, true, true), auth.waits)
     }
 
+    private suspend fun logOffline(count: Int) = repeat(count) { i ->
+        habitLogRepo.insertLog("log-$i", "user-1", "h1", 1.0, now)
+    }
+
+    @Test
+    fun `a push sends the rows of a table in batches of 500`() = runTest {
+        // One request per row took 0.3 s each, so 200 rows took a minute (#37).
+        logOffline(1200)
+        val result = engine.sync(SyncReason.MANUAL).getOrThrow()
+        assertEquals(1200, result.pushed)
+        assertEquals(listOf(500, 500, 200), supabase.upserts.filter { it.first == "habit_logs" }.map { it.second })
+        assertTrue(habitLogRepo.logs.all { it.syncedAt != null })
+    }
+
+    @Test
+    fun `a failed batch keeps the batches before it synced`() = runTest {
+        logOffline(1200)
+        supabase.throwOnUpsert = 2
+        assertTrue(engine.sync(SyncReason.MANUAL).isFailure)
+        assertEquals(500, habitLogRepo.logs.count { it.syncedAt != null })
+        assertEquals(500, supabase.habitLogs.size)
+    }
+
+    @Test
+    fun `a table with nothing to push sends no request`() = runTest {
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+        assertTrue(supabase.upserts.isEmpty())
+    }
+
+    @Test
+    fun `a pull asks again for the last 5 s before the watermark`() = runTest {
+        // A transaction stamps now() at its start. One that commits after a pull of another
+        // device has a time below that watermark, and a pull from the watermark skips it (#35).
+        for (table in listOf(SyncTable.HABITS, SyncTable.WANT_ACTIVITIES, SyncTable.HABIT_LOGS, SyncTable.WANT_LOGS, SyncTable.HABIT_IDENTITIES)) {
+            watermarks.set(table, 100_000)
+            watermarks.markPulled(table)
+        }
+        watermarks.markRecentLogsPulled()
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+        for (table in listOf("habits", "want_activities", "habit_logs", "want_logs", "habit_identities")) {
+            assertEquals(95_000, supabase.sinces[table], table)
+        }
+    }
+
+    @Test
+    fun `a first pull does not ask for a time before 0`() = runTest {
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+        assertEquals(0, supabase.sinces["habit_logs"])
+    }
+
+    @Test
+    fun `a pull of only the overlap does not move the watermark back`() = runTest {
+        watermarks.set(SyncTable.HABIT_LOGS, tPlus(10).toEpochMilliseconds())
+        SyncTable.entries.forEach { watermarks.markPulled(it) }
+        watermarks.markRecentLogsPulled()
+        supabase.habitLogs.add(HabitLog("old", "user-1", "h1", 1.0, now, syncedAt = tPlus(8)))
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+        assertEquals(tPlus(10).toEpochMilliseconds(), watermarks.get(SyncTable.HABIT_LOGS))
+    }
+
     @Test
     fun `push failure surfaces Error state`() = runTest {
         habitRepo.saveHabit(makeHabit("h1"))

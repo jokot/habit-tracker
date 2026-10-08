@@ -20,14 +20,14 @@ The app reads and writes only the local SQLite database. The screens and the wid
 flowchart LR
     UI["Screens and widgets"] -- "read and write" --> DB[("Local SQLite<br/>source for the UI")]
     DB -- "rows with syncedAt = null" --> ENG["SyncEngine"]
-    ENG -- "1. push: upsert one row per request" --> SB[("Supabase<br/>Postgrest")]
+    ENG -- "1. push: upsert 500 rows per request" --> SB[("Supabase<br/>Postgrest")]
     SB -- "2. pull: rows newer than the watermark" --> ENG
     ENG -- "merge" --> DB
     DB -- "data flows" --> UI
 ```
 
 - A local write sets `syncedAt = null`. That marks the row as "not pushed yet".
-- A push sends the row and sets `syncedAt` to the push time.
+- A push sends the row and sets `syncedAt` on the phone. The server ignores that time. Its triggers set `synced_at` and `updated_at` to the server time.
 - A pull asks only for rows that are newer than the table watermark. Each table has its own watermark.
 
 ## 2. What starts a sync
@@ -82,12 +82,13 @@ sequenceDiagram
         E-->>T: Success, 0 pushed, 0 pulled
     else Signed in
         E->>E: state = Running
-        Note over E,S: Push: one table after another, one request per row
+        Note over E,S: Push: one table after another, 500 rows per request
         loop habits, want_activities, habit_logs,<br/>want_logs, user_identities, habit_identities
             E->>L: Read rows with syncedAt = null
-            loop Each row
-                E->>S: Upsert the row
-                E->>L: Set syncedAt = push time
+            loop Each batch of 500 rows
+                E->>S: Upsert the batch
+                Note over S: Triggers set synced_at<br/>and updated_at = now()
+                E->>L: Set syncedAt on each row of the batch
             end
         end
         Note over E,S: Pull: see section 4
@@ -188,9 +189,15 @@ A table with new rows costs 2 requests: one page of rows and one empty page. A t
 
 | Table | Watermark column |
 |---|---|
-| habits, want_activities | `updated_at` |
+| habits, want_activities, habit_identities | `updated_at` |
 | habit_logs, want_logs | `synced_at` |
-| user_identities, habit_identities | `synced_at`, or `added_at` when `synced_at` is empty |
+| user_identities | none: each pull gets all the rows of the user |
+
+The server sets each watermark column. A `before insert or update` trigger writes `now()`, and replaces the time that the app sends (#35). So all the watermarks come from one clock, also for an old version of the app.
+
+A pull asks for rows after the watermark less 5 s (`WATERMARK_OVERLAP_MS`). `now()` is the start time of a transaction. A transaction that commits after the pull of another device can have a time below the watermark of that pull. The next pull asks for those seconds again. The merges are by id, so a row that comes again changes nothing. The watermark only moves forward.
+
+The watermark is in milliseconds, and `now()` has microseconds. The watermark rounds down, so the rows of its last millisecond come again. This direction never loses a row.
 
 Each page starts after the key of the last row read: the watermark column, then `id`. The `id` breaks ties between rows with the same timestamp. Thus no row is lost or read twice at a page boundary.
 
@@ -227,7 +234,8 @@ sequenceDiagram
 - A job that ColorOS stops counts as one attempt, and the next attempt waits for the backoff. With `KEEP`, a new log joins that job, so it also waits for the backoff and not for the network.
 - A job waits for a network connection, not for a server that answers. If the server is down, the job runs, fails, counts as a sync failure, and asks for a retry.
 - The failed sync changes no local data. The rows stay pending until a push succeeds.
-- When a push fails in the middle, the rows sent before the failure stay synced. The next push sends only the rest. An upsert of the same row again is safe.
+- A push sends each table in batches of 500 rows. Each batch is one request, so the server saves the whole batch or none of it. When a batch fails, the batches before it stay synced. The next push sends only the rest. An upsert of the same row again is safe.
+- A list upsert sends one `columns` list with the keys of all its rows. A row without a key gets NULL in that column. So every DTO field with a default value has `@EncodeDefault`.
 - A pull that fails keeps the watermarks of the tables merged before the failure. The failed table and the tables after it keep their old watermarks. The next pull starts from there.
 
 ### The life of one row
@@ -363,5 +371,6 @@ The next sign-in resolves the hold before the guest migration:
 
 ## 7. Known risks
 
-- **The push uses the phone clock.** `synced_at` is the push time on the phone. A phone with a slow clock writes a time that is earlier than the real time. Another device with a watermark after that time never pulls the row.
-- **The push sends one request per row.** After a long time offline, a push of 200 logs needs 200 requests in series.
+- **The overlap pulls the newest rows again.** All the rows of one batch have the same `synced_at`, and the watermark stays at that time until a newer row arrives. Each sync then pulls that batch again: 222 logs are about 60 KB.
+- **A cancelled job shows as a failure.** ColorOS can stop a job during a sync. `SyncEngine` then sets the state to "Sync failed", and the failure counter goes up by 1. The next sync that succeeds resets both.
+- **Last push wins.** The server sets `updated_at` at the push. An edit that was made offline and pushed later replaces a newer edit from another device.

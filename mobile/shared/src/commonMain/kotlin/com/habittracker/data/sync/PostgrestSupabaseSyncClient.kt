@@ -19,20 +19,25 @@ class PostgrestSupabaseSyncClient(
     private val supabase: SupabaseClient,
 ) : SupabaseSyncClient {
 
-    override suspend fun upsertHabit(row: Habit) {
-        supabase.postgrest.from("habits").upsert(row.toDto())
-    }
+    override suspend fun upsertHabits(rows: List<Habit>) =
+        upsertAll("habits", rows.map { it.toDto() })
 
-    override suspend fun upsertWantActivity(row: WantActivity, ownerUserId: String) {
-        supabase.postgrest.from("want_activities").upsert(row.toDto(ownerUserId))
-    }
+    override suspend fun upsertWantActivities(rows: List<WantActivity>, ownerUserId: String) =
+        upsertAll("want_activities", rows.map { it.toDto(ownerUserId) })
 
-    override suspend fun upsertHabitLog(row: HabitLog) {
-        supabase.postgrest.from("habit_logs").upsert(row.toDto())
-    }
+    override suspend fun upsertHabitLogs(rows: List<HabitLog>) =
+        upsertAll("habit_logs", rows.map { it.toDto() })
 
-    override suspend fun upsertWantLog(row: WantLog) {
-        supabase.postgrest.from("want_logs").upsert(row.toDto())
+    override suspend fun upsertWantLogs(rows: List<WantLog>) =
+        upsertAll("want_logs", rows.map { it.toDto() })
+
+    /**
+     * A list upsert sends one `columns` list, the keys of all its rows. A row without a key
+     * gets NULL in that column, so each DTO field with a default has @EncodeDefault.
+     */
+    private suspend inline fun <reified D : Any> upsertAll(table: String, rows: List<D>) {
+        if (rows.isEmpty()) return
+        supabase.postgrest.from(table).upsert(rows)
     }
 
     override suspend fun fetchHabitsSince(userId: String, sinceMs: Long): List<Habit> =
@@ -95,13 +100,11 @@ class PostgrestSupabaseSyncClient(
             gte("logged_at", Instant.fromEpochMilliseconds(fromMs).toString())
         }.map { it.toDomain() }
 
-    override suspend fun upsertUserIdentity(row: UserIdentityRow) {
-        supabase.postgrest.from("user_identities").upsert(row.toDto())
-    }
+    override suspend fun upsertUserIdentities(rows: List<UserIdentityRow>) =
+        upsertAll("user_identities", rows.map { it.toDto() })
 
-    override suspend fun upsertHabitIdentity(row: HabitIdentityRow) {
-        supabase.postgrest.from("habit_identities").upsert(row.toDto())
-    }
+    override suspend fun upsertHabitIdentities(rows: List<HabitIdentityRow>) =
+        upsertAll("habit_identities", rows.map { it.toDto() })
 
     override suspend fun fetchUserIdentitiesSince(userId: String, sinceMs: Long): List<UserIdentityRow> {
         // user_identities mutate via UPDATE (pin / why / soft-remove) without
@@ -279,6 +282,7 @@ private fun HabitDto.toDomain(): Habit = Habit(
     effectiveTo = effectiveTo?.let { Instant.parse(it) },
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 private data class WantActivityDto(
     val id: String,
@@ -288,8 +292,8 @@ private data class WantActivityDto(
     @SerialName("units_per_point") val unitsPerPoint: Int,
     @SerialName("is_custom") val isCustom: Boolean,
     @SerialName("updated_at") val updatedAt: String,
-    @SerialName("icon_key") val iconKey: String? = null,
-    @SerialName("hidden_at") val hiddenAt: String? = null,
+    @kotlinx.serialization.EncodeDefault @SerialName("icon_key") val iconKey: String? = null,
+    @kotlinx.serialization.EncodeDefault @SerialName("hidden_at") val hiddenAt: String? = null,
 )
 
 private fun WantActivity.toDto(ownerUserId: String) = WantActivityDto(
@@ -348,13 +352,14 @@ private fun HabitLogDto.toDomain() = HabitLog(
     syncedAt = syncedAt?.let { Instant.parse(it) },
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 private data class WantLogDto(
     val id: String,
     @SerialName("user_id") val userId: String,
     @SerialName("activity_id") val activityId: String,
     val quantity: Double,
-    @SerialName("points_spent") val pointsSpent: Int = 1,
+    @kotlinx.serialization.EncodeDefault @SerialName("points_spent") val pointsSpent: Int = 1,
     @SerialName("device_mode") val deviceMode: String,
     @SerialName("logged_at") val loggedAt: String,
     @SerialName("deleted_at") val deletedAt: String?,
