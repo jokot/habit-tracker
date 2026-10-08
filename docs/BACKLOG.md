@@ -100,3 +100,17 @@ an issue, #33 to #37. Most severe first:
      `docs/qa/2026-08-08-phase10-widgets-v2-qa.md`.
    - PR #27: a cold start in airplane mode while signed in. Widgets must show the data
      of the user. This test is the one that proves the `LastAuthUserStore` fix.
+5. **Today: no space above the identity strip when the timer banner shows.** Found in the
+   QA of PR #41. `HomeTimerBanner` (`HomeScreen.kt`) touches the "I AM" row below it. The
+   strip has no top padding, so the banner needs a gap below it. Check the rate-ladder
+   banner too, because it is the next item in the same list.
+6. **A running want timer shows only on the device that started it.** Found in the QA of
+   PR #41. Sign in as the same user on device A and device B. Start a timed want on device
+   A. Device B shows no timer, and the balance of device B does not show the points that
+   the timer uses.
+   - `LocalWantTimer` is a local SQLite table. No Supabase table and no sync code exist
+     for it.
+   - The want log arrives on the server only when the timer ends. Until then, device B
+     can spend the same points again.
+   - A fix needs a product decision: show the timer on each device, or only lock the
+     points. It also needs a server table, RLS and a sync path for the timer rows.
