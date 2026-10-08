@@ -9,6 +9,7 @@ import com.habittracker.data.repository.HabitRepository
 import com.habittracker.data.repository.IdentityRepository
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantLogRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,7 @@ class SyncEngine(
         }
         val userId = identity.currentUserId()
         val start = clock.now()
+        val before = _state.value
         _state.value = SyncState.Running(start, reason)
         runCatching {
             val pushed = push(userId)
@@ -84,6 +86,15 @@ class SyncEngine(
             _state.value = SyncState.Synced(clock.now(), pushed, pulled)
             outcome
         }.onFailure { e ->
+            // A stopped job is not a failed sync. ColorOS stops a background job after about
+            // 5 s. As an Error, each stop showed "Sync failed" and counted toward the
+            // "Sync has been failing" notification. The rows that were not pushed stay
+            // pending, and the job runs again. An old Error goes back to Idle: each new Error
+            // counts as a failure, and Today shows its message again.
+            if (e is CancellationException) {
+                _state.value = if (before is SyncState.Error) SyncState.Idle else before
+                throw e
+            }
             // Full detail goes to logcat; UI gets a short categorized label.
             println("SyncEngine: sync($reason) failed — ${e::class.simpleName}: ${e.message}")
             e.printStackTrace()
