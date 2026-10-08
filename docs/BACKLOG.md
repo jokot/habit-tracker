@@ -1,6 +1,6 @@
 # Backlog
 
-State as of 2026-10-02. The phase table in
+State as of 2026-10-09. The phase table in
 `docs/superpowers/specs/2026-04-20-habit-tracker-design.md` §12 is stale — it lists
 seven phases, and twelve have shipped. This file is the live one.
 
@@ -66,6 +66,7 @@ Out of scope by decision: posted notification copy in the workers,
 | #27 | 2026-08-10 | Widgets no longer go empty after a cold start. `LastAuthUserStore` keeps the last signed-in user id, so widgets, workers and `WantTimerService` read the correct rows before the session loads. Also: streak grid fills its frame, widgets default to 2×2, quick-log tiles fit their cells. |
 | #28 | 2026-08-11 | Timed wants start their timer from Today. A tap opens the "How long?" sheet on Home. A tap on a running want shows a snackbar with the time left. The predicate moved to `WantActivity.isTimed`. |
 | #29 | 2026-08-11 | The pending card of a timed want says `Starts in 3s` and `−1 pt at start`. Before, it said `Spends in 3s` with a total for each tap. |
+| #32 | 2026-10-03 | Fixes issue #31. The six pull fetches run in parallel. `RealPostgrestSyncTest` tests the paging against a local Supabase. |
 | #30 | 2026-10-03 | Fixes items 1 and 3 of issue #20. All six pulls use keyset paging, so a first sync no longer loses rows past the 1000-row cap. Sign-in opens Home at once, and each Today section shows a shimmer until its data is local. Streak History updates live and computes off the main thread. A sync at `SYNC_PAGE_SIZE` 2 against the real server pulled all 348 rows correctly. |
 
 ## Known bugs
@@ -79,20 +80,21 @@ an issue, #33 to #37. Most severe first:
 2. **#34 A widget log does not start a sync.** Fixed in PR #40. A signed-in
    widget log queues a `WIDGET_WRITE` job. A background process loads the session from
    storage, and counts the remembered user as signed in. See `docs/sync-flow.md` §2 and §6.
-3. **#35 The push stamps `synced_at` with the phone clock.** Fixed on `fix/batch-push`.
+3. **#35 The push stamps `synced_at` with the phone clock.** Fixed in PR #41.
    Server triggers set `synced_at` and `updated_at`, and a pull asks again for the last 5 s
    before the watermark. See `docs/sync-flow.md` §4.
 4. **#36 The background sync jobs have no network constraint.** Fixed in PR #40. Every job except `MANUAL` waits for `NetworkType.CONNECTED`. A
    job that starts on a reconnect waits for the token refresh. See `docs/sync-flow.md` §2.
-5. **#37 The push sends one request per row, in series.** Fixed on `fix/batch-push`. The
+5. **#37 The push sends one request per row, in series.** Fixed in PR #41. The
    push sends 500 rows per request. On a phone, 222 logs took 1 request and 7 s.
 
 ## Open work, not started
 
 1. **iOS** — SwiftUI screens + WidgetKit extensions over the same shared KMP module.
    Largest remaining spec item; deserves its own spec → plan → phase cycle.
-2. **Issue #31** (the leftovers of issue #20) — PR #32 is open. It runs the six pull
-   fetches in parallel, and it adds `RealPostgrestSyncTest` against a local Supabase.
+2. **Issue #39: Today links and logging from the detail screens.** The Today habit and
+   want sections get a link to their list screens. Habit detail and want detail get a log
+   action. Needs a product decision on the link label and on the log action first.
 3. **Overlay enforcement** (`SYSTEM_ALERT_WINDOW`) — spec backlog, marked post-iOS.
 4. **Device QA leftovers** — not done on a device yet:
    - Phase 10: quick-log grid scrolling past the visible rows, and tap latency with all
@@ -114,3 +116,76 @@ an issue, #33 to #37. Most severe first:
      can spend the same points again.
    - A fix needs a product decision: show the timer on each device, or only lock the
      points. It also needs a server table, RLS and a sync path for the timer rows.
+
+## Deferred features, not built
+
+The specs deferred these features, and no later phase built them. Checked against `main`
+at `831b68d` on 2026-10-09. Each item names the spec that deferred it.
+
+### Small to medium: the UI or the design exists
+
+1. **Custom identity.** The user picks a name, an icon and a colour. The "Custom" tile in
+   Add Identity step 1 shows a "Coming soon" toast (`AddIdentityStep1Screen.kt:191`).
+   `Identity` has no owner field, and the `identities` table holds only the global seed
+   rows. So this needs a schema change. Spec: Phase 5c-2.
+2. **Custom habit inside Add Identity.** The "+ Define a custom habit" button in step 2
+   shows a "Coming soon" toast (`AddIdentityStep2Screen.kt:191`). The habit form exists
+   and can supply the form. Specs: Phase 5c-2 and 5e-3.
+3. **Search in Add Identity step 1.** The search field is a placeholder with no filter
+   (`AddIdentityStep1Screen.kt:134`). Spec: Phase 5c-2.
+4. **Past identities.** A collapsed section on the Identities list for removed
+   identities. The design has it (canvas line 2220). Specs: Phase 5c-2 and 5e-3.
+5. **Habit icon picker.** The habit icon comes from the name (`habitIcon(name)`), and
+   `Habit` has no icon field. Wants already have a picker (`WantIconPicker`). Spec: Phase
+   5e-3.
+6. **Habit reorder.** The design shows a drag handle. Habits have no order field, and the
+   list sorts by name. Specs: Phase 5e-1 and 5e-3.
+7. **Habit list grouped by identity.** The habit list is one flat list. Spec: Phase 5e-2.
+8. **Per-habit streak on the Today cards.** The per-habit streak shows only on habit
+   detail. Spec: Phase 5a.
+9. **Past-spend rate text.** For example, "This was logged at the 1.2× rate" on a want
+   log. Spec: Phase 6.
+10. **Resend the confirmation email.** Sign-up shows a "check your email" state, but no
+    resend action. Spec: Phase 3.
+11. **Dev tools.** Force sync, clock offset, trigger a session expiry, wipe data. The dev
+    tools screen only seeds test data. Spec: Dev tools.
+
+### Medium to large: needs a product decision first
+
+12. **Automatic daily targets.** An engine raises or lowers a daily target from the
+    history, with the notifications `bar_raised` and `bar_dropped`. Nothing changes
+    `dailyTarget` except the habit form. Specs: Phase 9 and 9.1.
+13. **Theme picker.** Light, dark or system. The app uses `isSystemInDarkTheme()` only.
+    Spec: Phase 4.
+14. **Data export and backup.** No export exists. Spec: Phase 4.
+15. **More timer actions.** Pause and resume, more than one timer at a time, and a snooze
+    action. `WantTimerState` has only RUNNING, FINISHED and CANCELLED. See also open work
+    item 6 for the timer on other devices. Specs: Phase 9 and 9.1.
+16. **Per-habit streak widget.** The streak widget shows only the overall streak. Spec:
+    master spec §3.2.
+17. **Freeze stock.** The user earns and spends freezes. Today a frozen day is automatic
+    ("never miss twice"), with no count and no screen. Specs: Phase 4 and 5a.
+18. **Periodic and live sync.** A periodic WorkManager sync, or Supabase Realtime. Sync
+    runs only on a trigger today. Spec: Phase 3.
+
+### Large: after iOS
+
+19. **Android overlay enforcement** (`SYSTEM_ALERT_WINDOW`). The app warns or blocks while
+    the user spends time on a want. The manifest has no such permission. Spec: master spec
+    §12.
+20. **Apple Sign-In.** Tied to the iOS work. Spec: Phase 3.
+
+### Deferred, and built later
+
+These items appear in the deferred lists of the specs, but a later phase built them. Do
+not plan them again:
+
+- Milestone, timer-end and tier-up notifications: `MILESTONE_STREAK`, `WANT_TIMER_END`
+  and `TIER_ADVANCED` in `NotificationTypeId.kt`.
+- Habit and want CRUD, the want timer, the identity screens, the widgets and the
+  exchange-rate screen.
+- Custom habits outside Add Identity: `HabitFormScreen.kt`.
+- The edit action on habit detail: `HabitDetailScreen.kt:71`.
+- Identity stats that use the link dates of each day: `ComputeIdentityStatsUseCase.kt:117`.
+- Removal of the old notification switches from Settings.
+- The per-habit streak number: `ComputePerHabitStreakUseCase`, on habit detail.
