@@ -1,6 +1,5 @@
 package com.jktdeveloper.habitto.ui.identity
 
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.jktdeveloper.habitto.ui.components.HabitGlyph
@@ -61,8 +59,8 @@ fun AddIdentityStep2Screen(
     onBack: () -> Unit,
     onToggle: (String) -> Unit,
     onCommit: () -> Unit,
+    onDefineCustomHabit: () -> Unit,
 ) {
-    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val selectedIdentity = state.selectedIdentity
     val hue = IdentityHue.forIdentity(selectedIdentity)
@@ -187,9 +185,8 @@ fun AddIdentityStep2Screen(
             // "Define a custom habit" button
             item {
                 TextButton(
-                    onClick = {
-                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
-                    },
+                    onClick = onDefineCustomHabit,
+                    enabled = !state.isCommitting,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Icon(
