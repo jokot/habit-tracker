@@ -235,6 +235,54 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `a sync that the job stops keeps the state from before it, not an error`() = runTest {
+        // ColorOS stops a background job after about 5 s. The stop is not a failure, so it must
+        // not show "Sync failed" or count toward "Sync has been failing".
+        engine.sync(SyncReason.MANUAL).getOrThrow()
+        val before = engine.syncState.value
+        assertTrue(before is SyncState.Synced)
+
+        supabase.holds["habits"] = CompletableDeferred()
+        val job = launch { engine.sync(SyncReason.POST_LOG) }
+        runCurrent()
+        assertTrue(engine.syncState.value is SyncState.Running)
+
+        job.cancel()
+        runCurrent()
+
+        assertEquals(before, engine.syncState.value)
+    }
+
+    @Test
+    fun `a sync that the job stops after an error does not show the old error again`() = runTest {
+        // Each new Error counts as a failure, and Today shows its message again.
+        habitRepo.saveHabit(makeHabit("h1"))
+        supabase.shouldThrowOnNext = RuntimeException("boom")
+        engine.sync(SyncReason.MANUAL)
+        assertTrue(engine.syncState.value is SyncState.Error)
+
+        supabase.holds["habits"] = CompletableDeferred()
+        val job = launch { engine.sync(SyncReason.POST_LOG) }
+        runCurrent()
+        job.cancel()
+        runCurrent()
+
+        assertEquals(SyncState.Idle, engine.syncState.value)
+    }
+
+    @Test
+    fun `a stopped sync does not hold the lock`() = runTest {
+        supabase.holds["habits"] = CompletableDeferred()
+        val job = launch { engine.sync(SyncReason.POST_LOG) }
+        runCurrent()
+        job.cancel()
+        runCurrent()
+
+        supabase.holds.clear()
+        assertTrue(engine.sync(SyncReason.MANUAL).isSuccess)
+    }
+
+    @Test
     fun `push failure surfaces Error state`() = runTest {
         habitRepo.saveHabit(makeHabit("h1"))
         supabase.shouldThrowOnNext = RuntimeException("boom")
