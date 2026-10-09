@@ -94,7 +94,7 @@ Decided on 2026-10-09. No user except the developer uses the app yet, so the nex
 real use, not more features. Each feature below that waits for a signal waits for this
 release.
 
-1. **One PR** with the 3 items of "Before release: fix".
+1. **One PR** with the 3 items of "Before release: fix". Done on `fix/release-blockers`.
 2. **The 5 items** of "Before release: check".
 3. **A Play Store closed test** for 5 to 20 testers, with crash reporting and 3 events:
    a logged habit, a spent want, and a return on day 7.
@@ -105,19 +105,21 @@ second widget system to each later change.
 
 ## Before release: fix
 
-1. **A sync that the phone stops shows as a failure.** In the background, ColorOS (OPPO)
+1. **Done on `fix/release-blockers`. A sync that the phone stops shows as a failure.** In the background, ColorOS (OPPO)
    and similar systems stop a sync job after about 5 s. `runCatching` in `SyncEngine.sync`
    (`SyncEngine.kt:80`) also catches the `CancellationException`. The engine then sets
    "Sync failed", and `SyncFailureCounter` counts 1 failure. After 3 stops in a row, the
    user gets "Sync has been failing — check your connection", but no sync failed. A
    stopped sync must not set `Error`, and must not count. Seen on an OPPO CPH2737 in the
    QA of PR #41: `sync(POST_LOG) failed — JobCancellationException`.
-2. **No space above the identity strip when the timer banner shows.** Found in the QA of
+2. **Done on `fix/release-blockers`. No space above the identity strip when the timer banner shows.** Found in the QA of
    PR #41. `HomeTimerBanner` (`HomeScreen.kt`) touches the "I AM" row below it. The strip
    has no top padding, so the banner needs a gap below it. Check the rate-ladder banner
    too, because it is the next item in the same list.
-3. **"Coming soon" dead ends in Add Identity.** See deferred features 1 to 3:
-   - Build the custom habit in step 2. The habit form exists.
+3. **Done on `fix/release-blockers`. "Coming soon" dead ends in Add Identity.** See deferred features 1, 3 and 4:
+   - Build the custom habit in step 2. The button saves the identity and the checked
+     habits, then opens the habit form with the identity selected. A save or a close of
+     the form lands on the identity.
    - Remove the "Custom" identity tile from step 1.
    - Remove the search field from step 1. It filters nothing, and step 1 shows only 13
      identities.
@@ -193,8 +195,8 @@ from 2026-10-09, and they assume that no user except the developer uses the app 
 
 ### Build before release
 
-1. **Custom habit inside Add Identity.** The "+ Define a custom habit" button in step 2
-   shows a "Coming soon" toast (`AddIdentityStep2Screen.kt:191`). The habit form exists,
+1. **Custom habit inside Add Identity.** Done on `fix/release-blockers`. The
+   "+ Define a custom habit" button in step 2 showed a "Coming soon" toast. The habit form exists,
    so this is mostly navigation. A dead end in the first flow of a new user costs the most.
    Specs: Phase 5c-2 and 5e-3.
 2. **Resend the confirmation email,** only if prod requires email confirmation (see
@@ -204,13 +206,13 @@ from 2026-10-09, and they assume that no user except the developer uses the app 
 ### Remove the UI, do not build the feature
 
 3. **Custom identity.** The user picks a name, an icon and a colour. The "Custom" tile in
-   step 1 shows a "Coming soon" toast (`AddIdentityStep1Screen.kt:191`). `Identity` has no
+   step 1 showed a "Coming soon" toast, and `fix/release-blockers` removed it. `Identity` has no
    owner field, and the `identities` table holds only the 13 global seed rows. So the
    feature needs a schema change, RLS, sync for rows that a user owns, and an icon and
    colour picker. Custom habits already cover personal goals. Build it when users ask for
    an identity that the 13 do not cover. Spec: Phase 5c-2.
-4. **Search in Add Identity step 1.** The field is a placeholder with no filter
-   (`AddIdentityStep1Screen.kt:134`). A search over 13 items adds nothing, and a field
+4. **Search in Add Identity step 1.** The field was a placeholder with no filter, and
+   `fix/release-blockers` removed it. A search over 13 items adds nothing, and a field
    that does nothing looks like a bug. Spec: Phase 5c-2.
 
 ### Wait for a signal from the testers
