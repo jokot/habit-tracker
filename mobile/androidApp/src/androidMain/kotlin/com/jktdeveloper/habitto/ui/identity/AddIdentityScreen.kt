@@ -9,11 +9,11 @@ import androidx.compose.runtime.getValue
 fun AddIdentityScreen(
     viewModel: AddIdentityViewModel,
     onClose: () -> Unit,
-    onCommitSuccess: () -> Unit,
+    onCommitSuccess: (AddIdentityDone) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(Unit) {
-        viewModel.commitSuccess.collect { onCommitSuccess() }
+        viewModel.commitSuccess.collect { onCommitSuccess(it) }
     }
     when (state.step) {
         1 -> AddIdentityStep1Screen(
@@ -27,6 +27,7 @@ fun AddIdentityScreen(
             onBack = viewModel::goBackToStep1,
             onToggle = viewModel::toggleHabit,
             onCommit = viewModel::commit,
+            onDefineCustomHabit = viewModel::defineCustomHabit,
         )
     }
 }

@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -27,6 +29,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -36,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +51,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habittracker.domain.model.Identity
@@ -130,7 +137,9 @@ fun HabitFormScreen(
             ) { Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             return@Scaffold
         }
-        LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
+        // Edge-to-edge stops adjustResize, so the list must leave space for the keyboard itself.
+        // Without it, the keyboard covers the Goal fields.
+        LazyColumn(modifier = Modifier.padding(padding).fillMaxSize().imePadding()) {
             item { NameRow(state, viewModel::onNameChange) }
             item { IdentitiesSection(state, viewModel::onIdentitiesChange) }
             item { GoalSection(state, viewModel::onThresholdChange, viewModel::onTargetChange, viewModel::onUnitChange) }
@@ -208,9 +217,13 @@ private fun IdentitiesSection(state: HabitFormState, onChange: (Set<String>) -> 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
             )
-            FlowChips {
-                unselected.forEach { id ->
-                    SuggestionPill(id, onAdd = { onChange(state.selectedIdentityIds + id.id) })
+            // A clickable Surface reserves 48 dp of height, so each row of 28 dp pills had 20 dp
+            // of empty space. The pills keep their full width as targets.
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                FlowChips {
+                    unselected.forEach { id ->
+                        SuggestionPill(id, onAdd = { onChange(state.selectedIdentityIds + id.id) })
+                    }
                 }
             }
         }
@@ -223,7 +236,7 @@ private fun FlowChips(content: @Composable () -> Unit) {
     androidx.compose.foundation.layout.FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) { content() }
 }
 
@@ -280,20 +293,42 @@ private fun GoalSection(
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
         Text("Goal", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
+        // The fields keep their own text. The value in the state cannot be empty, so a field that
+        // showed the state could not be cleared. An empty field sends 0, and 0 disables Save.
+        var thresholdText by remember {
+            mutableStateOf(
+                if (state.threshold == state.threshold.toLong().toDouble())
+                    state.threshold.toLong().toString() else state.threshold.toString()
+            )
+        }
+        var targetText by remember { mutableStateOf(state.target.toString()) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
-                value = if (state.threshold == state.threshold.toLong().toDouble())
-                    state.threshold.toLong().toString() else state.threshold.toString(),
-                onValueChange = { v -> v.toDoubleOrNull()?.let(onThreshold) },
+                value = thresholdText,
+                onValueChange = { v ->
+                    // Some keyboards type a comma as the decimal mark.
+                    val text = v.replace(',', '.')
+                    if (text.all { it.isDigit() || it == '.' } && text.count { it == '.' } <= 1) {
+                        thresholdText = text
+                        onThreshold(text.toDoubleOrNull() ?: 0.0)
+                    }
+                },
                 label = { Text("1 point per") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                 modifier = Modifier.weight(1f),
             )
             OutlinedTextField(
-                value = state.target.toString(),
-                onValueChange = { v -> v.toIntOrNull()?.let(onTarget) },
+                value = targetText,
+                onValueChange = { v ->
+                    if (v.all { it.isDigit() }) {
+                        targetText = v
+                        onTarget(v.toIntOrNull() ?: 0)
+                    }
+                },
                 label = { Text("Daily target") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -303,6 +338,7 @@ private fun GoalSection(
             onValueChange = onUnit,
             label = { Text("Unit (e.g. min, reps, pages)") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             modifier = Modifier.fillMaxWidth(),
         )
     }

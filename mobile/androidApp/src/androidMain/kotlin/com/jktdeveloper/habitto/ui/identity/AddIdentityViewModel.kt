@@ -30,6 +30,9 @@ data class HabitChoice(
     val alreadyTracking: Boolean,
 )
 
+/** The identity is saved. [openHabitForm] is true when the user asked for a custom habit. */
+data class AddIdentityDone(val identityId: String, val openHabitForm: Boolean)
+
 data class AddIdentityUiState(
     val step: Int = 1,
     val candidates: List<Identity> = emptyList(),
@@ -51,8 +54,8 @@ class AddIdentityViewModel(
     private val _state = MutableStateFlow(AddIdentityUiState())
     val state: StateFlow<AddIdentityUiState> = _state.asStateFlow()
 
-    private val _commitSuccess = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val commitSuccess: SharedFlow<Unit> = _commitSuccess.asSharedFlow()
+    private val _commitSuccess = MutableSharedFlow<AddIdentityDone>(extraBufferCapacity = 1)
+    val commitSuccess: SharedFlow<AddIdentityDone> = _commitSuccess.asSharedFlow()
 
     constructor(container: AppContainer) : this(
         identityRepo = container.identityRepository,
@@ -119,7 +122,17 @@ class AddIdentityViewModel(
         }
     }
 
-    fun commit() {
+    fun commit() = save(openHabitForm = false)
+
+    /**
+     * Saves the identity and the checked habits, then opens the habit form for a custom habit.
+     * The habit form links a habit only to an identity that the user has, so the identity
+     * comes first.
+     */
+    fun defineCustomHabit() = save(openHabitForm = true)
+
+    private fun save(openHabitForm: Boolean) {
+        if (_state.value.isCommitting) return
         val selected = _state.value.selectedIdentity ?: return
         val selectedTemplateIds = _state.value.recommendedHabits.filter { it.checked }.map { it.templateId }.toSet()
         _state.update { it.copy(isCommitting = true, error = null) }
@@ -129,7 +142,7 @@ class AddIdentityViewModel(
                 .onSuccess {
                     triggerSync()
                     _state.update { it.copy(isCommitting = false) }
-                    _commitSuccess.tryEmit(Unit)
+                    _commitSuccess.tryEmit(AddIdentityDone(selected.id, openHabitForm))
                 }
                 .onFailure { e ->
                     _state.update { it.copy(isCommitting = false, error = "Couldn't save — try again. (${e.message})") }

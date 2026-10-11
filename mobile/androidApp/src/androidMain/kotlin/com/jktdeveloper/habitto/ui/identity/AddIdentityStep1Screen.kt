@@ -1,6 +1,5 @@
 package com.jktdeveloper.habitto.ui.identity
 
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,7 +57,6 @@ fun AddIdentityStep1Screen(
     onSelect: (Identity) -> Unit,
     onContinue: () -> Unit,
 ) {
-    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -124,40 +120,10 @@ fun AddIdentityStep1Screen(
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                     Text(
-                        text = "Pick from suggestions or define your own.",
+                        text = "Pick an identity to add.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-            }
-
-            // Search bar (non-functional placeholder)
-            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = "Search identities…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
@@ -181,15 +147,6 @@ fun AddIdentityStep1Screen(
                     identity = identity,
                     selected = selected,
                     onClick = { onSelect(identity) },
-                )
-            }
-
-            // Custom tile
-            item {
-                CustomIdentityTile(
-                    onClick = {
-                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
-                    },
                 )
             }
         }
@@ -257,55 +214,6 @@ private fun IdentityCandidateTile(
                     color = if (selected) selectedSubtitleFg else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CustomIdentityTile(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = Color.Transparent,
-        modifier = Modifier
-            .fillMaxWidth()
-            .dashedBorder(
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(16.dp),
-                strokeWidth = 2.dp,
-                dashLength = 6.dp,
-                gapLength = 4.dp,
-            ),
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = "Custom",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = "Define your own.",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

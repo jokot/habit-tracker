@@ -491,10 +491,16 @@ fun AppNavigation(container: AppContainer) {
                 AddIdentityScreen(
                     viewModel = vm,
                     onClose = { navController.popBackStack() },
-                    onCommitSuccess = {
+                    onCommitSuccess = { done ->
                         navController.navigate(Screen.IdentityList.route) {
                             popUpTo(Screen.IdentityList.route) { inclusive = true }
                             launchSingleTop = true
+                        }
+                        // A custom habit opens the form on top of the new identity, so a save or
+                        // a close of the form lands on the identity.
+                        if (done.openHabitForm) {
+                            navController.navigate(Screen.IdentityDetail.route(done.identityId))
+                            navController.navigate(Screen.HabitForm.route(identityId = done.identityId))
                         }
                     },
                 )

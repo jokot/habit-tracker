@@ -228,7 +228,7 @@ fun HomeScreen(
                     if (showBanner) {
                         Surface(
                             color = MaterialTheme.colorScheme.tertiaryContainer,
-                            modifier = Modifier.fillMaxWidth().clickable {
+                            modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().clickable {
                                 viewModel.markRateLadderBannerSeen()
                                 onOpenExchangeRate()
                             },
@@ -466,6 +466,8 @@ private fun HomeTimerBanner(
 ) {
     Row(
         modifier = Modifier
+            // Each Today section keeps 12 dp below it. The identity strip has no top padding.
+            .padding(bottom = 12.dp)
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primaryContainer),
         verticalAlignment = Alignment.CenterVertically,
