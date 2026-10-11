@@ -170,12 +170,18 @@ class AppContainer(context: Context) {
         habitLogRepository, wantLogRepository, habitRepository, wantActivityRepository,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
     )
-    val logHabitUseCase = LogHabitUseCase(habitLogRepository, habitRepository)
+    val analytics = AppAnalytics(appContext)
+    val logHabitUseCase = LogHabitUseCase(
+        habitLogRepository = habitLogRepository,
+        habitRepository = habitRepository,
+        onLogged = analytics::habitLogged,
+    )
     val logWantUseCase = LogWantUseCase(
         wantLogRepository = wantLogRepository,
         wantActivityRepository = wantActivityRepository,
         getPointBalanceUseCase = getPointBalanceUseCase,
         getUserStreakOnDayUseCase = getUserStreakOnDayUseCase,
+        onLogged = analytics::wantSpent,
     )
     val getWidgetDataUseCase = GetWidgetDataUseCase(
         getTodayHabitsUseCase = getTodayHabitsUseCase,

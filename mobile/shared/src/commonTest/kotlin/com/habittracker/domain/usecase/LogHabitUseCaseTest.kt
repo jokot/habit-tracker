@@ -77,4 +77,16 @@ class LogHabitUseCaseTest {
         val result = useCase.execute(userId, "h1", 9.0).getOrThrow()
         assertEquals(1, result.pointsEarned)
     }
+
+    @Test
+    fun `onLogged gets each saved log and no failed log`() = runTest {
+        val logged = mutableListOf<LogHabitResult>()
+        val reporting = LogHabitUseCase(habitLogRepo, habitRepo, onLogged = { logged += it })
+        habitRepo.saveHabit(makeHabit("h1", 3.0))
+
+        val result = reporting.execute(userId, "h1", 3.0).getOrThrow()
+        reporting.execute(userId, "unknown", 3.0)
+
+        assertEquals(listOf(result), logged)
+    }
 }

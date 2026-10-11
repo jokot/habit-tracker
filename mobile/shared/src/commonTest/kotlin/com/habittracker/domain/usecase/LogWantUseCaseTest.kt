@@ -78,4 +78,17 @@ class LogWantUseCaseTest {
         val result = useCase.execute(userId, "a1", taps = 3, deviceMode = DeviceMode.OTHER).getOrThrow()
         assertEquals(3, result.pointsSpent)
     }
+
+    @Test
+    fun `onLogged gets each saved spend and no refused spend`() = runTest {
+        val logged = mutableListOf<LogWantResult>()
+        val reporting = LogWantUseCase(wantLogRepo, activityRepo, balance, streakOnDay, onLogged = { logged += it })
+        giveBalance(2)
+        activityRepo.activities.add(WantActivity("a1", "Scroll", "minutes", 1))
+
+        val result = reporting.execute(userId, "a1", taps = 2, deviceMode = DeviceMode.OTHER).getOrThrow()
+        reporting.execute(userId, "a1", taps = 1, deviceMode = DeviceMode.OTHER)
+
+        assertEquals(listOf(result), logged)
+    }
 }

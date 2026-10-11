@@ -10,6 +10,13 @@ val localProps = Properties()
 val localPropsFile = rootProject.file("local.properties")
 if (localPropsFile.exists()) localProps.load(localPropsFile.inputStream())
 
+// Firebase reads its project from google-services.json. The file is not in git. Without it,
+// the app builds with no crash reports and no events. See docs/release.md.
+if (file("google-services.json").exists()) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+    apply(plugin = libs.plugins.firebase.crashlytics.get().pluginId)
+}
+
 kotlin {
     androidTarget {
         compilations.all {
@@ -35,6 +42,28 @@ android {
             "GOOGLE_WEB_CLIENT_ID",
             "\"${localProps.getProperty("google.web_client_id", "")}\"",
         )
+    }
+
+    // The upload key and its passwords are in local.properties, not in git. See docs/release.md.
+    val uploadStoreFile = localProps.getProperty("release.store_file")
+    signingConfigs {
+        if (uploadStoreFile != null) {
+            create("release") {
+                storeFile = file(uploadStoreFile)
+                storePassword = localProps.getProperty("release.store_password")
+                keyAlias = localProps.getProperty("release.key_alias")
+                keyPassword = localProps.getProperty("release.key_password")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // R8 stays off for the closed test. supabase-kt, Ktor and kotlinx.serialization need
+            // keep rules first, and a stack trace without obfuscation needs no mapping file.
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+        }
     }
 
     buildFeatures {
@@ -72,6 +101,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(kotlin("test-junit"))

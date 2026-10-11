@@ -98,6 +98,8 @@ release.
 2. **The 5 items** of "Before release: check".
 3. **A Play Store closed test** for 5 to 20 testers, with crash reporting and 3 events:
    a logged habit, a spent want, and a return on day 7.
+   The events are `habit_logged` and `want_spent`. The Retention report of Firebase gives
+   the return on day 7. See `docs/release.md` §4.
 4. **2 to 4 weeks of use.** Then choose between the features in "Wait for a signal".
 
 iOS waits until the Android test shows that users come back. iOS adds a second UI and a
@@ -139,10 +141,12 @@ second widget system to each later change.
      `docs/qa/2026-08-08-phase10-widgets-v2-qa.md`.
    - PR #27: a cold start in airplane mode while signed in. Widgets must show the data
      of the user. This test is the one that proves the `LastAuthUserStore` fix.
-5. **Build the release against prod.** The worktrees `fix-session-expiry-push`,
-   `fix-sync-triggers` and `fix-batch-push` point `local.properties` at the local
-   Supabase, and they have a debug manifest for clear-text HTTP. Each keeps the prod file
-   as `local.properties.prod`.
+5. **Build the release against prod.** On 2026-10-12, `local.properties` points at prod
+   again in the main checkout and in the 4 fix worktrees. Each fix worktree keeps the local
+   file as `local.properties.local`. `feature/release-setup` adds release signing, Firebase
+   Crashlytics and Analytics, and `docs/release.md`. The steps that you do by hand are in
+   `docs/release.md`: link the CLI, make the upload key, register the SHA-1 keys for Google
+   sign-in, and add `google-services.json`.
 
 ## Known limits, not fixed
 
