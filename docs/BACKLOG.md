@@ -193,6 +193,36 @@ Added on 2026-10-12. Play needs these items before the closed test can go to tes
    row. Only then can it apply for production access. Invite more than 12, because some
    testers leave.
 
+## Prod: checked on 2026-10-12
+
+1. **Dev tools do not ship in a release build.** The screen, the view model and
+   `DevSeeder` are in the `debug` source set. The `release` source set has an empty
+   `devToolsRoute`. Settings shows the row only when `BuildConfig.DEBUG` is true. The
+   release APK has no `DevSeeder` or `DevToolsScreen` class.
+   - A debug build that points at prod shows the dev tools. Do not use the seeder on a
+     prod account.
+2. **Supabase plan.** Prod uses the Free plan. Its limits on 2026-10-12:
+   - 500 MB database, 5 GB uncached egress per month, 50,000 monthly active users
+   - no backups
+   - the project pauses after 1 week without activity
+
+   Estimate: a user who logs 15 times a day adds about 1.5 MB in a year. The database
+   limit is far away. Egress comes first, at a few hundred active users.
+
+   Move to Pro ($25 a month: 8 GB, 250 GB egress, daily backups for 7 days, no pause)
+   when one of these is true:
+   - the app goes to production, because users then depend on the data and Free has no
+     backups
+   - the database passes 400 MB, or egress passes 4 GB in a month
+   - the project paused once during the test
+
+   Until then, back up by hand once a week with `supabase db dump`. See
+   `docs/prod-reset.md` §3.
+
+   Do not move to Firebase or a custom backend for cost. The sync, RLS, auth and the
+   migrations depend on Postgres and Supabase, and a rewrite costs more than Pro for
+   years. Supabase can also run on your own server later, with the same database.
+
 ## Known limits, not fixed
 
 Decided on 2026-10-09: these do not block the release. Fix one when a tester reports it.
