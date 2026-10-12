@@ -34,6 +34,8 @@ class LogHabitUseCase(
     private val habitRepository: HabitRepository,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
     private val clock: Clock = Clock.System,
+    /** Called after each saved log. The app uses it for analytics. */
+    private val onLogged: (LogHabitResult) -> Unit = {},
 ) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun execute(userId: String, habitId: String, quantity: Double): Result<LogHabitResult> =
@@ -64,5 +66,5 @@ class LogHabitUseCase(
                 else -> LogHabitStatus.DAILY_TARGET_MET
             }
             LogHabitResult(log, delta, status)
-        }
+        }.onSuccess(onLogged)
 }

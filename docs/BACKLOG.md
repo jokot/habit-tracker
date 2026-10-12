@@ -96,9 +96,12 @@ release.
 
 1. **One PR** with the 3 items of "Before release: fix". Done on `fix/release-blockers`.
 2. **The 5 items** of "Before release: check".
-3. **A Play Store closed test** for 5 to 20 testers, with crash reporting and 3 events:
+3. **The items of "Before the Play Store: store listing and policy".**
+4. **A Play Store closed test** for 12 to 20 testers, with crash reporting and 3 events:
    a logged habit, a spent want, and a return on day 7.
-4. **2 to 4 weeks of use.** Then choose between the features in "Wait for a signal".
+   The events are `habit_logged` and `want_spent`. The Retention report of Firebase gives
+   the return on day 7. See `docs/release.md` §4.
+5. **2 to 4 weeks of use.** Then choose between the features in "Wait for a signal".
 
 iOS waits until the Android test shows that users come back. iOS adds a second UI and a
 second widget system to each later change.
@@ -126,23 +129,99 @@ second widget system to each later change.
 
 ## Before release: check
 
-1. **Apply the migration `20261006000000_server_sync_timestamps` to prod** with
-   `supabase db push`. Without it, prod keeps the phone time, and #35 stays open on prod.
-2. **Test Google sign-in on prod.** The local Supabase has no Google provider, so no QA
-   since PR #38 tested it.
-3. **Find out if prod requires email confirmation.** Look in the Supabase dashboard,
-   under Authentication. If it does, a user who misses the email cannot sign up, and
-   deferred feature 10 (resend) moves to "Before release: fix".
+1. **Done on 2026-10-12. Apply the migrations to prod.** Prod was reset first: all users
+   and their rows are deleted. `supabase db push` applied
+   `20261006000000_server_sync_timestamps` and `20261012000000_identity_catalog` (PR #45).
+   Prod now has 13 identities, 88 habit templates and 93 `identity_habits` rows. The steps
+   are in `docs/prod-reset.md`, which is not in git.
+2. **Done on 2026-10-12. Test Google sign-in on prod.** Google sign-in and email sign-up
+   work on a debug build. The release key and the Play app signing key still need an
+   Android OAuth client each. See `docs/release.md` §3.
+3. **Done on 2026-10-12. Find out if prod requires email confirmation.** It does not:
+   "Confirm email" is off. A new user signs in at once, so deferred feature 10 (resend)
+   does not block the release. If "Confirm email" is turned on later, feature 10 moves to
+   "Before release: fix".
 4. **Run the device QA leftovers:**
    - Phase 10: quick-log grid scrolling past the visible rows, and tap latency with all
      seven widgets pinned at once. Checklist in
      `docs/qa/2026-08-08-phase10-widgets-v2-qa.md`.
    - PR #27: a cold start in airplane mode while signed in. Widgets must show the data
      of the user. This test is the one that proves the `LastAuthUserStore` fix.
-5. **Build the release against prod.** The worktrees `fix-session-expiry-push`,
-   `fix-sync-triggers` and `fix-batch-push` point `local.properties` at the local
-   Supabase, and they have a debug manifest for clear-text HTTP. Each keeps the prod file
-   as `local.properties.prod`.
+5. **Build the release against prod.** On 2026-10-12, `local.properties` points at prod
+   again in the main checkout and in the 4 fix worktrees. Each fix worktree keeps the local
+   file as `local.properties.local`. `feature/release-setup` adds release signing, Firebase
+   Crashlytics and Analytics, and `docs/release.md`. The steps that you do by hand are in
+   `docs/release.md`: link the CLI, make the upload key, register the SHA-1 keys for Google
+   sign-in, and add `google-services.json`.
+
+## Before the Play Store: store listing and policy
+
+Added on 2026-10-12. Play needs these items before the closed test can go to testers.
+
+1. **An app icon.** The manifest has no `android:icon`, so the app shows the default
+   Android icon. Make an adaptive icon (foreground and background layers) and a
+   monochrome layer for themed icons. Play also needs a 512 × 512 PNG of the icon.
+   The app label is `habitto` in lower case. Decide the name before the listing.
+2. **A landing page at `habitto.jokot.dev`.** Play asks for a website in the store
+   listing.
+3. **A privacy policy at `habitto.jokot.dev/privacy-policy`.** Play requires it for each
+   app. It must name the data that the app collects:
+   - the email address and the habit and want logs that Supabase stores
+   - the crash reports and app events of Firebase (PR #44)
+4. **Account deletion.** Play requires it for each app that lets users make an account.
+   The app has no "Delete account" action, and no server function deletes a user. Play
+   needs both:
+   - a path in the app, for example **Settings → Delete account**
+   - a web page, for example `habitto.jokot.dev/delete-account`, for users who removed
+     the app
+
+   A delete of the `auth.users` row deletes all rows of the user, because each user
+   table has `on delete cascade`. The app cannot delete an `auth.users` row with the anon
+   key, so the delete needs a Supabase Edge Function or a `security definer` database
+   function.
+5. **Store assets.** Play Console needs:
+   - the app icon, 512 × 512 PNG
+   - a feature graphic, 1024 × 500
+   - 2 to 8 phone screenshots
+6. **The store listing.** The app name (30 characters at most), the short description
+   (80 at most), the full description (4000 at most), the category, and a contact email.
+7. **The Play Console forms:** Data safety, the content rating questionnaire, the target
+   audience, ads (none), and app access. App access needs a test account for the Play
+   reviewers.
+8. **The closed test needs 12 testers for 14 days.** A personal developer account made
+   after November 2023 must have at least 12 testers who stay opted in for 14 days in a
+   row. Only then can it apply for production access. Invite more than 12, because some
+   testers leave.
+
+## Prod: checked on 2026-10-12
+
+1. **Dev tools do not ship in a release build.** The screen, the view model and
+   `DevSeeder` are in the `debug` source set. The `release` source set has an empty
+   `devToolsRoute`. Settings shows the row only when `BuildConfig.DEBUG` is true. The
+   release APK has no `DevSeeder` or `DevToolsScreen` class.
+   - A debug build that points at prod shows the dev tools. Do not use the seeder on a
+     prod account.
+2. **Supabase plan.** Prod uses the Free plan. Its limits on 2026-10-12:
+   - 500 MB database, 5 GB uncached egress per month, 50,000 monthly active users
+   - no backups
+   - the project pauses after 1 week without activity
+
+   Estimate: a user who logs 15 times a day adds about 1.5 MB in a year. The database
+   limit is far away. Egress comes first, at a few hundred active users.
+
+   Move to Pro ($25 a month: 8 GB, 250 GB egress, daily backups for 7 days, no pause)
+   when one of these is true:
+   - the app goes to production, because users then depend on the data and Free has no
+     backups
+   - the database passes 400 MB, or egress passes 4 GB in a month
+   - the project paused once during the test
+
+   Until then, back up by hand once a week with `supabase db dump`. See
+   `docs/prod-reset.md` §3.
+
+   Do not move to Firebase or a custom backend for cost. The sync, RLS, auth and the
+   migrations depend on Postgres and Supabase, and a rewrite costs more than Pro for
+   years. Supabase can also run on your own server later, with the same database.
 
 ## Known limits, not fixed
 

@@ -20,3 +20,12 @@ mobile/shared/build/
 # Supabase CLI link state (per-machine)
 supabase/.temp/
 supabase/.branches/
+
+# Copies of local.properties for other servers (local.properties.prod, .local)
+local.properties.*
+!local.properties.example
+
+# Firebase project config and the upload key — never commit
+mobile/androidApp/google-services.json
+*.jks
+*.keystore

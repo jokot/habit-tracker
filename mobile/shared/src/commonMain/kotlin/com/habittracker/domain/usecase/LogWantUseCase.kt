@@ -24,6 +24,8 @@ class LogWantUseCase(
     private val getUserStreakOnDayUseCase: GetUserStreakOnDayUseCase,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /** Called after each saved log. The app uses it for analytics. */
+    private val onLogged: (LogWantResult) -> Unit = {},
 ) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun execute(
@@ -59,5 +61,5 @@ class LogWantUseCase(
             loggedAt = now,
         )
         LogWantResult(log, points)
-    }
+    }.onSuccess(onLogged)
 }
