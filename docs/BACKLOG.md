@@ -96,11 +96,12 @@ release.
 
 1. **One PR** with the 3 items of "Before release: fix". Done on `fix/release-blockers`.
 2. **The 5 items** of "Before release: check".
-3. **A Play Store closed test** for 5 to 20 testers, with crash reporting and 3 events:
+3. **The items of "Before the Play Store: store listing and policy".**
+4. **A Play Store closed test** for 12 to 20 testers, with crash reporting and 3 events:
    a logged habit, a spent want, and a return on day 7.
    The events are `habit_logged` and `want_spent`. The Retention report of Firebase gives
    the return on day 7. See `docs/release.md` §4.
-4. **2 to 4 weeks of use.** Then choose between the features in "Wait for a signal".
+5. **2 to 4 weeks of use.** Then choose between the features in "Wait for a signal".
 
 iOS waits until the Android test shows that users come back. iOS adds a second UI and a
 second widget system to each later change.
@@ -128,13 +129,18 @@ second widget system to each later change.
 
 ## Before release: check
 
-1. **Apply the migration `20261006000000_server_sync_timestamps` to prod** with
-   `supabase db push`. Without it, prod keeps the phone time, and #35 stays open on prod.
-2. **Test Google sign-in on prod.** The local Supabase has no Google provider, so no QA
-   since PR #38 tested it.
-3. **Find out if prod requires email confirmation.** Look in the Supabase dashboard,
-   under Authentication. If it does, a user who misses the email cannot sign up, and
-   deferred feature 10 (resend) moves to "Before release: fix".
+1. **Done on 2026-10-12. Apply the migrations to prod.** Prod was reset first: all users
+   and their rows are deleted. `supabase db push` applied
+   `20261006000000_server_sync_timestamps` and `20261012000000_identity_catalog` (PR #45).
+   Prod now has 13 identities, 88 habit templates and 93 `identity_habits` rows. The steps
+   are in `docs/prod-reset.md`, which is not in git.
+2. **Done on 2026-10-12. Test Google sign-in on prod.** Google sign-in and email sign-up
+   work on a debug build. The release key and the Play app signing key still need an
+   Android OAuth client each. See `docs/release.md` §3.
+3. **Done on 2026-10-12. Find out if prod requires email confirmation.** It does not:
+   "Confirm email" is off. A new user signs in at once, so deferred feature 10 (resend)
+   does not block the release. If "Confirm email" is turned on later, feature 10 moves to
+   "Before release: fix".
 4. **Run the device QA leftovers:**
    - Phase 10: quick-log grid scrolling past the visible rows, and tap latency with all
      seven widgets pinned at once. Checklist in
@@ -147,6 +153,45 @@ second widget system to each later change.
    Crashlytics and Analytics, and `docs/release.md`. The steps that you do by hand are in
    `docs/release.md`: link the CLI, make the upload key, register the SHA-1 keys for Google
    sign-in, and add `google-services.json`.
+
+## Before the Play Store: store listing and policy
+
+Added on 2026-10-12. Play needs these items before the closed test can go to testers.
+
+1. **An app icon.** The manifest has no `android:icon`, so the app shows the default
+   Android icon. Make an adaptive icon (foreground and background layers) and a
+   monochrome layer for themed icons. Play also needs a 512 × 512 PNG of the icon.
+   The app label is `habitto` in lower case. Decide the name before the listing.
+2. **A landing page at `habitto.jokot.dev`.** Play asks for a website in the store
+   listing.
+3. **A privacy policy at `habitto.jokot.dev/privacy-policy`.** Play requires it for each
+   app. It must name the data that the app collects:
+   - the email address and the habit and want logs that Supabase stores
+   - the crash reports and app events of Firebase (PR #44)
+4. **Account deletion.** Play requires it for each app that lets users make an account.
+   The app has no "Delete account" action, and no server function deletes a user. Play
+   needs both:
+   - a path in the app, for example **Settings → Delete account**
+   - a web page, for example `habitto.jokot.dev/delete-account`, for users who removed
+     the app
+
+   A delete of the `auth.users` row deletes all rows of the user, because each user
+   table has `on delete cascade`. The app cannot delete an `auth.users` row with the anon
+   key, so the delete needs a Supabase Edge Function or a `security definer` database
+   function.
+5. **Store assets.** Play Console needs:
+   - the app icon, 512 × 512 PNG
+   - a feature graphic, 1024 × 500
+   - 2 to 8 phone screenshots
+6. **The store listing.** The app name (30 characters at most), the short description
+   (80 at most), the full description (4000 at most), the category, and a contact email.
+7. **The Play Console forms:** Data safety, the content rating questionnaire, the target
+   audience, ads (none), and app access. App access needs a test account for the Play
+   reviewers.
+8. **The closed test needs 12 testers for 14 days.** A personal developer account made
+   after November 2023 must have at least 12 testers who stay opted in for 14 days in a
+   row. Only then can it apply for production access. Invite more than 12, because some
+   testers leave.
 
 ## Known limits, not fixed
 
