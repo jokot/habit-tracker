@@ -127,6 +127,29 @@ second widget system to each later change.
    - Remove the search field from step 1. It filters nothing, and step 1 shows only 13
      identities.
 
+4. **A want timer spends the wrong points at the end.** Found by the developer on
+   2026-10-13. The cause in the code, not yet confirmed on a device:
+   `WantTimerService.onTimerFinished` and `WantTimerRecovery.scanOnStart` send the
+   minutes of the timer as `taps` to `LogWantUseCase`. `cancelWithPartialLog` sends the
+   elapsed minutes. But `LogWantUseCase` spends 1 point for each tap, and logs
+   `effectiveUnitsPerPoint` minutes for each tap. So a want of 5 min for 1 point, with a
+   5 min timer, spends 5 points and logs 25 min. A want of 1 min for 1 point is correct.
+   The fix: change the minutes to points with `effectiveUnitsPerPoint` and the rate of
+   the day. Add tests for a want with `unitsPerPoint` larger than 1, at the end and at a
+   cancel.
+5. **Spend the points while the timer runs.** Requested on 2026-10-13. Do it with item 4,
+   because it changes the same code. Spend 1 point each time that the timer completes 1
+   cost unit. Example: a want of 1 min for 1 point, with a 5 min timer. After 1 min, the
+   balance decreases by 1. At the end, the total is 5 points. Decide these items first:
+   - The end and a cancel spend only the points that the timer did not spend yet.
+   - What occurs when the balance becomes 0 before the end. A proposal: stop the timer,
+     and send a notification.
+   - One log for each unit, or one log that the app changes. Many logs add rows to sync.
+     One log that changes needs an update path in the sync.
+   - The ticks must work when the service is off (timer notifications off). The worker
+     runs only at the end now.
+   - The widgets and Today must show the new balance after each unit.
+
 ## Before release: check
 
 1. **Done on 2026-10-12. Apply the migrations to prod.** Prod was reset first: all users
@@ -222,6 +245,30 @@ Added on 2026-10-12. Play needs these items before the closed test can go to tes
    Do not move to Firebase or a custom backend for cost. The sync, RLS, auth and the
    migrations depend on Postgres and Supabase, and a rewrite costs more than Pro for
    years. Supabase can also run on your own server later, with the same database.
+
+## Before the Play Store: widgets
+
+Added on 2026-10-12. Decided on 2026-10-13: keep all 7 widgets. Each shows in the widget
+picker of the launcher.
+
+1. **Give each widget a clear name.** The picker shows the `android:label` of each
+   receiver. The labels are developer text, for example "Quick log — grid only" and
+   "Streak history — grid only". The user must see from the name if a widget has the
+   balance and streak header.
+2. **Add a preview to each widget.** No widget has `android:previewLayout` or
+   `android:previewImage`. So the picker shows the app icon, or an empty box, for each
+   widget. Android 12 and later use `previewLayout`. Older versions use `previewImage`.
+   Add a `description` too. Android 12 and later show it below the preview.
+
+| Receiver | Label now |
+|---|---|
+| `BalanceWidgetReceiver` | Point balance |
+| `QuickLogListWidgetReceiver` | Quick log — list |
+| `QuickLogGridWidgetReceiver` | Quick log — grid |
+| `StreakWidgetReceiver` | Streak history |
+| `QuickLogListPlainWidgetReceiver` | Quick log — list only |
+| `QuickLogGridPlainWidgetReceiver` | Quick log — grid only |
+| `StreakPlainWidgetReceiver` | Streak history — grid only |
 
 ## Known limits, not fixed
 
