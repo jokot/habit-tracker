@@ -100,6 +100,32 @@ class LogWantUseCaseRateTest {
         assertEquals(1, ex.required)
     }
 
+    @Test
+    fun `quantity replaces the units that the log records`() = runTest {
+        val today = LocalDate(2026, 5, 5)
+        val sut = makeSut(today, completeDaysEndingToday = 0)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 10)
+        seedEarn(sut.habitLogRepo, sut.habitRepo, today, points = 100)
+
+        val result = sut.useCase.execute(
+            userId, "a1", taps = 2, deviceMode = DeviceMode.THIS_DEVICE, quantity = 13.0,
+        ).getOrThrow()
+
+        assertEquals(2, result.pointsSpent)
+        assertEquals(13.0, result.log.quantity)
+    }
+
+    @Test
+    fun `unitsPerPoint applies the rate of today`() = runTest {
+        val today = LocalDate(2026, 5, 5)
+        // streak 30 → tier 5 → rate 2.0
+        val sut = makeSut(today, completeDaysEndingToday = 30)
+        seedActivity(sut.wantActivityRepo, "a1", unitsPerPoint = 10)
+
+        assertEquals(5, sut.useCase.unitsPerPoint(userId, "a1"))
+        assertEquals(null, sut.useCase.unitsPerPoint(userId, "missing"))
+    }
+
     // ── helpers ─────────────────────────────────────────────────────
 
     private data class Sut(

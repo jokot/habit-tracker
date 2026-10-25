@@ -122,7 +122,7 @@ The app sends these events:
 | Event | When | Parameters |
 |---|---|---|
 | `habit_logged` | a habit log is saved, from Today, a widget or a detail screen | `status` (`earned`, `below_threshold`, `daily_target_met`), `points` |
-| `want_spent` | a want log is saved, also at the end of a timer | `points`, `device_mode` (`this_device`, `other`) |
+| `want_spent` | a want log is saved, also each time that a running timer spends points | `points`, `device_mode` (`this_device`, `other`) |
 
 A return on day 7 needs no event. Use **Analytics → Retention** in the Firebase console. It
 uses the `first_open` and `session_start` events that Firebase sends.

@@ -69,8 +69,6 @@ class WantTimerViewModel(
                     val elapsedSec = totalSec - remainingSec
                     val totalMin = (totalSec / 60).coerceAtLeast(1)
                     val elapsedMin = elapsedSec / 60
-                    val unitsPerPoint = (want?.unitsPerPoint ?: 1).coerceAtLeast(1)
-                    val pointsSpent = elapsedMin / unitsPerPoint
                     _state.update {
                         it.copy(
                             isLoading = false,
@@ -79,7 +77,7 @@ class WantTimerViewModel(
                             remainingMmSs = WantTimerService.formatMmSs(remainingSec),
                             totalMin = totalMin,
                             elapsedMin = elapsedMin,
-                            pointsSpentSoFar = pointsSpent,
+                            pointsSpentSoFar = active.pointsSpent,
                             elapsedFraction = (elapsedSec.toFloat() / totalSec.toFloat()).coerceIn(0f, 1f),
                         )
                     }

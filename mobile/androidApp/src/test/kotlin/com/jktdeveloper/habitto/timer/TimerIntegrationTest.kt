@@ -201,7 +201,7 @@ class TimerIntegrationTest {
             durationSec = 300,
             startedAt = past.toEpochMilliseconds(),
             endsAt = (past + 5.minutes).toEpochMilliseconds(),
-            state = "RUNNING"
+            state = "RUNNING", minutesPerPoint = 1,
         )
 
         // 4. Confirm replace

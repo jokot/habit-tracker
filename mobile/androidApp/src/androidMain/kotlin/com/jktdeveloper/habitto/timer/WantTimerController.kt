@@ -5,14 +5,16 @@ import android.content.Intent
 import android.os.Build
 import com.habittracker.data.repository.WantActivityRepository
 import com.habittracker.data.repository.WantTimerRepository
-import com.habittracker.domain.model.DeviceMode
+import com.habittracker.data.sync.SyncReason
 import com.habittracker.domain.model.WantTimer
 import com.habittracker.domain.model.WantTimerState
+import com.habittracker.domain.usecase.ChargeWantTimerUseCase
 import com.habittracker.domain.usecase.GetPointBalanceUseCase
 import com.habittracker.domain.usecase.InsufficientPointsException
 import com.habittracker.domain.usecase.LogWantUseCase
 import com.jktdeveloper.habitto.notifications.NotificationPreferences
 import com.jktdeveloper.habitto.notifications.NotificationTypeId
+import com.jktdeveloper.habitto.sync.SyncTriggers
 import kotlinx.datetime.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -41,12 +43,19 @@ class WantTimerController(
     private val getPointBalanceUseCase: GetPointBalanceUseCase,
     private val notificationPreferences: NotificationPreferences = NotificationPreferences(context),
     private val clock: Clock = Clock.System,
+    /** The app passes the one instance that the service and the worker also use. */
+    private val chargeWantTimer: ChargeWantTimerUseCase = ChargeWantTimerUseCase(
+        repository, wantActivityRepository, logWantUseCase, getPointBalanceUseCase, clock,
+    ),
 ) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun start(userId: String, activityId: String, durationSec: Int) {
         require(durationSec in 1..(24 * 60 * 60))
         val balance = getPointBalanceUseCase.execute(userId).getOrThrow().balance
         if (balance <= 0) throw InsufficientPointsException(available = balance, required = 1)
+        // Fix the cost at the start, so that a change of the rate during the timer
+        // does not change the points that the timer spends.
+        val minutesPerPoint = logWantUseCase.unitsPerPoint(userId, activityId) ?: 1
         val now = clock.now()
         val timer = WantTimer(
             id = Uuid.random().toString(),
@@ -56,6 +65,7 @@ class WantTimerController(
             startedAt = now,
             endsAt = now + durationSec.seconds,
             state = WantTimerState.RUNNING,
+            minutesPerPoint = minutesPerPoint,
         )
         repository.startReplacing(timer)
         if (timerNotificationsAllowed()) {
@@ -68,8 +78,8 @@ class WantTimerController(
             )
         } else {
             // No service means no mandatory ongoing notification — but also no ticker
-            // to finish the timer, so hand that to WorkManager.
-            WantTimerFinalizeWorker.enqueue(context, durationSec)
+            // to spend the points and finish the timer, so hand that to WorkManager.
+            WantTimerFinalizeWorker.enqueueNextCharge(context, timer, now)
         }
     }
 
@@ -132,37 +142,19 @@ class WantTimerController(
     }
 
     /**
-     * Flips active timer → CANCELLED. For `unit == "min"` with elapsed ≥ 1 min,
-     * logs partial duration via [LogWantUseCase]. Returns [CancelResult] for UI
-     * feedback. Does NOT signal the service to stop — callers must invoke
-     * [signalServiceStop] separately.
+     * Flips active timer → CANCELLED, and spends the points that it still owes: 1 for
+     * each block that ran for 1 minute or more. Returns [CancelResult] for UI feedback.
+     * Does NOT signal the service to stop — callers must invoke [signalServiceStop]
+     * separately.
      */
     suspend fun cancelWithPartialLog(userId: String): CancelResult {
         val active = repository.getActive(userId) ?: return CancelResult.NoActiveTimer
-        val elapsedSec = (clock.now() - active.startedAt).inWholeSeconds.coerceAtLeast(0)
-        val elapsedMin = (elapsedSec / 60).toInt()
-        val activity = wantActivityRepository
-            .getAllWantActivitiesForUser(userId)
-            .firstOrNull { it.id == active.activityId }
-
-        val loggedPoints: Int? = if (activity != null && activity.unit == "min" && elapsedMin >= 1) {
-            logWantUseCase.execute(
-                userId = userId,
-                activityId = active.activityId,
-                taps = elapsedMin,
-                deviceMode = DeviceMode.THIS_DEVICE,
-            ).fold(
-                onSuccess = { it.pointsSpent },
-                onFailure = { null },
-            )
-        } else null
-
-        repository.setState(active.id, WantTimerState.CANCELLED)
-        return if (loggedPoints != null) {
-            CancelResult.Logged(elapsedMin, loggedPoints)
-        } else {
-            CancelResult.Discarded
-        }
+        val charge = chargeWantTimer.charge(active.id, cancel = true)
+            ?: return CancelResult.NoActiveTimer
+        val spent = charge.timer.pointsSpent
+        if (spent == 0) return CancelResult.Discarded
+        runCatching { SyncTriggers.enqueue(context, SyncReason.POST_LOG) }
+        return CancelResult.Logged(charge.minutesLogged, spent)
     }
 
     fun signalServiceStop() {

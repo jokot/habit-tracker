@@ -109,6 +109,7 @@ class WantTimerControllerTest {
             startedAt = fiveMinAgo.toEpochMilliseconds(),
             endsAt = (fiveMinAgo + kotlin.time.Duration.parse("15m")).toEpochMilliseconds(),
             state = "RUNNING",
+            minutesPerPoint = 1,
         )
 
         val result = controller.cancelWithPartialLog("u1")
@@ -132,6 +133,7 @@ class WantTimerControllerTest {
             startedAt = now.epochSeconds * 1000,
             endsAt = (now + kotlin.time.Duration.parse("10m")).epochSeconds * 1000,
             state = "RUNNING",
+            minutesPerPoint = 1,
         )
         val result = controller.cancelWithPartialLog("u1")
         assertEquals(CancelResult.Discarded, result)
@@ -152,6 +154,7 @@ class WantTimerControllerTest {
             startedAt = tenMinAgo.epochSeconds * 1000,
             endsAt = (tenMinAgo + kotlin.time.Duration.parse("15m")).epochSeconds * 1000,
             state = "RUNNING",
+            minutesPerPoint = 1,
         )
         val result = controller.cancelWithPartialLog("u1")
         assertEquals(CancelResult.Discarded, result)

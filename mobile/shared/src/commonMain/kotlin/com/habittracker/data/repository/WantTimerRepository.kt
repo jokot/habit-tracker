@@ -10,5 +10,7 @@ interface WantTimerRepository {
     suspend fun getActive(userId: String): WantTimer?
     suspend fun getById(id: String): WantTimer?
     suspend fun setState(id: String, state: WantTimerState)
+    /** Adds [points] to the points that the timer spent. A negative value takes points back. */
+    suspend fun addPointsSpent(id: String, points: Int)
     suspend fun getAllRunning(): List<WantTimer>
 }

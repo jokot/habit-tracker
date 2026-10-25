@@ -1,0 +1,5 @@
+-- A want timer spends its points while it runs (BACKLOG "Before release: fix" 4 and 5).
+-- minutesPerPoint: the cost of the want at the start of the timer, with the rate applied.
+-- pointsSpent: the points that the timer spent so far.
+ALTER TABLE LocalWantTimer ADD COLUMN minutesPerPoint INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE LocalWantTimer ADD COLUMN pointsSpent INTEGER NOT NULL DEFAULT 0;
