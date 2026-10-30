@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy policy — Habitto</title>
+  <meta name="description" content="What data the Habitto app collects, why, who processes it, and how to delete it.">
+  <meta name="theme-color" content="#2e7d32">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </span>
+        habitto
+      </a>
+      <nav class="site-nav">
+        <a href="/">Home</a>
+        <a href="/delete-account">Delete account</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="doc">
+    <div class="wrap">
+      <h1>Privacy policy</h1>
+      <p class="meta">Effective date: 30 October 2026</p>
+
+      <p>This policy applies to the Habitto app for Android ("the app"). __DEVELOPER_NAME__ ("we") makes the app. This page tells you which data the app collects, why, who processes it, and how you delete it.</p>
+
+      <div class="callout">
+        <strong>In short:</strong> without an account, your habit data stays on your phone. With an account, we store it so that it syncs between your devices. We also collect crash reports and a small set of usage events. We do not sell data, we do not show ads, and we do not use the advertising ID.
+      </div>
+
+      <h2>1. Data that you give us</h2>
+
+      <h3>Account data (only if you sign in)</h3>
+      <ul>
+        <li><strong>Email and password:</strong> the email address that you sign up with. The password is stored only as a hash by our authentication provider.</li>
+        <li><strong>Google sign-in:</strong> if you sign in with Google, Google sends us your email address, your name and the address of your profile picture. The app uses only the email address.</li>
+      </ul>
+
+      <h3>App content</h3>
+      <p>The habits, habit logs, wants, want logs, identities, goals and notes that you enter. Examples: "Read on Kindle, 20 minutes, 30 October", or "YouTube, 10 minutes".</p>
+      <ul>
+        <li><strong>Without an account,</strong> this data stays in the app storage on your phone. We do not receive it.</li>
+        <li><strong>With an account,</strong> the app also sends this data to our database, so that it syncs between your devices.</li>
+      </ul>
+
+      <h2>2. Data that the app collects</h2>
+
+      <h3>Crash reports</h3>
+      <p>When the app crashes, Firebase Crashlytics sends a report. A report contains the stack trace, the device model, the Android version, the app version, and a random installation ID. It does not contain your habit data or your email address.</p>
+
+      <h3>Usage events</h3>
+      <p>Google Analytics for Firebase collects events that show if testers use the app and come back. The app sends 2 events of its own:</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Event</th><th>When</th><th>Data</th></tr></thead>
+          <tbody>
+            <tr><td><code>habit_logged</code></td><td>You log a habit</td><td>The result (for example "earned") and the points</td></tr>
+            <tr><td><code>want_spent</code></td><td>You spend points on a want</td><td>The points, and if the want was on this phone or another device</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Firebase also sends automatic events, for example the first open of the app and the start of a session. With each event it sends a random app instance ID, the device model, the Android version, the app version, and an approximate location (country and city) that it derives from the IP address. The events do not contain the names of your habits or wants, or your email address.</p>
+      <p>Debug builds of the app send no crash reports and no events.</p>
+
+      <h3>Data that stays on your phone</h3>
+      <p>Your notification settings, reminder times and timers stay on your phone. The app shows notifications from your phone. It does not use a push notification server.</p>
+
+      <h2>3. Why we use the data</h2>
+      <ul>
+        <li>To run the app, and to sync your data between your devices (account data, app content).</li>
+        <li>To find and fix crashes (crash reports).</li>
+        <li>To learn if the app is useful, for example how many testers return after 7 days (usage events).</li>
+      </ul>
+      <p>We do not use your data for advertising, and we do not sell it or share it with data brokers.</p>
+
+      <h2>4. Who processes the data</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Service</th><th>What it does</th><th>Data</th></tr></thead>
+          <tbody>
+            <tr><td>Supabase</td><td>Database and sign-in</td><td>Account data, app content</td></tr>
+            <tr><td>Google Firebase</td><td>Crashlytics and Analytics</td><td>Crash reports, usage events</td></tr>
+            <tr><td>Google Sign-In</td><td>Sign-in with a Google account</td><td>Email, name, profile picture address</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>These services process the data for us under their own terms and security practices. Their servers can be outside your country.</p>
+
+      <h2>5. How long we keep the data</h2>
+      <ul>
+        <li><strong>Account data and app content:</strong> until you delete your account.</li>
+        <li><strong>Crash reports:</strong> 90 days.</li>
+        <li><strong>Usage events:</strong> 2 months for data at the level of a user or a device. Reports that show only totals can stay longer.</li>
+      </ul>
+
+      <h2>6. Delete your data</h2>
+      <ul>
+        <li><strong>In the app:</strong> open <strong>Settings → Account → Delete account</strong>. This deletes your account and all your app content from our database at once, and from your phone.</li>
+        <li><strong>Without the app:</strong> follow the steps on <a href="/delete-account">habitto.jokot.dev/delete-account</a>.</li>
+        <li><strong>Without an account:</strong> remove the app, or clear its storage in the Android settings. This deletes all the data.</li>
+      </ul>
+      <p>Crash reports and usage events are not connected to your account. They are deleted at the end of the periods in section 5.</p>
+
+      <h2>7. Security</h2>
+      <p>The app sends data over encrypted connections (HTTPS). In our database, rules at the level of each row make sure that an account can read and change only its own data.</p>
+
+      <h2>8. Children</h2>
+      <p>The app is not for children under 13. We do not knowingly collect data from children under 13. If you think that a child gave us data, contact us, and we delete it.</p>
+
+      <h2>9. Your rights</h2>
+      <p>You can ask for a copy of your data, a correction, or a deletion. Send an email to the address in section 11. We reply in 30 days or less.</p>
+
+      <h2>10. Changes to this policy</h2>
+      <p>If we change this policy, we change the effective date at the top of this page. If a change is important, we also tell you in the app.</p>
+
+      <h2>11. Contact</h2>
+      <p>__DEVELOPER_NAME__<br>Email: <a href="mailto:__SUPPORT_EMAIL__">__SUPPORT_EMAIL__</a></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© 2026 Habitto</span>
+      <nav>
+        <a href="/privacy-policy">Privacy policy</a>
+        <a href="/delete-account">Delete your account</a>
+        <a href="mailto:__SUPPORT_EMAIL__">Contact</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
