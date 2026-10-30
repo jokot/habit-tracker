@@ -21,6 +21,7 @@ class LocalWantTimerRepository(
             startedAt = timer.startedAt.toEpochMilliseconds(),
             endsAt = timer.endsAt.toEpochMilliseconds(),
             state = timer.state.name,
+            minutesPerPoint = timer.minutesPerPoint.toLong(),
         )
     }
 
@@ -38,6 +39,7 @@ class LocalWantTimerRepository(
                 startedAt = timer.startedAt.toEpochMilliseconds(),
                 endsAt = timer.endsAt.toEpochMilliseconds(),
                 state = timer.state.name,
+                minutesPerPoint = timer.minutesPerPoint.toLong(),
             )
         }
     }
@@ -52,6 +54,10 @@ class LocalWantTimerRepository(
         q.updateWantTimerState(state.name, id)
     }
 
+    override suspend fun addPointsSpent(id: String, points: Int) {
+        q.addWantTimerPointsSpent(points.toLong(), id)
+    }
+
     override suspend fun getAllRunning(): List<WantTimer> =
         q.getAllRunningTimers().executeAsList().map { it.toDomain() }
 
@@ -63,5 +69,7 @@ class LocalWantTimerRepository(
         startedAt = Instant.fromEpochMilliseconds(startedAt),
         endsAt = Instant.fromEpochMilliseconds(endsAt),
         state = WantTimerState.valueOf(state),
+        minutesPerPoint = minutesPerPoint.toInt(),
+        pointsSpent = pointsSpent.toInt(),
     )
 }

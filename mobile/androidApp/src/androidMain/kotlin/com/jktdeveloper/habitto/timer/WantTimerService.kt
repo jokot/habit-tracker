@@ -9,20 +9,19 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import com.habittracker.domain.model.DeviceMode
 import com.habittracker.domain.model.WantTimer
 import com.habittracker.domain.model.WantTimerState
+import com.habittracker.domain.usecase.WantTimerPoints
 import com.jktdeveloper.habitto.HabitTrackerApplication
 import com.jktdeveloper.habitto.MainActivity
 import com.jktdeveloper.habitto.R
 import com.jktdeveloper.habitto.notifications.NotificationChannels
-import com.jktdeveloper.habitto.notifications.NotificationTypeId
-import com.jktdeveloper.habitto.notifications.PermissionUtils
 import com.jktdeveloper.habitto.widget.WidgetUpdates
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 class WantTimerService : LifecycleService() {
 
@@ -74,28 +73,35 @@ class WantTimerService : LifecycleService() {
 
     private suspend fun runUntilEnd(timerId: String) {
         val container = (applicationContext as HabitTrackerApplication).container
-        val repo = container.wantTimerRepository
-        val initial = repo.getById(timerId) ?: run {
+        val initial = container.wantTimerRepository.getById(timerId) ?: run {
             stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); return
         }
         val activity = container.wantActivityRepository
             .getAllWantActivitiesForUser(initial.userId)
             .firstOrNull { it.id == initial.activityId }
         val activityName = activity?.name ?: "Timer"
+        val totalMin = WantTimerPoints.totalMinutes(initial)
 
         while (true) {
-            val current = repo.getById(timerId) ?: break
-            if (current.state != WantTimerState.RUNNING) break
-            val now = Clock.System.now()
-            val remainingSec = (current.endsAt - now).inWholeSeconds.coerceAtLeast(0)
-            if (remainingSec <= 0) {
-                onTimerFinished(current, activityName)
+            // Each tick spends the points of the blocks that are complete, and stops the
+            // timer at the end or when the balance is too low. Null: the timer stopped
+            // somewhere else, for example a cancel on a screen.
+            val charge = container.chargeWantTimerUseCase.charge(timerId) ?: break
+            runCatching { WidgetUpdates.updateAll(applicationContext) }
+            val current = charge.timer
+            if (current.state != WantTimerState.RUNNING) {
+                onTimerStopped(
+                    context = applicationContext,
+                    notificationPreferences = container.notificationPreferences,
+                    activityName = activityName,
+                    charge = charge,
+                    contentIntent = openTimerScreenPendingIntent(null),
+                )
                 break
             }
-            val totalMin = (initial.durationSec / 60).coerceAtLeast(1)
+            val now = Clock.System.now()
+            val remainingSec = (current.endsAt - now).inWholeSeconds.coerceAtLeast(0)
             val minLeft = ((remainingSec + 59) / 60).toInt()
-            val elapsedMin = (totalMin - minLeft).coerceAtLeast(0)
-            val pointsSpent = elapsedMin / ((activity?.unitsPerPoint ?: 1).coerceAtLeast(1))
             NotificationManagerCompat.from(applicationContext)
                 .notify(
                     NOTIF_RUNNING_ID,
@@ -103,55 +109,24 @@ class WantTimerService : LifecycleService() {
                         activityName = activityName,
                         activityId = initial.activityId,
                         minLeft = minLeft,
-                        elapsedMin = elapsedMin,
+                        elapsedMin = WantTimerPoints.elapsedMinutes(current, now),
                         totalMin = totalMin,
-                        pointsSpent = pointsSpent,
+                        pointsSpent = current.pointsSpent,
                     ),
                 )
-            runCatching { WidgetUpdates.updateAll(applicationContext) }
-            val tickDelay = ((remainingSec % 60).coerceAtLeast(1) * 1000L).coerceAtMost(60_000L)
-            delay(tickDelay)
+            delay(untilNextMinute(current, now))
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
-    private suspend fun onTimerFinished(timer: WantTimer, activityName: String) {
-        val container = (applicationContext as HabitTrackerApplication).container
-        val repo = container.wantTimerRepository
-        repo.setState(timer.id, WantTimerState.FINISHED)
-
-        val activity = container.wantActivityRepository
-            .getAllWantActivitiesForUser(timer.userId)
-            .firstOrNull { it.id == timer.activityId }
-        val pointsSegment: String = if (activity != null && activity.unit == "min") {
-            val taps = (timer.durationSec / 60).coerceAtLeast(1)
-            val result = container.logWantUseCase.execute(
-                userId = timer.userId,
-                activityId = timer.activityId,
-                taps = taps,
-                deviceMode = DeviceMode.THIS_DEVICE,
-            )
-            result.fold(
-                onSuccess = { " · $taps min logged · −${it.pointsSpent} pt" },
-                onFailure = { "" },
-            )
-        } else ""
-
-        val prefs = container.notificationPreferences.current()
-        val canFire = prefs.masterEnabled
-            && prefs.isEnabled(NotificationTypeId.WANT_TIMER_END)
-            && PermissionUtils.hasNotificationPermission(applicationContext)
-        if (canFire) {
-            val builder = NotificationCompat.Builder(applicationContext, NotificationChannels.WANT_TIMER_END)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Habitto")
-                .setContentText("$activityName timer finished$pointsSegment")
-                .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setContentIntent(openTimerScreenPendingIntent(null))
-            NotificationManagerCompat.from(applicationContext).notify(NOTIF_END_ID, builder.build())
-        }
+    /**
+     * Wake just after the next full minute of the timer. A block and the end are full
+     * minutes, so this tick sees them. The margin keeps the tick from coming a little early.
+     */
+    private fun untilNextMinute(timer: WantTimer, now: Instant): Long {
+        val elapsedMs = (now - timer.startedAt).inWholeMilliseconds.coerceAtLeast(0)
+        return 60_000L - (elapsedMs % 60_000L) + 250L
     }
 
     private fun buildRunningNotification(

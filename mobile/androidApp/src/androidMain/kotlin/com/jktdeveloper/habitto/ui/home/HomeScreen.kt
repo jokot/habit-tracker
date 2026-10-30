@@ -800,14 +800,15 @@ private fun WantActivityCard(
                     // Subtitle
                     Spacer(Modifier.height(Spacing.xs))
                     if (pending != null) {
-                        // A timed want spends one point when its timer starts, however
+                        // A timed want spends its points while the timer runs, however
                         // many times the card was tapped — the countdown ends in the
-                        // duration sheet, not in a log.
-                        val totalCost = if (activity.isTimed) 1 else pending.count
+                        // duration sheet, not in a log. The first point goes after the
+                        // first block, so the balance stays as it is at the start.
+                        val totalCost = if (activity.isTimed) 0 else pending.count
                         val afterBalance = balance - totalCost
                         Row {
                             Text(
-                                text = if (activity.isTimed) "−1 pt at start" else "−$totalCost pt total",
+                                text = if (activity.isTimed) "−1 pt each ${activity.unitsPerPoint} min" else "−$totalCost pt total",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )

@@ -25,6 +25,7 @@ import com.habittracker.data.sync.SyncEngine
 import com.habittracker.data.sync.SyncIdentity
 import com.habittracker.data.sync.SyncState
 import com.habittracker.domain.UserIdentityProvider
+import com.habittracker.domain.usecase.ChargeWantTimerUseCase
 import com.habittracker.domain.usecase.ComputeStreakUseCase
 import com.habittracker.domain.usecase.ComputeIdentityStatsUseCase
 import com.habittracker.domain.usecase.ComputePerHabitStreakUseCase
@@ -192,6 +193,13 @@ class AppContainer(context: Context) {
         habitLogRepository = habitLogRepository,
         wantLogRepository = wantLogRepository,
     )
+    /** One instance, so that its lock covers the service, the worker and the screens. */
+    val chargeWantTimerUseCase = ChargeWantTimerUseCase(
+        timerRepository = wantTimerRepository,
+        wantActivityRepository = wantActivityRepository,
+        logWantUseCase = logWantUseCase,
+        getPointBalanceUseCase = getPointBalanceUseCase,
+    )
     val wantTimerController = com.jktdeveloper.habitto.timer.WantTimerController(
         context = appContext,
         repository = wantTimerRepository,
@@ -199,12 +207,13 @@ class AppContainer(context: Context) {
         logWantUseCase = logWantUseCase,
         getPointBalanceUseCase = getPointBalanceUseCase,
         notificationPreferences = notificationPreferences,
+        chargeWantTimer = chargeWantTimerUseCase,
     )
     val wantTimerRecovery = com.jktdeveloper.habitto.timer.WantTimerRecovery(
         context = appContext,
         timerRepo = wantTimerRepository,
         wantActivityRepo = wantActivityRepository,
-        logWantUseCase = logWantUseCase,
+        chargeWantTimer = chargeWantTimerUseCase,
         notificationPreferences = notificationPreferences,
     )
     val undoHabitLogUseCase = UndoHabitLogUseCase(habitLogRepository)

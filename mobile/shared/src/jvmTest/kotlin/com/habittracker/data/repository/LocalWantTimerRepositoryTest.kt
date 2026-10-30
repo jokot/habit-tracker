@@ -58,4 +58,14 @@ class LocalWantTimerRepositoryTest {
         assertEquals(WantTimerState.FINISHED, repo.getById("t1")?.state)
         assertNull(repo.getActive("u1"))
     }
+
+    @Test fun `addPointsSpent adds to the stored points, and minutesPerPoint round-trips`() = runTest {
+        val t = WantTimer("t1", "u1", "a1", 600,
+            Instant.fromEpochSeconds(1000), Instant.fromEpochSeconds(1600), WantTimerState.RUNNING,
+            minutesPerPoint = 5)
+        repo.insert(t)
+        repo.addPointsSpent("t1", 2)
+        repo.addPointsSpent("t1", 1)
+        assertEquals(t.copy(pointsSpent = 3), repo.getById("t1"))
+    }
 }

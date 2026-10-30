@@ -27,25 +27,24 @@ class LogWantUseCase(
     /** Called after each saved log. The app uses it for analytics. */
     private val onLogged: (LogWantResult) -> Unit = {},
 ) {
+    /**
+     * [quantity] replaces the units that the log records. A want timer uses it to record
+     * the minutes that it ran. Without it, the log records 1 cost unit for each tap.
+     */
     @OptIn(ExperimentalUuidApi::class)
     suspend fun execute(
         userId: String,
         activityId: String,
         taps: Int = 1,
         deviceMode: DeviceMode,
+        quantity: Double? = null,
     ): Result<LogWantResult> = runCatching {
         require(taps >= 1) { "taps must be >= 1" }
-        val activity = wantActivityRepository.getWantActivities(userId)
-            .firstOrNull { it.id == activityId }
+        val effUnits = unitsPerPoint(userId, activityId)
             ?: error("Activity $activityId not found")
-
-        val now = clock.now()
-        val today = now.toLocalDateTime(timeZone).date
-        val streakOnDay = getUserStreakOnDayUseCase.execute(userId, today)
-        val rate = ExchangeRateCalculator.rateFor(streakOnDay)
-        val effUnits = PointCalculator.effectiveUnitsPerPoint(activity.unitsPerPoint, rate)
-        val quantity = (effUnits.toLong() * taps.toLong()).toDouble()
+        val loggedQuantity = quantity ?: (effUnits.toLong() * taps.toLong()).toDouble()
         val points = PointCalculator.pointsSpent(taps)
+        val now = clock.now()
 
         val balance = getPointBalanceUseCase.execute(userId).getOrThrow().balance
         if (points > balance) throw InsufficientPointsException(balance, points)
@@ -55,11 +54,21 @@ class LogWantUseCase(
             id = id,
             userId = userId,
             activityId = activityId,
-            quantity = quantity,
+            quantity = loggedQuantity,
             pointsSpent = points,
             deviceMode = deviceMode,
             loggedAt = now,
         )
         LogWantResult(log, points)
     }.onSuccess(onLogged)
+
+    /** The units that 1 point buys now, with the rate of today. Null if the want does not exist. */
+    suspend fun unitsPerPoint(userId: String, activityId: String): Int? {
+        val activity = wantActivityRepository.getWantActivities(userId)
+            .firstOrNull { it.id == activityId }
+            ?: return null
+        val today = clock.now().toLocalDateTime(timeZone).date
+        val rate = ExchangeRateCalculator.rateFor(getUserStreakOnDayUseCase.execute(userId, today))
+        return PointCalculator.effectiveUnitsPerPoint(activity.unitsPerPoint, rate)
+    }
 }

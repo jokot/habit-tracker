@@ -481,7 +481,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         val batch = _pendingWants.value[activity.id] ?: return
         _pendingWants.update { it - activity.id }
         wantTimers.remove(activity.id)
-        // A timed want spends its point when the timer finishes, not now: the countdown
+        // A timed want spends its points while the timer runs, not now: the countdown
         // was the undo window, so what follows it is "how long?", not a log.
         if (activity.isTimed) {
             _durationSheetWant.value = activity

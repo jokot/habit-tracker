@@ -6,21 +6,24 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.habittracker.domain.model.WantTimer
+import com.habittracker.domain.usecase.WantTimerPoints
 import com.jktdeveloper.habitto.HabitTrackerApplication
 import com.jktdeveloper.habitto.widget.WidgetUpdates
+import kotlinx.datetime.Instant
 import java.util.concurrent.TimeUnit
 
 /**
- * Finalizes a want timer when no foreground service is running it.
+ * Spends the points of a want timer, and finishes it, when no foreground service runs it.
  *
  * A foreground service must post a visible notification for as long as it lives —
  * Android gives no way to hide it — so with timer notifications switched off we don't
- * start one. Something still has to flip the timer to FINISHED and log the want at
- * `endsAt`, and this is it.
+ * start one. Something still has to spend 1 point at the end of each block, and flip
+ * the timer to FINISHED at `endsAt`, and this is it.
  *
- * Reuses [WantTimerRecovery.scanOnStart], which finalizes every RUNNING timer already
- * past its end. That makes this idempotent: if the service (or an app launch) got there
- * first, the scan finds nothing and the run is a no-op.
+ * Reuses [WantTimerRecovery.scanOnStart], which charges every RUNNING timer and enqueues
+ * the next run. A charge spends only what the timer still owes, so a run is a no-op if
+ * the service (or an app launch) got there first, and a late run catches up.
  */
 class WantTimerFinalizeWorker(
     appContext: Context,
@@ -40,12 +43,15 @@ class WantTimerFinalizeWorker(
         private const val WORK_NAME = "want_timer_finalize"
 
         /**
-         * One pending finalize at a time — a new timer replaces any older one, and
+         * One pending run at a time — a new timer replaces any older one, and
          * REPLACE also covers a timer cancelled before its worker fired.
+         * The run is at the next charge of [timer]: the end of a block, or the end.
          */
-        fun enqueue(context: Context, delaySec: Int) {
+        fun enqueueNextCharge(context: Context, timer: WantTimer, now: Instant) {
+            val delayMs = (WantTimerPoints.nextChargeAt(timer, now) - now).inWholeMilliseconds
             val request = OneTimeWorkRequestBuilder<WantTimerFinalizeWorker>()
-                .setInitialDelay(delaySec.toLong(), TimeUnit.SECONDS)
+                // A small margin, so that the run comes after the block ends, not before.
+                .setInitialDelay(delayMs.coerceAtLeast(0) + 1_000, TimeUnit.MILLISECONDS)
                 .build()
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)

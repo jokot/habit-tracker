@@ -342,15 +342,17 @@ CREATE TABLE IF NOT EXISTS LocalWantTimer (
     durationSec INTEGER NOT NULL,
     startedAt INTEGER NOT NULL,
     endsAt INTEGER NOT NULL,
-    state TEXT NOT NULL
+    state TEXT NOT NULL,
+    minutesPerPoint INTEGER NOT NULL DEFAULT 1,
+    pointsSpent INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_wanttimer_user_state ON LocalWantTimer(userId, state);
 
 -- LocalWantTimer queries
 insertWantTimer:
-INSERT INTO LocalWantTimer (id, userId, activityId, durationSec, startedAt, endsAt, state)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO LocalWantTimer (id, userId, activityId, durationSec, startedAt, endsAt, state, minutesPerPoint)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 getActiveWantTimer:
 SELECT * FROM LocalWantTimer WHERE userId = ? AND state = 'RUNNING' LIMIT 1;
@@ -363,6 +365,9 @@ SELECT * FROM LocalWantTimer WHERE state = 'RUNNING';
 
 updateWantTimerState:
 UPDATE LocalWantTimer SET state = ? WHERE id = ?;
+
+addWantTimerPointsSpent:
+UPDATE LocalWantTimer SET pointsSpent = pointsSpent + ? WHERE id = ?;
 
 deleteFinishedTimersBefore:
 DELETE FROM LocalWantTimer WHERE state != 'RUNNING' AND endsAt < ?;
