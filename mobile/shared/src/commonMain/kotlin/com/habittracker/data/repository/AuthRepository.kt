@@ -14,6 +14,13 @@ interface AuthRepository {
     suspend fun signOut(): Result<Unit>
 
     /**
+     * Deletes the account of the signed-in user, and all the rows of that user, on the
+     * server. Then clears the session on this device. Needs the network. On failure,
+     * the account and the session stay.
+     */
+    suspend fun deleteAccount(): Result<Unit>
+
+    /**
      * Attempts to refresh the current session via the underlying auth client.
      * Returns success when refresh completed (a fresh JWT is now active).
      * Returns failure if there is no session, the refresh token is invalid,

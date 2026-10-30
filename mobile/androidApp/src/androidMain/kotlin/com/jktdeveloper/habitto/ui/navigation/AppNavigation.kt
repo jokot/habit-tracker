@@ -273,6 +273,7 @@ fun AppNavigation(container: AppContainer) {
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
                         },
+                        deleteAccountAction = { container.deleteAccountFromSettings() },
                     )
                 }
                 val showDialog by vm.showLogoutDialog.collectAsState()
@@ -288,11 +289,21 @@ fun AppNavigation(container: AppContainer) {
                 }
                 val authState by container.authState.collectAsState()
                 val email = remember(authState) { container.currentAccountEmail() }
+                val deleteAccount by vm.deleteAccount.collectAsState()
+                deleteAccount?.let { ui ->
+                    com.jktdeveloper.habitto.ui.settings.DeleteAccountDialog(
+                        email = email,
+                        state = ui,
+                        onConfirm = vm::confirmDeleteAccount,
+                        onDismiss = vm::dismissDeleteAccount,
+                    )
+                }
                 com.jktdeveloper.habitto.ui.settings.SettingsScreen(
                     viewModel = vm,
                     isAuthenticated = authState.isAuthenticated,
                     accountEmail = email,
                     onSignOut = { vm.beginSignOut() },
+                    onDeleteAccount = { vm.beginDeleteAccount() },
                     onSignIn = { navController.navigate(Screen.Auth.route) },
                     onBack = { navController.popBackStack() },
                     onOpenNotificationsSettings = { navController.navigate(Screen.NotificationsSettings.route) },

@@ -6,6 +6,7 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +68,13 @@ class SupabaseAuthRepository(
             // The server session stays until its refresh token expires.
             client.auth.clearSession()
         }
+    }
+
+    override suspend fun deleteAccount(): Result<Unit> = runCatching {
+        // The server function deletes the user of the session only (auth.uid()).
+        client.postgrest.rpc("delete_my_account")
+        // The user no longer exists, so a logout request would fail. Clear only here.
+        client.auth.clearSession()
     }
 
     override suspend fun tryRefreshSession(): Result<Unit> = runCatching {

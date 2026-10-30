@@ -20,6 +20,7 @@ class SettingsViewModel(
     private val signOutAction: (suspend () -> Unit)? = null,
     private val unsyncedCountProvider: (suspend () -> Int)? = null,
     private val onSignOutComplete: () -> Unit = {},
+    private val deleteAccountAction: (suspend () -> Result<Unit>)? = null,
 ) : ViewModel() {
 
     val prefs: StateFlow<NotificationPrefs> = notificationPrefs.flow.stateIn(
@@ -100,6 +101,37 @@ class SettingsViewModel(
         _showLogoutDialog.value = false
     }
 
+    /** Null: no dialog. Otherwise the dialog shows, with [DeleteAccountUi.error] if the delete failed. */
+    private val _deleteAccount = MutableStateFlow<DeleteAccountUi?>(null)
+    val deleteAccount: StateFlow<DeleteAccountUi?> = _deleteAccount.asStateFlow()
+
+    fun beginDeleteAccount() {
+        _deleteAccount.value = DeleteAccountUi()
+    }
+
+    fun confirmDeleteAccount() {
+        val current = _deleteAccount.value ?: return
+        if (current.isDeleting) return
+        val action = deleteAccountAction ?: return
+        viewModelScope.launch {
+            _deleteAccount.value = current.copy(isDeleting = true, error = null)
+            val result = action()
+            if (result.isSuccess) {
+                _deleteAccount.value = null
+                onSignOutComplete()
+            } else {
+                _deleteAccount.value = DeleteAccountUi(
+                    error = "Could not delete the account. Check your connection, and try again.",
+                )
+            }
+        }
+    }
+
+    fun dismissDeleteAccount() {
+        if (_deleteAccount.value?.isDeleting == true) return
+        _deleteAccount.value = null
+    }
+
     private fun update(block: suspend () -> Unit) {
         viewModelScope.launch {
             block()
@@ -117,3 +149,8 @@ class SettingsViewModel(
         }
     }
 }
+
+data class DeleteAccountUi(
+    val isDeleting: Boolean = false,
+    val error: String? = null,
+)

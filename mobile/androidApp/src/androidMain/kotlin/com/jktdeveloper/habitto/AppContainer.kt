@@ -72,6 +72,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import com.habittracker.domain.model.WantTimerState
 import com.habittracker.domain.model.TodaySection
 import com.habittracker.domain.model.readySections
 import kotlinx.coroutines.flow.Flow
@@ -427,6 +428,26 @@ class AppContainer(context: Context) {
             }
             refreshAuthState()
         }
+    }
+
+    /**
+     * Settings-screen account deletion (Play requires it). Deletes the account and its
+     * rows on the server, then the session and the local rows. If the server call fails,
+     * nothing changes, and the caller shows the error.
+     */
+    suspend fun deleteAccountFromSettings(): Result<Unit> = runCatching {
+        check(isAuthenticated()) { "Not signed in" }
+        val userId = currentUserId()
+        serverSessionEnd.ownSignOut {
+            authRepository.deleteAccount().getOrThrow()
+            // A running timer would spend the points of a user that no longer exists.
+            wantTimerRepository.getActive(userId)?.let {
+                wantTimerRepository.setState(it.id, WantTimerState.CANCELLED)
+            }
+            wantTimerController.signalServiceStop()
+            clearAuthenticatedUserData(userId)
+        }
+        refreshAuthState()
     }
 
     suspend fun clearAuthenticatedUserData(authUserId: String) {
