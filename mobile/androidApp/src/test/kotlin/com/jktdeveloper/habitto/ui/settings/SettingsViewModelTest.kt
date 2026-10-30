@@ -92,4 +92,43 @@ class SettingsViewModelTest {
 
         assertEquals("Off", SettingsViewModel.summarize(prefs(false, types.associateWith { true })))
     }
+
+    @Test
+    fun `a failed delete keeps the dialog with an error, and a retry that works completes`() = runBlocking {
+        val prefs = NotificationPreferences(context)
+        val scheduler = NotificationScheduler(context, prefs)
+        var calls = 0
+        var completed = 0
+        val vm = SettingsViewModel(
+            prefs, scheduler,
+            onSignOutComplete = { completed++ },
+            deleteAccountAction = {
+                calls++
+                if (calls == 1) Result.failure(RuntimeException("offline")) else Result.success(Unit)
+            },
+        )
+
+        vm.beginDeleteAccount()
+        vm.confirmDeleteAccount()
+        assertEquals(false, vm.deleteAccount.value?.isDeleting)
+        assertEquals(true, vm.deleteAccount.value?.error != null)
+        assertEquals(0, completed)
+
+        vm.confirmDeleteAccount()
+        assertEquals(null, vm.deleteAccount.value)
+        assertEquals(1, completed)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `dismiss closes the delete dialog without a delete`() {
+        val prefs = NotificationPreferences(context)
+        val vm = SettingsViewModel(
+            prefs, NotificationScheduler(context, prefs),
+            deleteAccountAction = { error("must not run") },
+        )
+        vm.beginDeleteAccount()
+        vm.dismissDeleteAccount()
+        assertEquals(null, vm.deleteAccount.value)
+    }
 }

@@ -1,5 +1,7 @@
 package com.jktdeveloper.habitto.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
@@ -29,12 +32,15 @@ import com.jktdeveloper.habitto.ui.components.SettingsGroup
 import com.jktdeveloper.habitto.ui.theme.FlameOrange
 import com.jktdeveloper.habitto.ui.theme.FlameOrangeDark
 
+private const val PRIVACY_POLICY_URL = "https://habitto.jokot.dev/privacy-policy"
+
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     isAuthenticated: Boolean,
     accountEmail: String?,
     onSignOut: () -> Unit,
+    onDeleteAccount: () -> Unit,
     onSignIn: () -> Unit,
     onBack: () -> Unit,
     onOpenNotificationsSettings: (() -> Unit)? = null,
@@ -109,6 +115,15 @@ fun SettingsScreen(
                         leadingColor = MaterialTheme.colorScheme.error,
                         onClick = onSignOut,
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingsRow(
+                        title = "Delete account",
+                        supporting = "Deletes your account and all your data",
+                        titleColor = MaterialTheme.colorScheme.error,
+                        leading = Icons.Default.DeleteForever,
+                        leadingColor = MaterialTheme.colorScheme.error,
+                        onClick = onDeleteAccount,
+                    )
                 } else {
                     SettingsRow(
                         title = "Sign in to sync",
@@ -148,7 +163,13 @@ fun SettingsScreen(
                             modifier = Modifier.size(18.dp),
                         )
                     },
-                    onClick = { /* TODO open privacy URL */ },
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)),
+                            )
+                        }
+                    },
                 )
             }
 

@@ -45,6 +45,11 @@ class FakeAuthRepository(
         return Result.success(Unit)
     }
 
+    override suspend fun deleteAccount(): Result<Unit> {
+        session = null
+        return Result.success(Unit)
+    }
+
     override suspend fun tryRefreshSession(): Result<Unit> {
         if (session == null) return Result.failure(IllegalStateException("No session"))
         return if (refreshSucceeds) Result.success(Unit)
